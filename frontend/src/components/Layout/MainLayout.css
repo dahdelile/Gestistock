@@ -1,0 +1,391 @@
+/* src/components/Layout/MainLayout.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+
+/* --- BASE --- */
+.emonsite-layout {
+    min-height: 100vh;
+    background-color: #f8fafc;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Police Arabe */
+[dir="rtl"] .emonsite-layout {
+    font-family: 'Cairo', sans-serif;
+}
+
+/* --- HEADER FLOTTANT (Pleine Largeur) --- */
+.floating-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 20px;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.header-container {
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    width: 100%;
+    height: 90px; /* Taille augmentée */
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.02);
+    border: 1px solid #f1f5f9;
+    pointer-events: auto;
+    gap: 24px;
+}
+
+/* Logo */
+.brand-logo {
+    font-size: 2.6rem;
+    font-weight: 800;
+    cursor: pointer;
+    letter-spacing: -0.5px;
+    white-space: nowrap;
+    direction: ltr; /* Force le logo en LTR même en arabe */
+}
+.logo-text { color: #1e293b; }
+.logo-highlight { color: #f97316; }
+
+/* Navigation */
+.modern-nav {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    justify-content: space-between;
+    height: 100%;
+}
+
+.nav-list {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex-grow: 1;
+    justify-content: center;
+    height: 100%;
+}
+
+/* Boutons du menu */
+/* Remplacez le bloc .nav-btn existant par celui-ci */
+.nav-btn {
+    background: transparent;
+    border: none;
+    padding: 12px 22px; /* J'ai légèrement augmenté le padding pour aérer */
+    font-size: 25px; /* <--- TAILLE AUGMENTÉE ICI */
+    font-weight: 600;
+    color: #64748b;
+    border-radius: 999px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.nav-btn:hover {
+    color: #1e293b;
+    background-color: #f1f5f9;
+}
+
+/* Effet Pilule Bleue */
+.nav-btn.active-pill, .nav-btn.active {
+    background-color: #eff6ff;
+    color: #2563eb;
+}
+.nav-btn.text-blue {
+    color: #2563eb;
+}
+
+.arrow {
+    font-size: 20px;
+    transition: transform 0.2s ease;
+}
+.arrow.open {
+    transform: rotate(180deg);
+}
+
+/* --- MEGA MENU (Dropdown) --- */
+.nav-dropdown-container {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.mega-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08), 0 0 0 1px #f1f5f9;
+    padding: 20px;
+    min-width: 550px;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+    direction: rtl; /* Les textes du menu restent en arabe */
+    text-align: right;
+}
+
+.mega-menu.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+}
+
+.mega-menu-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+}
+
+.mega-menu-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.mega-menu-item:hover, .mega-menu-item.active {
+    background-color: #f8fafc;
+}
+
+.mega-menu-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 18px;
+    background-color: #f1f5f9;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    flex-shrink: 0;
+}
+
+.mega-menu-item:hover .mega-menu-icon {
+    background-color: #eff6ff;
+    color: #2563eb;
+}
+
+.mega-menu-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mega-title {
+    font-size: 23px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.mega-desc {
+    font-size: 22px;
+    color: #64748b;
+}
+
+/* --- ACTIONS À DROITE --- */
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    white-space: nowrap;
+}
+
+/* Bouton Langue */
+.lang-toggle-btn {
+    background: #f1f5f9;
+    color: #475569;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.lang-toggle-btn:hover {
+    background: #e2e8f0;
+}
+
+.notif-icon {
+    position: relative;
+    cursor: pointer;
+    color: #64748b;
+    font-size: 1.8rem;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+.notif-icon:hover { background-color: #f1f5f9; }
+
+.dot {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 8px;
+    height: 8px;
+    background-color: #ef4444;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+}
+
+.logout-btn {
+    background: #1e293b;
+    color: #ffffff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.logout-btn:hover { background: #0f172a; }
+
+/* --- CONTENU PRINCIPAL --- */
+.main-content-emonsite {
+    padding-top: 120px;
+    padding-left: 32px;
+    padding-right: 32px;
+    padding-bottom: 32px;
+    width: 100%;
+    min-height: 100vh;
+}
+
+/* --- RESPONSIVE MOBILE --- */
+.mobile-toggle {
+    display: none;
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    color: #1e293b;
+    cursor: pointer;
+}
+
+@media (max-width: 1200px) {
+    .nav-btn { padding: 8px 12px; font-size: 14px; }
+    .header-container { height: 70px; padding: 0 20px; }
+    .brand-logo { font-size: 1.4rem; }
+}
+
+@media (max-width: 1024px) {
+    .mobile-toggle { display: block; }
+    
+    .modern-nav {
+        position: absolute;
+        top: 90px;
+        left: 16px;
+        right: 16px;
+        background: white;
+        flex-direction: column;
+        border-radius: 20px;
+        padding: 16px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: all 0.2s;
+        max-height: calc(100vh - 110px);
+        overflow-y: auto;
+    }
+    
+    .modern-nav.mobile-open {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+        display: flex;
+    }
+
+    .nav-list { 
+        flex-direction: column; 
+        width: 100%; 
+        align-items: stretch; 
+        gap: 8px;
+    }
+    
+    .nav-btn { 
+        width: 100%; 
+        justify-content: space-between; 
+        padding: 12px 16px; 
+        font-size: 16px;
+    }
+    
+    .mega-menu {
+        position: static;
+        min-width: 100%;
+        box-shadow: none;
+        border: 1px solid #f1f5f9;
+        transform: none;
+        padding: 12px;
+        display: none;
+        margin-top: 8px;
+    }
+    
+    .mega-menu.show { display: block; }
+    .mega-menu-grid { grid-template-columns: 1fr; }
+    
+    .nav-actions {
+        flex-direction: row;
+        justify-content: space-between;
+        width: 100%;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid #f1f5f9;
+    }
+}
+
+/* =========================================
+   AJUSTEMENTS POUR L'ARABE (RTL)
+   ========================================= */
+
+/* Inverse l'ordre dans la barre pour que le logo reste à gauche et les boutons à droite */
+[dir="rtl"] .header-container {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .nav-list {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .nav-actions {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .modern-nav {
+    flex-direction: row-reverse;
+}
+
+/* Corrige la flèche du menu déroulant en arabe */
+[dir="rtl"] .mega-menu {
+    direction: rtl;
+}
+
+/* Positionne le Mega Menu correctement sous le bouton */
+[dir="rtl"] .mega-menu-item {
+    text-align: right;
+}

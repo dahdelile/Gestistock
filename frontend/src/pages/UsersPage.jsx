@@ -280,7 +280,7 @@ const cur = t.currency;
         .ep-page * { box-sizing: border-box; }
         
         .ep-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
-        .ep-title h1 { margin: 0 0 8px 0; font-size: 28oldimnpx; font-weight: 800; display: flex; align-items: center; gap: 12px; }
+        .ep-title h1 { margin: 0 0 8px 0; font-size: 28px; font-weight: 800; display: flex; align-items: center; gap: 12px; }
         .ep-title p { margin: 0; color: var(--muted); font-size: 19px; }
         
         .ep-btn-add { background: var(--primary); color: white; border: none; border-radius: 10px; padding: 12px 20px; font-weight: 600; font-size: 19px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; box-shadow: 0 4px 12px rgba(31,94,234,0.2); }

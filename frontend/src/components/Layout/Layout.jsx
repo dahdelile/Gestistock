@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './MainLayout.css';
 import { useLanguage } from '../../context/LanguageContext';
-
+import { supabase } from '../../supabaseClient';
 // Dictionnaire de traduction (défini hors du composant : créé une seule fois)
 const i18n = {
     ar: {
@@ -86,7 +86,19 @@ const MainLayout = ({ children }) => {
     // Langue GLOBALE : partagée avec toutes les pages (plus d'état local ici)
     const { lang, setLang } = useLanguage();
     const t = i18n[lang];
+const handleLogout = async () => {
+    try {
+        const { error } = await supabase.auth.signOut();
 
+        if (error) {
+            console.error('Erreur de déconnexion:', error);
+        }
+    } finally {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login', { replace: true });
+    }
+};
     useEffect(() => {
         const handleResize = () => {
             const mobile = window.innerWidth <= 1024;
@@ -283,10 +295,9 @@ const MainLayout = ({ children }) => {
                                 <i className="fas fa-bell"></i>
                                 <span className="dot"></span>
                             </div>
-
-                            <button className="logout-btn" onClick={() => { localStorage.removeItem('token'); navigate('/login'); }}>
-                                {t.logout}
-                            </button>
+<button className="logout-btn" onClick={handleLogout}>
+    {t.logout}
+</button>
                         </div>
                     </nav>
                 </div>

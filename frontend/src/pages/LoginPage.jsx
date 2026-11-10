@@ -143,35 +143,75 @@ const LoginPage = () => {
     try { localStorage.setItem(LANG_KEY, newLang); } catch {}
   };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    if (!email.trim() || !password) {
-      return setError(t.required);
+ 
+const handleLogin = async (e) => {
+  e.preventDefault();
+
+  if (!email.trim() || !password) {
+    setError(t.required);
+    return;
+  }
+
+  setLoading(true);
+  setError('');
+
+  try {
+    // 1. Authentification sécurisée avec Supabase
+    const { data, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+    if (authError) throw authError;
+
+    if (!data.user || !data.session) {
+      throw new Error('Session introuvable');
     }
 
-    setLoading(true);
-    setError('');
+    // 2. Récupérer le profil de l'utilisateur
+    const { data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('id, name, email, role, status')
+      .ilike('email', email.trim())
+      .maybeSingle();
 
-    try {
-      const { data: user, error: dbError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email.trim())
-        .single();
+    if (profileError) throw profileError;
 
-      if (dbError || !user) throw new Error('Utilisateur introuvable');
-      if (user.password !== password) throw new Error('Mot de passe incorrect');
-
-      localStorage.setItem('token', 'session-ok');
-      localStorage.setItem('user', JSON.stringify(user));
-      navigate('/dashboard');
-    } catch (err) {
-      console.error('Erreur de connexion:', err.message);
-      setError(t.error);
-    } finally {
-      setLoading(false);
+    if (!profile) {
+      await supabase.auth.signOut();
+      throw new Error('Profil utilisateur introuvable');
     }
-  };
+
+    // 3. Vérifier le statut
+    if (profile.status !== 'active') {
+      await supabase.auth.signOut();
+      throw new Error('Compte désactivé');
+    }
+
+    // 4. Enregistrer la vraie session
+    localStorage.setItem('token', data.session.access_token);
+    localStorage.setItem('user', JSON.stringify(profile));
+
+    // 5. Ouvrir le tableau de bord
+    navigate('/dashboard', { replace: true });
+
+  } catch (err) {
+    console.error('Erreur de connexion:', err);
+
+    setError(
+      err.message === 'Invalid login credentials'
+        ? t.error
+        : err.message === 'Compte désactivé'
+          ? 'Votre compte est désactivé.'
+          : err.message === 'Profil utilisateur introuvable'
+            ? 'Profil utilisateur introuvable.'
+            : t.error
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="lp" dir={t.dir} lang={lang}>

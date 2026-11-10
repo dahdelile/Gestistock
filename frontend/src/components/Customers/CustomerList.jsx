@@ -287,7 +287,8 @@ const t = I18N[lang];
     <div className="expenses-page" dir={t.dir} lang={lang}>
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
       <style>{`
-       
+   
+
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
 
 .expenses-page {

@@ -51,6 +51,7 @@
     ]
   },
   "devDependencies": {
-    "@craco/craco": "^7.1.0"
+    "@craco/craco": "^7.1.0",
+    "wrangler": "^4.160.0"
   }
 }

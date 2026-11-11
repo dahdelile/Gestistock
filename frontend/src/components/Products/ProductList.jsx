@@ -1,9 +1,10 @@
 // src/pages/ProductsPage.jsx
-// Version bilingue Français / العربية (RTL) — design unifié ExpensesPage
+// Version bilingue Français / العربية (RTL) — typographie responsive + sous-catégories
 import React, { useState, useEffect, useMemo } from 'react';
 import { productsApi, categoriesApi, suppliersApi } from '../../api';
 import BarcodeScanner from './BarcodeScanner';
 import { useLanguage } from '../../context/LanguageContext';
+
 /* =========================================================
    TRADUCTIONS / الترجمة
 ========================================================= */
@@ -24,7 +25,7 @@ const I18N = {
     stat_out: 'Rupture',
     stat_out_sub: 'Produits indisponibles',
     stat_value: 'Valeur du stock',
-    stat_value_sub: 'Prix d\'achat × quantité',
+    stat_value_sub: "Prix d'achat × quantité",
     filters_title: 'Recherche et filtres',
     filters_sub: 'Retrouvez rapidement un produit dans votre inventaire.',
     reset: 'Réinitialiser',
@@ -32,6 +33,8 @@ const I18N = {
     scan: 'Scanner un code-barres',
     category: 'Catégorie',
     all_categories: 'Toutes',
+    subcategory: 'Sous-catégorie',
+    all_subcategories: 'Toutes',
     status: 'État',
     all_status: 'Tous les états',
     neuf: 'Neuf',
@@ -44,7 +47,7 @@ const I18N = {
     results: 'Résultats',
     results_count: (n) => `${n} produit(s)`,
     inventory: 'Inventaire des produits',
-    inventory_sub: 'Consultez et modifiez les informations de chaque article.',
+    inventory_sub: "Consultez et modifiez les informations de chaque article.",
     th_product: 'Produit',
     th_category: 'Catégorie',
     th_status: 'État',
@@ -71,6 +74,8 @@ const I18N = {
     f_name_ph: 'Ex. : Ordinateur portable',
     f_category: 'Catégorie',
     f_category_ph: 'Sélectionner',
+    f_subcategory: 'Sous-catégorie',
+    f_subcategory_ph: 'Sélectionner (facultatif)',
     f_barcode: 'Code-barres',
     f_barcode_ph: 'Référence',
     f_status: 'État du produit',
@@ -127,6 +132,8 @@ const I18N = {
     scan: 'مسح الباركود',
     category: 'الفئة',
     all_categories: 'الكل',
+    subcategory: 'الفئة الفرعية',
+    all_subcategories: 'الكل',
     status: 'الحالة',
     all_status: 'كل الحالات',
     neuf: 'جديد',
@@ -166,6 +173,8 @@ const I18N = {
     f_name_ph: 'مثال: حاسوب محمول',
     f_category: 'الفئة',
     f_category_ph: 'اختر',
+    f_subcategory: 'الفئة الفرعية',
+    f_subcategory_ph: 'اختر (اختياري)',
     f_barcode: 'الباركود',
     f_barcode_ph: 'المرجع',
     f_status: 'حالة المنتج',
@@ -201,8 +210,6 @@ const I18N = {
   },
 };
 
-
-
 /* =========================================================
    UTILITAIRES
 ========================================================= */
@@ -210,6 +217,7 @@ const I18N = {
 const emptyForm = () => ({
   name: '',
   category: '',
+  subcategory: '',
   barcode: '',
   status: 'neuf',
   purchase_price: '',
@@ -218,8 +226,6 @@ const emptyForm = () => ({
   min_quantity: 5,
   supplier_id: '',
 });
-
-const pad = (n) => String(n).padStart(2, '0');
 
 const formatMoney = (value, cur = 'UM') => {
   const n = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(Number(value) || 0);
@@ -239,6 +245,12 @@ const getCategoryName = (product) => {
   if (product.categories && typeof product.categories === 'object') return product.categories.name || '';
   if (product.category && typeof product.category === 'object') return product.category.name || '';
   return typeof product.category === 'string' ? product.category : '';
+};
+
+const getSubcategoryName = (product) => {
+  if (product.subcategories && typeof product.subcategories === 'object') return product.subcategories.name || '';
+  if (product.subcategory && typeof product.subcategory === 'object') return product.subcategory.name || '';
+  return typeof product.subcategory === 'string' ? product.subcategory : '';
 };
 
 const getStockStatus = (quantity, minimum) => {
@@ -262,10 +274,10 @@ const toneFor = (name = '') => {
 
 const ProductsPage = () => {
   const { lang } = useLanguage(); // langue globale (menu)
-const t = I18N[lang];
-  
+  const t = I18N[lang];
+
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [categoriesFull, setCategoriesFull] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
 
   const [stats, setStats] = useState({ total: 0, low: 0, out: 0, value: 0 });
@@ -280,6 +292,7 @@ const t = I18N[lang];
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterSubcategory, setFilterSubcategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterStock, setFilterStock] = useState('all');
 
@@ -296,6 +309,32 @@ const t = I18N[lang];
   const [sortDir, setSortDir] = useState('asc');
 
   const cur = t.currency;
+
+  /* ---------- Catégories / sous-catégories ---------- */
+  // Catégories principales (sans parent)
+  const mainCategories = useMemo(
+    () => categoriesFull.filter((c) => !c.parent_id),
+    [categoriesFull]
+  );
+  const categories = useMemo(() => mainCategories.map((c) => c.name), [mainCategories]);
+
+  // Sous-catégories d'une catégorie : via parent_id OU via subcategories/children imbriquées
+  const getSubcategories = (categoryName) => {
+  const main = categoriesFull.find((c) => c.name === categoryName);
+  return (main?.sous_categories || [])
+    .filter((s) => s.status !== 'inactive')
+    .map((s) => s.name);
+};
+  const formSubcategories = useMemo(
+    () => getSubcategories(formData.category),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [formData.category, mainCategories, categoriesFull]
+  );
+  const filterSubcategories = useMemo(
+    () => (filterCategory === 'all' ? [] : getSubcategories(filterCategory)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filterCategory, mainCategories, categoriesFull]
+  );
 
   /* ---------- Chargements ---------- */
   const fetchProducts = async () => {
@@ -330,7 +369,7 @@ const t = I18N[lang];
   const fetchCategories = async () => {
     try {
       const response = await categoriesApi.getAll();
-      setCategories(getRows(response).map((c) => c.name).filter(Boolean));
+      setCategoriesFull(getRows(response).filter((c) => c && c.name));
     } catch (err) {
       console.warn('Catégories indisponibles :', err);
     }
@@ -396,6 +435,7 @@ const t = I18N[lang];
     setFormData({
       name: product.name || '',
       category: getCategoryName(product),
+      subcategory: getSubcategoryName(product),
       barcode: product.barcode || '',
       status: product.status || 'neuf',
       purchase_price: product.purchase_price ?? '',
@@ -421,6 +461,7 @@ const t = I18N[lang];
     try {
       const payload = {
         ...formData,
+        subcategory: formData.subcategory || null,
         purchase_price: Number(formData.purchase_price),
         sale_price: Number(formData.sale_price),
         quantity: Number.parseInt(formData.quantity, 10),
@@ -461,6 +502,7 @@ const t = I18N[lang];
     setSearch('');
     setDebouncedSearch('');
     setFilterCategory('all');
+    setFilterSubcategory('all');
     setFilterStatus('all');
     setFilterStock('all');
     setSortBy('name');
@@ -488,9 +530,11 @@ const t = I18N[lang];
         const name = String(product.name || '').toLocaleLowerCase('fr');
         const barcode = String(product.barcode || '').toLocaleLowerCase('fr');
         const category = getCategoryName(product);
+        const subcategory = getSubcategoryName(product);
 
         const matchSearch = !q || name.includes(q) || barcode.includes(q);
         const matchCategory = filterCategory === 'all' || category === filterCategory;
+        const matchSubcategory = filterSubcategory === 'all' || subcategory === filterSubcategory;
         const matchStatus = filterStatus === 'all' || product.status === filterStatus;
 
         const qty = Number(product.quantity) || 0;
@@ -500,7 +544,7 @@ const t = I18N[lang];
         if (filterStock === 'low') matchStock = qty > 0 && qty <= min;
         if (filterStock === 'available') matchStock = qty > min;
 
-        return matchSearch && matchCategory && matchStatus && matchStock;
+        return matchSearch && matchCategory && matchSubcategory && matchStatus && matchStock;
       })
       .sort((a, b) => {
         let x;
@@ -517,7 +561,7 @@ const t = I18N[lang];
         if (x > y) cmp = 1;
         return sortDir === 'asc' ? cmp : -cmp;
       });
-  }, [products, debouncedSearch, filterCategory, filterStatus, filterStock, sortBy, sortDir]);
+  }, [products, debouncedSearch, filterCategory, filterSubcategory, filterStatus, filterStock, sortBy, sortDir]);
 
   const calculatedPrices = useMemo(() => {
     const quantity = Number(formData.quantity) || 0;
@@ -529,8 +573,6 @@ const t = I18N[lang];
       margin: quantity * (sale - purchase),
     };
   }, [formData.quantity, formData.purchase_price, formData.sale_price]);
-
-  const hasFilters = Boolean(debouncedSearch || filterCategory !== 'all' || filterStatus !== 'all' || filterStock !== 'all');
 
   /* =======================================================
      AFFICHAGE
@@ -556,13 +598,23 @@ const t = I18N[lang];
           --teal: #0e8fa8;      --teal-soft: #dcf3f8;
           --rose: #c2417c;      --rose-soft: #fbe6f0;
 
+          /* ===== Échelle typographique responsive ===== */
+          --fs-xs:  clamp(11px, 0.70vw + 9px,  13px);
+          --fs-sm:  clamp(12px, 0.75vw + 10px, 14px);
+          --fs-md:  clamp(13px, 0.80vw + 11px, 15px);
+          --fs-lg:  clamp(15px, 0.90vw + 12px, 18px);
+          --fs-xl:  clamp(17px, 1.00vw + 13px, 21px);
+          --fs-2xl: clamp(20px, 1.80vw + 14px, 28px);
+
           min-height: 100vh;
-          padding: clamp(14px, 2.2vw, 28px);
+          padding: clamp(12px, 2.2vw, 28px);
           background: radial-gradient(1000px 340px at 100% -80px, rgba(31,94,234,.08), transparent 70%), var(--bg);
           color: var(--ink);
+          font-size: var(--fs-md);
           font-family: Inter, 'Segoe UI', system-ui, Tahoma, Arial, sans-serif;
+          -webkit-text-size-adjust: 100%;
         }
-        .expenses-page[lang="ar"] { font-family: Cairo, 'Noto Sans Arabic', Tahoma, 'Segoe UI', Arial, sans-serif; }
+        .expenses-page[lang="ar"] { font-family: Cairo, 'Noto Sans Arabic', Tahoma, 'Segoe UI', Arial, sans-serif; line-height: 1.6; }
         .expenses-page * { box-sizing: border-box; }
         .expenses-page button:focus-visible, .expenses-page input:focus-visible,
         .expenses-page select:focus-visible, .expenses-page textarea:focus-visible {
@@ -573,42 +625,39 @@ const t = I18N[lang];
         /* ---------- En-tête ---------- */
         .ep-hero {
           position: relative; isolation: isolate; overflow: hidden;
-          display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px;
-          padding: clamp(20px, 3vw, 30px); margin-bottom: 20px; border-radius: 20px; color: #fff;
+          display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+          padding: clamp(16px, 3vw, 30px); margin-bottom: 20px; border-radius: 20px; color: #fff;
           background: linear-gradient(125deg, #0f2f66 0%, #1b55c9 58%, #2aa3d9 100%);
           box-shadow: 0 14px 32px rgba(21, 74, 170, .20);
         }
         .ep-hero::after { content: ""; position: absolute; z-index: -1; width: 250px; height: 250px; inset-inline-end: -70px; top: -115px; border: 32px solid rgba(255,255,255,.09); border-radius: 50%; }
-        .ep-eyebrow { font-size: 24px; font-weight: 800; letter-spacing: 1.8px; opacity: .78; }
-        .ep-title h1 { margin: 6px 0 4px; font-size: clamp(22px, 2.8vw, 30px); font-weight: 800; display: flex; align-items: center; gap: 12px; line-height: 1.25; }
-        .ep-title-icon { display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: rgba(255,255,255,.16); font-size: 24px; }
-        .ep-title p { margin: 0; color: rgba(255,255,255,.82); font-size: 21px; }
+        .ep-eyebrow { font-size: var(--fs-xs); font-weight: 800; letter-spacing: 1.8px; opacity: .78; }
+        .ep-title h1 { margin: 6px 0 4px; font-size: var(--fs-2xl); font-weight: 800; display: flex; align-items: center; gap: 12px; line-height: 1.25; }
+        .ep-title-icon { display: inline-grid; place-items: center; flex: 0 0 auto; width: clamp(34px, 4vw, 42px); height: clamp(34px, 4vw, 42px); border-radius: 12px; background: rgba(255,255,255,.16); font-size: var(--fs-lg); }
+        .ep-title p { margin: 0; color: rgba(255,255,255,.82); font-size: var(--fs-md); }
         .ep-hero-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .ep-lang { display: inline-flex; padding: 3px; border-radius: 11px; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.25); }
-        .ep-lang button { border: 0; padding: 7px 12px; border-radius: 8px; background: transparent; color: #fff; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; }
-        .ep-lang button.on { background: #fff; color: #153f92; }
-        .ep-btn-add { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border: 0; border-radius: 11px; background: #fff; color: #174078; font: inherit; font-weight: 800; font-size: 18px; cursor: pointer; box-shadow: 0 6px 16px rgba(0,0,0,.14); transition: .18s; }
+        .ep-btn-add { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border: 0; border-radius: 11px; background: #fff; color: #174078; font: inherit; font-weight: 800; font-size: var(--fs-md); cursor: pointer; box-shadow: 0 6px 16px rgba(0,0,0,.14); transition: .18s; }
         .ep-btn-add:hover { transform: translateY(-2px); }
-        .ep-btn-ghost { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid rgba(255,255,255,.45); border-radius: 11px; background: rgba(255,255,255,.10); color: #fff; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; transition: .18s; }
+        .ep-btn-ghost { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid rgba(255,255,255,.45); border-radius: 11px; background: rgba(255,255,255,.10); color: #fff; font: inherit; font-size: var(--fs-sm); font-weight: 800; cursor: pointer; transition: .18s; }
         .ep-btn-ghost:hover { background: rgba(255,255,255,.2); }
 
         /* ---------- Alerte / succès ---------- */
-        .ep-alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid #f6c8cd; border-radius: 11px; background: var(--red-soft); color: #a3212e; font-size: 13px; }
-        .ep-alert button { border: 0; padding: 7px 12px; border-radius: 8px; background: #fff; color: #a3212e; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
-        .ep-success { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid #bfe8d9; border-radius: 11px; background: var(--green-soft); color: #0b6a4e; font-size: 13px; }
-        .ep-success button { border: 0; padding: 7px 12px; border-radius: 8px; background: #fff; color: #0b6a4e; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+        .ep-alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid #f6c8cd; border-radius: 11px; background: var(--red-soft); color: #a3212e; font-size: var(--fs-sm); }
+        .ep-alert button { border: 0; padding: 7px 12px; border-radius: 8px; background: #fff; color: #a3212e; font: inherit; font-size: var(--fs-xs); font-weight: 800; cursor: pointer; }
+        .ep-success { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid #bfe8d9; border-radius: 11px; background: var(--green-soft); color: #0b6a4e; font-size: var(--fs-sm); }
+        .ep-success button { border: 0; padding: 7px 12px; border-radius: 8px; background: #fff; color: #0b6a4e; font: inherit; font-size: var(--fs-xs); font-weight: 800; cursor: pointer; }
 
         /* ---------- Statistiques ---------- */
         .ep-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
-        .ep-card { position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 20px; background: var(--card); border: 1px solid var(--line); border-inline-start: 4px solid var(--accent); border-radius: 16px; box-shadow: 0 4px 14px rgba(20,33,61,.04); transition: transform .2s, box-shadow .2s; }
+        .ep-card { position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: clamp(14px, 1.8vw, 20px); background: var(--card); border: 1px solid var(--line); border-inline-start: 4px solid var(--accent); border-radius: 16px; box-shadow: 0 4px 14px rgba(20,33,61,.04); transition: transform .2s, box-shadow .2s; }
         .ep-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(20,33,61,.08); }
         .ep-card::after { content: ""; position: absolute; inset-inline-end: -30px; bottom: -42px; width: 105px; height: 105px; border-radius: 50%; background: var(--accent-soft); opacity: .7; }
         .ep-card-info { position: relative; z-index: 1; min-width: 0; }
-        .ep-card-info h3 { margin: 0 0 9px; font-size: 20px; color: var(--muted); font-weight: 800; }
-        .ep-card-info .value { font-size: clamp(20px, 2vw, 26px); font-weight: 800; letter-spacing: -.3px; color: var(--ink); overflow-wrap: anywhere; }
-        .ep-card-info .value small { font-size: 12px; color: #8896ab; font-weight: 700; }
-        .ep-card-info .sub { margin-top: 5px; font-size: 20px; color: var(--accent); font-weight: 700; }
-        .ep-icon { position: relative; z-index: 1; flex: 0 0 44px; width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; font-size: 19px; background: var(--accent-soft); color: var(--accent); }
+        .ep-card-info h3 { margin: 0 0 8px; font-size: var(--fs-sm); color: var(--muted); font-weight: 800; }
+        .ep-card-info .value { font-size: var(--fs-2xl); font-weight: 800; letter-spacing: -.3px; color: var(--ink); overflow-wrap: anywhere; line-height: 1.2; }
+        .ep-card-info .value small { font-size: var(--fs-xs); color: #8896ab; font-weight: 700; }
+        .ep-card-info .sub { margin-top: 5px; font-size: var(--fs-xs); color: var(--accent); font-weight: 700; }
+        .ep-icon { position: relative; z-index: 1; flex: 0 0 auto; width: clamp(36px, 3.5vw, 44px); height: clamp(36px, 3.5vw, 44px); border-radius: 13px; display: grid; place-items: center; font-size: var(--fs-lg); background: var(--accent-soft); color: var(--accent); }
         .tone-blue   { --accent: var(--primary); --accent-soft: var(--primary-soft); }
         .tone-amber  { --accent: var(--amber);  --accent-soft: var(--amber-soft); }
         .tone-violet { --accent: var(--violet); --accent-soft: var(--violet-soft); }
@@ -619,29 +668,31 @@ const t = I18N[lang];
         /* ---------- Panneau & filtres ---------- */
         .ep-panel { background: var(--card); border-radius: 16px; border: 1px solid var(--line); overflow: hidden; box-shadow: 0 4px 14px rgba(20,33,61,.035); }
         .ep-panel-head { padding: 16px 20px; border-bottom: 1px solid var(--line); background: #fbfcff; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
-        .ep-panel-head h5 { margin: 0 0 4px; font-size: 21px; font-weight: 800; color: var(--ink); }
-        .ep-panel-head p { margin: 0; font-size: 20px; color: var(--muted); }
-        .ep-panel-head .badge-count { background: var(--primary-soft); color: var(--primary); font-weight: 800; padding: 7px 12px; border-radius: 999px; font-size: 20px; }
-        .ep-filters { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr auto; gap: 10px; align-items: end; padding: 15px 20px; background: #fbfcff; border-bottom: 1px solid var(--line); }
+        .ep-panel-head h5 { margin: 0 0 4px; font-size: var(--fs-lg); font-weight: 800; color: var(--ink); }
+        .ep-panel-head p { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
+        .ep-panel-head .badge-count { background: var(--primary-soft); color: var(--primary); font-weight: 800; padding: 6px 12px; border-radius: 999px; font-size: var(--fs-sm); }
+        .ep-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; padding: 15px 20px; background: #fbfcff; border-bottom: 1px solid var(--line); }
+        .ep-filters .ep-fg-search { grid-column: span 2; }
         .ep-fg { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-        .ep-fg label { font-size: 19px; font-weight: 800; color: #4b5b75; text-transform: uppercase; letter-spacing: .4px; }
-        .ep-filter-input { width: 100%; height: 40px; border: 1px solid #d9e1ed; border-radius: 9px; padding: 0 12px; font: inherit; font-size: 18px; color: #2a3a55; background: #fff; outline: none; }
+        .ep-fg label { font-size: var(--fs-xs); font-weight: 800; color: #4b5b75; text-transform: uppercase; letter-spacing: .4px; }
+        .ep-filter-input { width: 100%; height: 42px; border: 1px solid #d9e1ed; border-radius: 9px; padding: 0 12px; font: inherit; font-size: max(16px, var(--fs-md)); color: #2a3a55; background: #fff; outline: none; }
         .ep-filter-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
         .ep-search-input-group { display: flex; }
         .ep-search-input-group .ep-filter-input { border-start-end-radius: 0; border-end-end-radius: 0; border-inline-end: 0; }
-        .ep-search-btn { height: 40px; padding: 0 12px; border: 1px solid #d9e1ed; border-start-start-radius: 0; border-end-start-radius: 0; border-start-end-radius: 9px; border-end-end-radius: 9px; background: var(--primary-soft); color: var(--primary); cursor: pointer; font-size: 13px; }
+        .ep-search-btn { height: 42px; padding: 0 14px; border: 1px solid #d9e1ed; border-start-start-radius: 0; border-end-start-radius: 0; border-start-end-radius: 9px; border-end-end-radius: 9px; background: var(--primary-soft); color: var(--primary); cursor: pointer; font-size: var(--fs-md); }
         .ep-search-btn:hover { background: var(--primary); color: #fff; }
-        .ep-reset { height: 40px; padding: 0 13px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: #4b5b75; font: inherit; font-size: 18px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+        .ep-reset { height: 40px; padding: 0 13px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: #4b5b75; font: inherit; font-size: var(--fs-sm); font-weight: 800; cursor: pointer; white-space: nowrap; }
         .ep-reset:hover { background: #f1f5fb; }
+        .ep-results-box { height: 42px; display: flex; align-items: center; justify-content: center; background: var(--primary-soft); color: var(--primary); font-weight: 800; border-radius: 9px; font-size: var(--fs-sm); text-align: center; padding: 0 8px; }
 
         /* ---------- Tableau ---------- */
-        .ep-table-wrap { overflow-x: auto; }
+        .ep-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .ep-table { width: 100%; min-width: 1100px; border-collapse: collapse; }
-        .ep-table th { background: #f3f6fc; color: #5b6b85; text-align: start; padding: 14px 16px; font-size: 19px; font-weight: 800; letter-spacing: .4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-        .ep-table th .sort-btn { background: none; border: 0; padding: 0; font: inherit; font-size: 19px; font-weight: 800; color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; letter-spacing: .4px; text-transform: uppercase; }
-        .ep-table th .sort-btn i { font-size: 18px; opacity: .6; }
+        .ep-table th { background: #f3f6fc; color: #5b6b85; text-align: start; padding: 13px 14px; font-size: var(--fs-xs); font-weight: 800; letter-spacing: .4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+        .ep-table th .sort-btn { background: none; border: 0; padding: 0; font: inherit; font-size: var(--fs-xs); font-weight: 800; color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; letter-spacing: .4px; text-transform: uppercase; }
+        .ep-table th .sort-btn i { font-size: var(--fs-xs); opacity: .6; }
         .ep-table th .sort-btn i.on { opacity: 1; color: var(--primary); }
-        .ep-table td { padding: 13px 16px; border-bottom: 1px solid #f0f3f8; font-size: 20px; color: #44546d; vertical-align: middle; }
+        .ep-table td { padding: 12px 14px; border-bottom: 1px solid #f0f3f8; font-size: var(--fs-sm); color: #44546d; vertical-align: middle; }
         .ep-table tbody tr:nth-child(even) td { background: #fafbfe; }
         .ep-table tbody tr:hover td { background: #eff4ff; }
         .ep-table tr:last-child td { border-bottom: 0; }
@@ -653,11 +704,11 @@ const t = I18N[lang];
         @media (prefers-reduced-motion: reduce) { .ep-spinner { animation-duration: 2s; } .ep-card, .ep-btn-add { transition: none; } }
 
         .ep-prod-cell { display: flex; align-items: center; gap: 10px; }
-        .ep-prod-avatar { flex: 0 0 38px; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); font-size: 15px; }
-        .ep-prod-name { font-weight: 700; color: #2a3a55; }
-        .ep-prod-meta { font-size: 19px; color: var(--muted); margin-top: 2px; }
+        .ep-prod-avatar { flex: 0 0 38px; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); font-size: var(--fs-md); }
+        .ep-prod-name { font-weight: 700; color: #2a3a55; font-size: var(--fs-md); }
+        .ep-prod-meta { font-size: var(--fs-xs); color: var(--muted); margin-top: 2px; }
 
-        .ep-badge { display: inline-block; padding: 5px 11px; border-radius: 999px; font-size: 20px; font-weight: 800; white-space: nowrap; }
+        .ep-badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 800; white-space: nowrap; }
         .badge-blue   { background: var(--primary-soft); color: #164aba; }
         .badge-violet { background: var(--violet-soft);  color: #4a32b0; }
         .badge-green  { background: var(--green-soft);   color: #0b6a4e; }
@@ -669,8 +720,8 @@ const t = I18N[lang];
         .ep-money-purchase { color: #164aba; font-weight: 700; white-space: nowrap; }
         .ep-money-sale     { color: #0b6a4e; font-weight: 700; white-space: nowrap; }
 
-        .ep-actions { display: flex; gap: 6px; justify-content: flex-end; }
-        .btn-icon { width: 32px; height: 32px; border-radius: 8px; border: 1px solid transparent; display: grid; place-items: center; cursor: pointer; transition: .18s; background: transparent; color: #64748b; font-size: 12px; }
+        .ep-actions { display: flex; gap: 6px; justify-content: center; }
+        .btn-icon { width: 34px; height: 34px; border-radius: 8px; border: 1px solid transparent; display: grid; place-items: center; cursor: pointer; transition: .18s; background: transparent; color: #64748b; font-size: var(--fs-sm); }
         .btn-icon:hover { background: #eef2f8; }
         .btn-edit { background: var(--primary-soft); color: var(--primary); border-color: #c9daff; }
         .btn-edit:hover { background: var(--primary); color: #fff; }
@@ -678,41 +729,41 @@ const t = I18N[lang];
         .btn-delete:hover { background: var(--red); color: #fff; }
 
         /* ---------- Modales ---------- */
-        .ep-modal-overlay { position: fixed; inset: 0; z-index: 1050; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(15,23,42,.58); backdrop-filter: blur(4px); }
-        .ep-modal { width: 100%; max-width: 760px; max-height: calc(100vh - 40px); overflow: auto; background: #fff; border-radius: 18px; box-shadow: 0 25px 50px rgba(0,0,0,.22); }
+        .ep-modal-overlay { position: fixed; inset: 0; z-index: 1050; display: flex; align-items: center; justify-content: center; padding: clamp(10px, 2vw, 20px); background: rgba(15,23,42,.58); backdrop-filter: blur(4px); }
+        .ep-modal { width: 100%; max-width: 760px; max-height: calc(100vh - 24px); overflow: auto; background: #fff; border-radius: 18px; box-shadow: 0 25px 50px rgba(0,0,0,.22); }
         .ep-modal.small { max-width: 420px; }
-        .ep-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fbfcff, #fff); }
-        .ep-modal-header h3 { margin: 0; font-size: 17px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
-        .ep-modal-header .ep-modal-icon { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--primary-soft); color: var(--primary); font-size: 14px; }
-        .ep-modal-body { padding: 22px; }
-        .ep-modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 15px 22px; background: #f7f9fd; border-top: 1px solid var(--line); }
+        .ep-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fbfcff, #fff); }
+        .ep-modal-header h3 { margin: 0; font-size: var(--fs-lg); font-weight: 800; display: flex; align-items: center; gap: 10px; }
+        .ep-modal-header .ep-modal-icon { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--primary-soft); color: var(--primary); font-size: var(--fs-sm); }
+        .ep-modal-body { padding: clamp(14px, 2.5vw, 22px); }
+        .ep-modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; background: #f7f9fd; border-top: 1px solid var(--line); }
         .ep-modal-footer.center { justify-content: center; }
         .ep-form-group { margin-bottom: 15px; }
-        .ep-form-group label { display: block; margin-bottom: 6px; font-size: 20px; font-weight: 800; color: #4b5b75; }
-        .ep-form-group input, .ep-form-group select, .ep-form-group textarea { width: 100%; border: 1px solid #d9e1ed; border-radius: 9px; padding: 10px 12px; font: inherit; font-size: 14px; color: #2a3a55; background: #fbfcfe; outline: none; }
+        .ep-form-group label { display: block; margin-bottom: 6px; font-size: var(--fs-sm); font-weight: 800; color: #4b5b75; }
+        .ep-form-group input, .ep-form-group select, .ep-form-group textarea { width: 100%; border: 1px solid #d9e1ed; border-radius: 9px; padding: 10px 12px; font: inherit; font-size: max(16px, var(--fs-md)); color: #2a3a55; background: #fbfcfe; outline: none; }
         .ep-form-group input:focus, .ep-form-group select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); background: #fff; }
-        .ep-form-hint { display: block; margin-top: 4px; font-size: 19px; color: #8896ab; }
-        .ep-form-error { margin-bottom: 14px; padding: 11px 14px; border-radius: 9px; background: var(--red-soft); color: #a3212e; font-size: 13px; font-weight: 600; }
+        .ep-form-hint { display: block; margin-top: 4px; font-size: var(--fs-xs); color: #8896ab; }
+        .ep-form-error { margin-bottom: 14px; padding: 11px 14px; border-radius: 9px; background: var(--red-soft); color: #a3212e; font-size: var(--fs-sm); font-weight: 600; }
         .ep-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
         .ep-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
         @media (max-width: 720px) { .ep-grid3, .ep-grid2 { grid-template-columns: 1fr; } }
 
         .ep-barcode-group { display: flex; }
         .ep-barcode-group input { border-start-end-radius: 0; border-end-end-radius: 0; }
-        .ep-barcode-btn { padding: 0 12px; border: 1px solid #d9e1ed; border-inline-start: 0; border-start-end-radius: 9px; border-end-end-radius: 9px; background: var(--primary-soft); color: var(--primary); cursor: pointer; font-size: 13px; }
+        .ep-barcode-btn { padding: 0 14px; border: 1px solid #d9e1ed; border-inline-start: 0; border-start-end-radius: 9px; border-end-end-radius: 9px; background: var(--primary-soft); color: var(--primary); cursor: pointer; font-size: var(--fs-md); }
         .ep-barcode-btn:hover { background: var(--primary); color: #fff; }
 
         .ep-summary { margin-top: 16px; padding: 16px; border-radius: 13px; background: linear-gradient(120deg, #f2f7ff, #f8fbff); border: 1px solid #e0ebff; }
-        .ep-summary h6 { margin: 0 0 12px; font-size: 21px; font-weight: 800; color: #2a3a55; }
+        .ep-summary h6 { margin: 0 0 12px; font-size: var(--fs-md); font-weight: 800; color: #2a3a55; }
         .ep-summary .ep-summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
         @media (max-width: 560px) { .ep-summary .ep-summary-grid { grid-template-columns: 1fr; } }
-        .ep-summary .lbl { font-size: 19px; color: var(--muted); margin-bottom: 3px; }
-        .ep-summary .val { font-weight: 800; font-size: 23px; }
+        .ep-summary .lbl { font-size: var(--fs-xs); color: var(--muted); margin-bottom: 3px; }
+        .ep-summary .val { font-weight: 800; font-size: var(--fs-lg); }
         .ep-summary .val.buy { color: #164aba; }
         .ep-summary .val.sell { color: #0b6a4e; }
         .ep-summary .val.margin-negative { color: var(--red); }
 
-        .ep-btn { padding: 10px 20px; border-radius: 10px; border: 0; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; transition: .18s; }
+        .ep-btn { padding: 10px 20px; border-radius: 10px; border: 0; font: inherit; font-size: var(--fs-md); font-weight: 800; cursor: pointer; transition: .18s; }
         .ep-btn:hover:not(:disabled) { filter: brightness(.96); transform: translateY(-1px); }
         .ep-btn:disabled { opacity: .6; cursor: not-allowed; }
         .ep-btn-cancel { background: #e6ebf3; color: #44546d; }
@@ -720,20 +771,23 @@ const t = I18N[lang];
         .ep-btn-danger { background: var(--red); color: #fff; }
 
         .ep-delete-body { padding: 28px 22px 10px; text-align: center; }
-        .ep-delete-icon { display: inline-grid; place-items: center; width: 58px; height: 58px; margin-bottom: 14px; border-radius: 50%; background: var(--red-soft); color: var(--red); font-size: 24px; }
-        .ep-delete-body h4 { margin: 0 0 6px; font-size: 25px; font-weight: 800; }
-        .ep-delete-body p { margin: 0 0 10px; color: var(--muted); font-size: 20px; }
-        .ep-delete-name { background: #f7f9fd; border-radius: 9px; padding: 10px 14px; font-weight: 800; margin: 10px 0; }
+        .ep-delete-icon { display: inline-grid; place-items: center; width: 58px; height: 58px; margin-bottom: 14px; border-radius: 50%; background: var(--red-soft); color: var(--red); font-size: var(--fs-xl); }
+        .ep-delete-body h4 { margin: 0 0 6px; font-size: var(--fs-xl); font-weight: 800; }
+        .ep-delete-body p { margin: 0 0 10px; color: var(--muted); font-size: var(--fs-sm); }
+        .ep-delete-name { background: #f7f9fd; border-radius: 9px; padding: 10px 14px; font-weight: 800; font-size: var(--fs-md); margin: 10px 0; overflow-wrap: anywhere; }
 
-        @media (max-width: 1100px) { .ep-filters { grid-template-columns: 1fr 1fr 1fr; } .ep-filters .ep-fg-search { grid-column: 1 / -1; } }
+        /* ---------- Responsive ---------- */
         @media (max-width: 900px) { .ep-stats { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 700px) { .ep-filters { grid-template-columns: 1fr 1fr; } }
         @media (max-width: 560px) {
-          .expenses-page { padding: 12px; }
+          .expenses-page { padding: 10px; }
+          .ep-hero { border-radius: 16px; }
           .ep-filters { grid-template-columns: 1fr; padding: 14px; }
-          .ep-hero-actions { width: 100%; } .ep-btn-add, .ep-btn-ghost { flex: 1; justify-content: center; }
-          .ep-table th, .ep-table td { padding: 11px 12px; }
-          .ep-stats { grid-template-columns: 1fr; }
+          .ep-filters .ep-fg-search { grid-column: auto; }
+          .ep-hero-actions { width: 100%; }
+          .ep-btn-add, .ep-btn-ghost { flex: 1; justify-content: center; }
+          .ep-table th, .ep-table td { padding: 10px 11px; }
+          .ep-stats { grid-template-columns: 1fr; gap: 12px; }
+          .ep-modal-footer .ep-btn { flex: 1; }
         }
       `}</style>
 
@@ -749,7 +803,6 @@ const t = I18N[lang];
         </div>
 
         <div className="ep-hero-actions">
-          
           <button type="button" className="ep-btn-ghost" onClick={refreshData} disabled={loading}>
             <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`} /> {t.refresh}
           </button>
@@ -845,11 +898,31 @@ const t = I18N[lang];
 
           <div className="ep-fg">
             <label htmlFor="pp-cat">{t.category}</label>
-            <select id="pp-cat" className="ep-filter-input" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+            <select
+              id="pp-cat"
+              className="ep-filter-input"
+              value={filterCategory}
+              onChange={(e) => { setFilterCategory(e.target.value); setFilterSubcategory('all'); }}
+            >
               <option value="all">{t.all_categories}</option>
               {categories.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+
+          {filterSubcategories.length > 0 && (
+            <div className="ep-fg">
+              <label htmlFor="pp-subcat">{t.subcategory}</label>
+              <select
+                id="pp-subcat"
+                className="ep-filter-input"
+                value={filterSubcategory}
+                onChange={(e) => setFilterSubcategory(e.target.value)}
+              >
+                <option value="all">{t.all_subcategories}</option>
+                {filterSubcategories.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          )}
 
           <div className="ep-fg">
             <label htmlFor="pp-status">{t.status}</label>
@@ -872,12 +945,8 @@ const t = I18N[lang];
 
           <div className="ep-fg">
             <label>{t.results}</label>
-            <div style={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--primary-soft)', color: 'var(--primary)', fontWeight: 800, borderRadius: 9, fontSize: 13 }}>
-              {t.results_count(filteredProducts.length)}
-            </div>
+            <div className="ep-results-box">{t.results_count(filteredProducts.length)}</div>
           </div>
-
-          <div>{hasFilters && <span style={{ display: 'inline-block', width: 1 }} />}</div>
         </div>
       </div>
 
@@ -888,9 +957,7 @@ const t = I18N[lang];
             <h5>{t.inventory}</h5>
             <p>{t.inventory_sub}</p>
           </div>
-          <span className="badge-count">
-            {t.results_count(filteredProducts.length)}
-          </span>
+          <span className="badge-count">{t.results_count(filteredProducts.length)}</span>
         </div>
 
         <div className="ep-table-wrap">
@@ -932,11 +999,11 @@ const t = I18N[lang];
               ) : filteredProducts.length === 0 ? (
                 <tr>
                   <td colSpan="11" className="ep-state">
-                    <div className="ep-prod-avatar" style={{ width: 56, height: 56, fontSize: 26, margin: '0 auto 12px' }}>
+                    <div className="ep-prod-avatar" style={{ width: 56, height: 56, fontSize: 'var(--fs-xl)', margin: '0 auto 12px' }}>
                       <i className="fas fa-box-open" />
                     </div>
-                    <div style={{ fontWeight: 800, color: '#2a3a55', fontSize: 20 }}>{t.none_title}</div>
-                    <div style={{ marginTop: 4, fontSize: 18 }}>{t.none_sub}</div>
+                    <div style={{ fontWeight: 800, color: '#2a3a55', fontSize: 'var(--fs-lg)' }}>{t.none_title}</div>
+                    <div style={{ marginTop: 4, fontSize: 'var(--fs-sm)' }}>{t.none_sub}</div>
                     <button type="button" className="ep-btn ep-btn-save" style={{ marginTop: 14 }} onClick={handleOpenCreate}>
                       <i className="fas fa-plus" style={{ marginInlineEnd: 6 }} />{t.none_add}
                     </button>
@@ -949,6 +1016,7 @@ const t = I18N[lang];
                   const sale = Number(product.sale_price) || 0;
                   const stock = getStockStatus(qty, product.min_quantity);
                   const category = getCategoryName(product) || t.no_category;
+                  const subcategory = getSubcategoryName(product);
 
                   return (
                     <tr key={product.id}>
@@ -967,6 +1035,12 @@ const t = I18N[lang];
                       </td>
                       <td>
                         <span className={`ep-badge badge-${toneFor(category)}`}>{category}</span>
+                        {subcategory && (
+                          <div className="ep-prod-meta">
+                            <i className="fas fa-turn-up fa-rotate-90" style={{ marginInlineEnd: 4 }} />
+                            {subcategory}
+                          </div>
+                        )}
                       </td>
                       <td>
                         <span className={`ep-badge ${product.status === 'neuf' ? 'badge-blue' : 'badge-amber'}`}>
@@ -1042,7 +1116,7 @@ const t = I18N[lang];
                     <select
                       id="pp-category"
                       value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value, subcategory: '' })}
                     >
                       <option value="">{t.f_category_ph}</option>
                       {formData.category && !categories.includes(formData.category) && (
@@ -1051,6 +1125,23 @@ const t = I18N[lang];
                       {categories.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
+
+                  {formSubcategories.length > 0 && (
+                    <div className="ep-form-group">
+                      <label htmlFor="pp-subcategory">{t.f_subcategory}</label>
+                      <select
+                        id="pp-subcategory"
+                        value={formData.subcategory}
+                        onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
+                      >
+                        <option value="">{t.f_subcategory_ph}</option>
+                        {formData.subcategory && !formSubcategories.includes(formData.subcategory) && (
+                          <option value={formData.subcategory}>{formData.subcategory}</option>
+                        )}
+                        {formSubcategories.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="ep-form-group">
                     <label htmlFor="pp-barcode">{t.f_barcode}</label>
@@ -1069,9 +1160,9 @@ const t = I18N[lang];
                   </div>
 
                   <div className="ep-form-group">
-                    <label htmlFor="pp-status">{t.f_status}</label>
+                    <label htmlFor="pp-status-form">{t.f_status}</label>
                     <select
-                      id="pp-status"
+                      id="pp-status-form"
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                     >
@@ -1192,7 +1283,7 @@ const t = I18N[lang];
               <h4 id="pp-delete-title">{t.delete_title}</h4>
               <p>{t.delete_sub}</p>
               <div className="ep-delete-name">{productToDelete.name}</div>
-              <p style={{ fontSize: 16 }}>{t.delete_warn}</p>
+              <p style={{ fontSize: 'var(--fs-xs)' }}>{t.delete_warn}</p>
               {formErrorKey && <div className="ep-form-error" role="alert">{t[formErrorKey]}</div>}
             </div>
             <div className="ep-modal-footer center">

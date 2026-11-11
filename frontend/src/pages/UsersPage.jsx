@@ -363,6 +363,8 @@ const cur = t.currency;
       `}</style>
 
       {/* Header */}
+     
+      {/* Header */}
       <div className="ep-header">
         <div className="ep-title">
           <h1>
@@ -371,7 +373,15 @@ const cur = t.currency;
           </h1>
           <p>{t.subtitle}</p>
         </div>
-      
+
+        <button
+          type="button"
+          className="ep-btn-add"
+          onClick={handleOpenCreate}
+        >
+          <i className="fas fa-user-plus"></i>
+          {t.add}
+        </button>
       </div>
 
       {/* Erreur globale */}

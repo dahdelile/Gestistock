@@ -526,36 +526,57 @@ export const purchasesApi = {
 
 };
 // ===== API Users (Utilisateurs) =====
+
 export const usersApi = {
-    getAll: async () => {
-        const { data, error } = await supabase
-            .from('users') // Assurez-vous que la table s'appelle bien 'users'
-            .select('*')
-            .order('created_at', { ascending: false });
-        if (error) throw error;
-        return { data };
-    },
-    getById: async (id) => {
-        const { data, error } = await supabase.from('users').select('*').eq('id', id).single();
-        if (error) throw error;
-        return { data };
-    },
-    create: async (data) => {
-        const { data: res, error } = await supabase.from('users').insert([data]).select();
-        if (error) throw error;
-        return { data: res[0] };
-    },
-    update: async (id, data) => {
-        const { data: res, error } = await supabase.from('users').update(data).eq('id', id).select();
-        if (error) throw error;
-        return { data: res[0] };
-    },
-    delete: async (id) => {
-        const { error } = await supabase.from('users').delete().eq('id', id);
-        if (error) throw error;
-        return { success: true };
-    }
+  getAll: async () => {
+    const { data, error } = await supabase.functions.invoke(
+      'manage-users',
+      { body: { action: 'list' } }
+    );
+
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    return { data: data.data || [] };
+  },
+
+  create: async (userData) => {
+    const { data, error } = await supabase.functions.invoke(
+      'manage-users',
+      { body: { action: 'create', data: userData } }
+    );
+
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    return { data: data.data };
+  },
+
+  update: async (id, userData) => {
+    const { data, error } = await supabase.functions.invoke(
+      'manage-users',
+      { body: { action: 'update', id, data: userData } }
+    );
+
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    return { data: data.data };
+  },
+
+  delete: async (id) => {
+    const { data, error } = await supabase.functions.invoke(
+      'manage-users',
+      { body: { action: 'delete', id } }
+    );
+
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    return { success: true };
+  }
 };
+
 // ===== API Caisse (Registre) =====
 export const registerApi = {
     getCurrentSession: async () => {

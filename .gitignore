@@ -4,3 +4,8 @@ frontend/build/
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
+
+# Fichiers locaux et temporaires
+node_modules/
+.vscode/
+supabase/.temp/

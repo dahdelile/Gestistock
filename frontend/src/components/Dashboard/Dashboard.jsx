@@ -570,7 +570,7 @@ const dashStyles = `
 ========================================= */
 .dash-section {
   margin: 20px 0 12px;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 800;
   color: #3a4a66;
   display: flex;

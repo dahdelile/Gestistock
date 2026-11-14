@@ -293,7 +293,6 @@ const CategoriesPage = () => {
     setFormErrorKey('');
     setShowForm(true);
   };
-
   const handleDeleteCategory = (cat) => {
     setModalType('category');
     setCurrentCategory(cat);
@@ -309,7 +308,6 @@ const CategoriesPage = () => {
     setFormErrorKey('');
     setShowDeleteModal(true);
   };
-
   /* ---------- Soumission ---------- */
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -446,7 +444,6 @@ const CategoriesPage = () => {
     () => [...categories].sort((a, b) => (a.name || '').localeCompare(b.name || '')),
     [categories]
   );
-
   const hasFilters = Boolean(search || filterStatus !== 'all' || filterCategory !== 'all');
   const resetFilters = () => {
     setSearch('');

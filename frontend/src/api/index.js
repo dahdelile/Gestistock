@@ -12,10 +12,21 @@ const getCategoryIdByName = async (name) => {
 // ===== API Categories =====
 export const categoriesApi = {
     getAll: async (params) => {
-        const { data, error } = await supabase.from('categories').select('*').order('name');
-        if (error) throw error;
-        return { data };
-    },
+    const { data, error } = await supabase
+        .from('categories')
+        .select(`
+            *,
+            sous_categories (*)
+        `)
+        .order('name');
+
+    if (error) {
+        console.error('Erreur chargement catégories:', error);
+        throw error;
+    }
+
+    return { data };
+},
     create: async (data) => {
         const { data: res, error } = await supabase.from('categories').insert([data]).select();
         if (error) throw error;
@@ -127,11 +138,65 @@ update: async (id, productData) => {
     if (error) throw error;
     return { data: res[0] };
 },
-    delete: async (id) => {
-        const { error } = await supabase.from('products').delete().eq('id', id);
+   
+delete: async (id) => {
+    // Vérifier si le produit est utilisé dans des opérations historiques
+    const relatedTables = [
+        'invoice_items',
+        'inventory_transactions',
+        'purchase_items',
+        'customer_returns',
+        'internal_outputs'
+    ];
+
+    let isReferenced = false;
+
+    for (const table of relatedTables) {
+        const { data, error } = await supabase
+            .from(table)
+            .select('id')
+            .eq('product_id', id)
+            .limit(1);
+
         if (error) throw error;
-        return { success: true };
-    },
+
+        if (data && data.length > 0) {
+            isReferenced = true;
+            break;
+        }
+    }
+
+    // Si le produit possède un historique, le désactiver
+    if (isReferenced) {
+        const { data, error } = await supabase
+            .from('products')
+            .update({ status: 'inactive' })
+            .eq('id', id)
+            .select();
+
+        if (error) throw error;
+
+        return {
+            success: true,
+            archived: true,
+            data: data?.[0]
+        };
+    }
+
+    // Sinon, autoriser la suppression définitive
+    const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+    if (error) throw error;
+
+    return {
+        success: true,
+        archived: false
+    };
+},
+
     getLowStock: async () => {
         // جلب المنتجات التي كميتها أقل من أو تساوي الحد الأدنى
         const { data, error } = await supabase.from('products').select('*').filter('quantity', 'lte', 'min_quantity');
@@ -452,14 +517,14 @@ export const purchasesApi = {
     getAll: async () => {
         const { data, error } = await supabase
             .from('purchases')
-            .select('*, suppliers(name), purchase_items(*, products(name))')
+            .select('*, suppliers(name), purchase_items(*, products(id, name, category_id, subcategory_id))')
             .order('created_at', { ascending: false });
         if (error) throw error;
         return { data };
     },
     
     create: async (purchaseData) => {
-        // 1. إنشاء الفاتورة
+        // 1. Créer l'en-tête de l'achat
         const { data: purchase, error: purError } = await supabase
             .from('purchases')
             .insert([{
@@ -472,37 +537,96 @@ export const purchasesApi = {
             }])
             .select()
             .single();
-        
         if (purError) throw purError;
 
-        // 2. إضافة العناصر وتحديث المخزون
-        if (purchaseData.items && purchaseData.items.length > 0) {
-            // إضافة عناصر الفاتورة
-            const items = purchaseData.items.map(item => ({
-                purchase_id: purchase.id,
-                product_id: item.product_id,
-                quantity: item.quantity,
-                unit_price: item.unit_price,
-                total: item.total
-            }));
-            
-            const { error: itemsError } = await supabase.from('purchase_items').insert(items);
-            if (itemsError) throw itemsError;
+        // 2. Résoudre chaque sous-catégorie en produit et mettre le stock à jour
+        const purchaseItems = [];
+        for (const item of (purchaseData.items || [])) {
+            const categoryId = Number(item.category_id);
+            const subcategoryId = Number(item.subcategory_id);
+            const quantity = Number(item.quantity);
+            const unitPrice = Number(item.unit_price);
 
-            // تحديث كمية المخزون لكل منتج (زيادة الكمية)
-            for (const item of items) {
-                // جلب الكمية الحالية
-                const { data: product } = await supabase.from('products').select('quantity').eq('id', item.product_id).single();
-                if (product) {
-                    const newQuantity = product.quantity + item.quantity;
-                    await supabase.from('products').update({ quantity: newQuantity }).eq('id', item.product_id);
-                }
+            if (!categoryId || !subcategoryId || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0) {
+                throw new Error('Catégorie, sous-catégorie, quantité ou prix invalide.');
             }
+
+            const { data: subcategory, error: subError } = await supabase
+                .from('sous_categories')
+                .select('id, name, category_id')
+                .eq('id', subcategoryId)
+                .eq('category_id', categoryId)
+                .single();
+            if (subError) throw subError;
+
+            // L'identité du produit est la paire catégorie + sous-catégorie.
+            const { data: matches, error: findError } = await supabase
+                .from('products')
+                .select('id, quantity')
+                .eq('category_id', categoryId)
+                .eq('subcategory_id', subcategoryId)
+                .limit(1);
+            if (findError) throw findError;
+
+            let productId;
+            if (matches && matches.length > 0) {
+                const existing = matches[0];
+                const { data: updated, error: updateError } = await supabase
+                    .from('products')
+                    .update({
+                        quantity: Number(existing.quantity || 0) + quantity,
+                        purchase_price: unitPrice,
+                        supplier_id: purchaseData.supplier_id || null,
+                        name: subcategory.name,
+                        category_id: categoryId,
+                        subcategory_id: subcategoryId,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id)
+                    .select('id')
+                    .single();
+                if (updateError) throw updateError;
+                productId = updated.id;
+            } else {
+                // sale_price est obligatoire dans votre table : le prix d'achat est utilisé comme valeur initiale.
+                const { data: created, error: createError } = await supabase
+                    .from('products')
+                    .insert([{
+                        name: subcategory.name,
+                        category_id: categoryId,
+                        subcategory_id: subcategoryId,
+                        barcode: null,
+                        status: 'active',
+                        purchase_price: unitPrice,
+                        sale_price: unitPrice,
+                        quantity,
+                        min_quantity: 0,
+                        supplier_id: purchaseData.supplier_id || null
+                    }])
+                    .select('id')
+                    .single();
+                if (createError) throw createError;
+                productId = created.id;
+            }
+
+            purchaseItems.push({
+                purchase_id: purchase.id,
+                product_id: productId,
+                quantity,
+                unit_price: unitPrice,
+                total: Number(item.total ?? quantity * unitPrice)
+            });
+        }
+
+        // 3. Enregistrer les lignes d'historique. Le stock a déjà été incrémenté ci-dessus.
+        if (purchaseItems.length > 0) {
+            const { error: itemsError } = await supabase.from('purchase_items').insert(purchaseItems);
+            if (itemsError) throw itemsError;
         }
 
         return { data: purchase };
     },
-        deletePurchase: async (id, items) => {
+    deletePurchase: async (id, items) => {
         // خصم الكميات من المخزون لأننا نحذف فاتورة شراء
         for (const item of items) {
             const { data: product } = await supabase.from('products').select('quantity').eq('id', item.product_id).single();
@@ -650,89 +774,519 @@ export const registerApi = {
 
 
 // ===== API Sorties Internes =====
+
+// ===== API Sorties Internes =====
 export const internalOutputsApi = {
+
+    // Récupérer toutes les sorties internes
     getAll: async () => {
         const { data, error } = await supabase
             .from('internal_outputs')
             .select('*, products(name)')
             .order('created_at', { ascending: false });
+
         if (error) throw error;
         return { data };
     },
+
+    // Créer une sortie et diminuer le stock
     create: async (payload) => {
-        // 1. Enregistrer la sortie
+        const quantity = Number(payload.quantity);
+
+        if (!payload.product_id || !Number.isInteger(quantity) || quantity <= 0) {
+            throw new Error('Produit ou quantité invalide.');
+        }
+
+        // Vérifier le produit et son stock
+        const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('id, quantity')
+            .eq('id', payload.product_id)
+            .single();
+
+        if (productError) throw productError;
+
+        const currentStock = Number(product.quantity) || 0;
+
+        if (currentStock < quantity) {
+            throw new Error('Stock insuffisant.');
+        }
+
+        const newStock = currentStock - quantity;
+
+        // Diminuer le stock
+        const { error: stockError } = await supabase
+            .from('products')
+            .update({ quantity: newStock })
+            .eq('id', product.id);
+
+        if (stockError) throw stockError;
+
+        // Enregistrer la sortie
         const { data: outputData, error: outputError } = await supabase
             .from('internal_outputs')
             .insert([{
                 product_id: payload.product_id,
-                quantity: payload.quantity,
-                reason: payload.reason,
-                notes: payload.notes
+                quantity,
+                reason: payload.reason || 'other',
+                notes: payload.notes || null
             }])
-            .select()
+            .select('*, products(name)')
             .single();
-        if (outputError) throw outputError;
 
-        // 2. Déduire le produit du stock
-        const { data: product } = await supabase
-            .from('products')
-            .select('quantity')
-            .eq('id', payload.product_id)
-            .single();
-        
-        if (product) {
+        if (outputError) {
+            // Restaurer le stock si l'enregistrement échoue
             await supabase
                 .from('products')
-                .update({ quantity: Math.max(0, Number(product.quantity) - Number(payload.quantity)) })
-                .eq('id', payload.product_id);
+                .update({ quantity: currentStock })
+                .eq('id', product.id);
+
+            throw outputError;
         }
+
         return { data: outputData };
+    },
+
+    // Modifier une sortie existante
+    update: async (id, payload) => {
+        const quantity = Number(payload.quantity);
+
+        if (!payload.product_id || !Number.isInteger(quantity) || quantity <= 0) {
+            throw new Error('Produit ou quantité invalide.');
+        }
+
+        // Récupérer l'ancienne sortie
+        const { data: oldOutput, error: oldError } = await supabase
+            .from('internal_outputs')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (oldError) throw oldError;
+
+        const oldProductId = oldOutput.product_id;
+        const newProductId = payload.product_id;
+        const oldQuantity = Number(oldOutput.quantity);
+
+        // Récupérer les produits concernés
+        const productIds = [...new Set([
+            String(oldProductId),
+            String(newProductId)
+        ])];
+
+        const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select('id, quantity')
+            .in('id', productIds);
+
+        if (productsError) throw productsError;
+
+        const productMap = new Map(
+            products.map(p => [String(p.id), p])
+        );
+
+        const oldProduct = productMap.get(String(oldProductId));
+        const newProduct = productMap.get(String(newProductId));
+
+        if (!oldProduct || !newProduct) {
+            throw new Error('Produit introuvable.');
+        }
+
+        // Calculer les nouveaux stocks
+        const stockChanges = new Map();
+
+        if (String(oldProductId) === String(newProductId)) {
+            // Même produit : restituer l'ancienne quantité puis retirer la nouvelle
+            stockChanges.set(
+                String(oldProductId),
+                Number(oldProduct.quantity) + oldQuantity - quantity
+            );
+        } else {
+            // Produit différent : restituer l'ancien et retirer du nouveau
+            stockChanges.set(
+                String(oldProductId),
+                Number(oldProduct.quantity) + oldQuantity
+            );
+
+            const availableStock = Number(newProduct.quantity) || 0;
+
+            if (availableStock < quantity) {
+                throw new Error('Stock insuffisant pour le nouveau produit.');
+            }
+
+            stockChanges.set(
+                String(newProductId),
+                availableStock - quantity
+            );
+        }
+
+        // Sauvegarder les anciens stocks pour un éventuel retour arrière
+        const previousStocks = new Map();
+
+        for (const [productId, newStock] of stockChanges) {
+            if (newStock < 0) {
+                throw new Error('Stock insuffisant.');
+            }
+
+            previousStocks.set(
+                productId,
+                Number(productMap.get(productId).quantity)
+            );
+        }
+
+        // Appliquer les modifications de stock
+        for (const [productId, newStock] of stockChanges) {
+            const { error } = await supabase
+                .from('products')
+                .update({ quantity: newStock })
+                .eq('id', productId);
+
+            if (error) {
+                // Restaurer les stocks déjà modifiés
+                for (const [rollbackId, previousQuantity] of previousStocks) {
+                    await supabase
+                        .from('products')
+                        .update({ quantity: previousQuantity })
+                        .eq('id', rollbackId);
+                }
+
+                throw error;
+            }
+        }
+
+        // Modifier la sortie
+        const { data, error: updateError } = await supabase
+            .from('internal_outputs')
+            .update({
+                product_id: newProductId,
+                quantity,
+                reason: payload.reason || 'other',
+                notes: payload.notes || null
+            })
+            .eq('id', id)
+            .select('*, products(name)')
+            .single();
+
+        if (updateError) {
+            // Restaurer les stocks si la modification échoue
+            for (const [productId, previousQuantity] of previousStocks) {
+                await supabase
+                    .from('products')
+                    .update({ quantity: previousQuantity })
+                    .eq('id', productId);
+            }
+
+            throw updateError;
+        }
+
+        return { data };
+    },
+
+    // Supprimer une sortie et restituer le stock
+    delete: async (id) => {
+        // Récupérer la sortie
+        const { data: output, error: outputError } = await supabase
+            .from('internal_outputs')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (outputError) throw outputError;
+
+        // Récupérer le produit
+        const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('id, quantity')
+            .eq('id', output.product_id)
+            .single();
+
+        if (productError) throw productError;
+
+        const oldStock = Number(product.quantity) || 0;
+        const restoredStock = oldStock + Number(output.quantity);
+
+        // Restituer la quantité au stock
+        const { error: stockError } = await supabase
+            .from('products')
+            .update({ quantity: restoredStock })
+            .eq('id', product.id);
+
+        if (stockError) throw stockError;
+
+        // Supprimer la sortie
+        const { error: deleteError } = await supabase
+            .from('internal_outputs')
+            .delete()
+            .eq('id', id);
+
+        if (deleteError) {
+            // Restaurer le stock si la suppression échoue
+            await supabase
+                .from('products')
+                .update({ quantity: oldStock })
+                .eq('id', product.id);
+
+            throw deleteError;
+        }
+
+        return { success: true };
     }
 };
+
+// ===== API Retours Clients =====
 // ===== API Retours Clients =====
 export const returnsApi = {
+    // Récupérer tous les retours
     getAll: async () => {
         const { data, error } = await supabase
             .from('customer_returns')
-            // On ne joint que la table products (qui a une clé étrangère product_id)
             .select('*, products(name)')
             .order('created_at', { ascending: false });
-            
-        if (error) {
-            console.error("Erreur Supabase (returnsApi):", error);
-            throw error;
-        }
+
+        if (error) throw error;
         return { data };
     },
+
+    // Enregistrer un nouveau retour
     create: async (payload) => {
+        const quantity = Number(payload.quantity);
+        const refundAmount = Number(payload.refund_amount) || 0;
+
+        if (!payload.product_id || !Number.isInteger(quantity) || quantity <= 0) {
+            throw new Error('Produit ou quantité invalide.');
+        }
+
+        // Vérifier le produit
+        const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('id, quantity')
+            .eq('id', payload.product_id)
+            .single();
+
+        if (productError) throw productError;
+
+        // Créer le retour
         const { data: returnData, error: returnError } = await supabase
             .from('customer_returns')
             .insert([{
                 invoice_number: payload.invoice_number || null,
                 product_id: payload.product_id,
-                quantity: payload.quantity,
-                refund_amount: payload.refund_amount,
+                quantity,
+                refund_amount: refundAmount,
                 reason: payload.reason
             }])
             .select()
             .single();
-            
+
         if (returnError) throw returnError;
 
-        // Mettre à jour le stock
-        const { data: product } = await supabase
+        // Ajouter la quantité au stock
+        const { error: stockError } = await supabase
             .from('products')
-            .select('quantity')
-            .eq('id', payload.product_id)
+            .update({
+                quantity: Number(product.quantity) + quantity
+            })
+            .eq('id', product.id);
+
+        if (stockError) {
+            // Annuler le retour si la mise à jour du stock échoue
+            await supabase
+                .from('customer_returns')
+                .delete()
+                .eq('id', returnData.id);
+
+            throw stockError;
+        }
+
+        return { data: returnData };
+    },
+
+    // Modifier un retour existant
+    update: async (id, payload) => {
+        const quantity = Number(payload.quantity);
+        const refundAmount = Number(payload.refund_amount) || 0;
+
+        if (!payload.product_id || !Number.isInteger(quantity) || quantity <= 0) {
+            throw new Error('Produit ou quantité invalide.');
+        }
+
+        // Récupérer les anciennes données directement depuis Supabase
+        const { data: oldReturn, error: oldError } = await supabase
+            .from('customer_returns')
+            .select('*')
+            .eq('id', id)
             .single();
-        
-        if (product) {
+
+        if (oldError) throw oldError;
+
+        const oldProductId = oldReturn.product_id;
+        const newProductId = payload.product_id;
+
+        // Récupérer les produits concernés
+        const productIds = [...new Set([
+            String(oldProductId),
+            String(newProductId)
+        ])];
+
+        const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select('id, quantity')
+            .in('id', productIds);
+
+        if (productsError) throw productsError;
+
+        const productMap = new Map(
+            products.map(p => [String(p.id), p])
+        );
+
+        const oldProduct = productMap.get(String(oldProductId));
+        const newProduct = productMap.get(String(newProductId));
+
+        if (!oldProduct || !newProduct) {
+            throw new Error('Produit introuvable.');
+        }
+
+        // Calculer les nouvelles quantités de stock
+        const stockChanges = new Map();
+
+        if (String(oldProductId) === String(newProductId)) {
+            stockChanges.set(
+                String(oldProductId),
+                Number(oldProduct.quantity)
+                    - Number(oldReturn.quantity)
+                    + quantity
+            );
+        } else {
+            stockChanges.set(
+                String(oldProductId),
+                Number(oldProduct.quantity) - Number(oldReturn.quantity)
+            );
+
+            stockChanges.set(
+                String(newProductId),
+                Number(newProduct.quantity) + quantity
+            );
+        }
+
+        // Empêcher un stock négatif
+        for (const [productId, newStock] of stockChanges) {
+            if (newStock < 0) {
+                throw new Error(
+                    `Stock insuffisant pour le produit ${productId}.`
+                );
+            }
+        }
+
+        // Conserver les anciennes quantités pour pouvoir annuler en cas d'erreur
+        const previousStocks = new Map();
+
+        for (const [productId, newStock] of stockChanges) {
+            const product = productMap.get(productId);
+
+            previousStocks.set(productId, Number(product.quantity));
+
+            const { error } = await supabase
+                .from('products')
+                .update({ quantity: newStock })
+                .eq('id', product.id);
+
+            if (error) {
+                // Restaurer les stocks déjà modifiés
+                for (const [rollbackId, previousQuantity] of previousStocks) {
+                    await supabase
+                        .from('products')
+                        .update({ quantity: previousQuantity })
+                        .eq('id', rollbackId);
+                }
+
+                throw error;
+            }
+        }
+
+        // Modifier le retour
+        const { data, error: updateError } = await supabase
+            .from('customer_returns')
+            .update({
+                invoice_number: payload.invoice_number || null,
+                product_id: newProductId,
+                quantity,
+                refund_amount: refundAmount,
+                reason: payload.reason
+            })
+            .eq('id', id)
+            .select('*, products(name)')
+            .single();
+
+        if (updateError) {
+            // Restaurer les stocks si la modification échoue
+            for (const [productId, previousQuantity] of previousStocks) {
+                await supabase
+                    .from('products')
+                    .update({ quantity: previousQuantity })
+                    .eq('id', productId);
+            }
+
+            throw updateError;
+        }
+
+        return { data };
+    },
+
+    // Supprimer un retour
+    delete: async (id) => {
+        // Récupérer le retour
+        const { data: returnData, error: returnError } = await supabase
+            .from('customer_returns')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (returnError) throw returnError;
+
+        // Récupérer le produit concerné
+        const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('id, quantity')
+            .eq('id', returnData.product_id)
+            .single();
+
+        if (productError) throw productError;
+
+        const oldStock = Number(product.quantity);
+        const quantityToRemove = Number(returnData.quantity);
+        const newStock = oldStock - quantityToRemove;
+
+        if (newStock < 0) {
+            throw new Error(
+                'Suppression impossible : le stock disponible est insuffisant.'
+            );
+        }
+
+        // Diminuer le stock
+        const { error: stockError } = await supabase
+            .from('products')
+            .update({ quantity: newStock })
+            .eq('id', product.id);
+
+        if (stockError) throw stockError;
+
+        // Supprimer le retour
+        const { error: deleteError } = await supabase
+            .from('customer_returns')
+            .delete()
+            .eq('id', id);
+
+        if (deleteError) {
+            // Restaurer le stock si la suppression échoue
             await supabase
                 .from('products')
-                .update({ quantity: Number(product.quantity) + Number(payload.quantity) })
-                .eq('id', payload.product_id);
+                .update({ quantity: oldStock })
+                .eq('id', product.id);
+
+            throw deleteError;
         }
-        return { data: returnData };
+
+        return { success: true };
     }
 };
 export default {}; 

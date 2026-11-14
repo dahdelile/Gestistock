@@ -1,7 +1,7 @@
 // src/pages/PurchasesPage.jsx
 // Version bilingue Français / العربية (RTL) — design unifié ExpensesPage
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { purchasesApi, suppliersApi, productsApi } from '../api';
+import { purchasesApi, suppliersApi, productsApi, categoriesApi } from '../api';
 import { useLanguage } from '../context/LanguageContext';
 /* =========================================================
    TRADUCTIONS / الترجمة
@@ -22,8 +22,8 @@ const I18N = {
     stat_daily_sub: (v) => `Dépenses : ${v}`,
     stat_monthly: 'Achats du mois',
     stat_monthly_sub: (v) => `Dépenses : ${v}`,
-    stat_total: 'Total achats',
-    stat_total_sub: 'Enregistrés',
+    stat_total: 'Quantité achetée',
+    stat_total_sub: 'Unités de sous-catégories achetées',
     stat_amount: 'Montant global',
     history: 'Historique des achats',
     history_sub: (n) => `${n} résultat(s) affiché(s)`,
@@ -50,6 +50,7 @@ const I18N = {
     th_supplier: 'Fournisseur',
     th_date: 'Date',
     th_products: 'Produit(s)',
+    th_category: 'Catégorie',
     th_qty: 'Quantité',
     th_unit_price: 'Prix unitaire',
     th_total: 'Montant total',
@@ -75,8 +76,12 @@ const I18N = {
     f_supplier_ph: 'Sélectionner un fournisseur (Optionnel)',
     f_notes: 'Notes / Observations',
     f_notes_ph: 'Informations complémentaires...',
-    f_product: 'Produit',
-    f_product_ph: 'Sélectionner un produit',
+    f_product: 'Sous-catégorie / Produit',
+    f_product_ph: 'Sélectionner une sous-catégorie',
+    f_category: 'Catégorie',
+    f_category_ph: 'Sélectionner une catégorie',
+    f_subcategory: 'Sous-catégorie',
+    f_subcategory_ph: 'Sélectionner une sous-catégorie',
     f_qty: 'Quantité',
     f_price: 'Prix unitaire (MRU)',
     btn_add: 'Ajouter',
@@ -134,8 +139,8 @@ const I18N = {
     stat_daily_sub: (v) => `المصروفات: ${v}`,
     stat_monthly: 'مشتريات الشهر',
     stat_monthly_sub: (v) => `المصروفات: ${v}`,
-    stat_total: 'إجمالي المشتريات',
-    stat_total_sub: 'المسجلة',
+    stat_total: 'الكمية المشتراة',
+    stat_total_sub: 'إجمالي وحدات الفئات الفرعية المشتراة',
     stat_amount: 'المبلغ الإجمالي',
     history: 'سجل المشتريات',
     history_sub: (n) => `${n} نتيجة معروضة`,
@@ -162,6 +167,7 @@ const I18N = {
     th_supplier: 'المورد',
     th_date: 'التاريخ',
     th_products: 'المنتج (المنتجات)',
+    th_category: 'الفئة',
     th_qty: 'الكمية',
     th_unit_price: 'سعر الوحدة',
     th_total: 'المبلغ الإجمالي',
@@ -186,8 +192,12 @@ const I18N = {
     f_supplier_ph: 'اختر موردًا (اختياري)',
     f_notes: 'ملاحظات',
     f_notes_ph: 'معلومات إضافية...',
-    f_product: 'المنتج',
-    f_product_ph: 'اختر منتجًا',
+    f_product: 'الفئة الفرعية / المنتج',
+    f_product_ph: 'اختر فئة فرعية',
+    f_category: 'الفئة',
+    f_category_ph: 'اختر فئة',
+    f_subcategory: 'الفئة الفرعية',
+    f_subcategory_ph: 'اختر فئة فرعية',
     f_qty: 'الكمية',
     f_price: 'سعر الوحدة (أوقية)',
     btn_add: 'إضافة',
@@ -237,7 +247,7 @@ const I18N = {
 ========================================================= */
 
 const emptyForm = () => ({ purchase_number: '', supplier_id: '', notes: '' });
-const emptyItem = () => ({ product_id: '', quantity: 1, unit_price: '' });
+const emptyItem = () => ({ product_id: '', category_id: '', subcategory_id: '', quantity: 1, unit_price: '' });
 
 const formatMoney = (value, cur = 'MRU') => {
   const n = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value) || 0);
@@ -279,6 +289,7 @@ const cur = t.currency;
   const [purchases, setPurchases] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -315,14 +326,16 @@ const cur = t.currency;
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [purchaseResponse, supplierResponse, productResponse] = await Promise.all([
+      const [purchaseResponse, supplierResponse, productResponse, categoryResponse] = await Promise.all([
         purchasesApi.getAll(),
         suppliersApi.getAll(),
         productsApi.getAll(),
+        categoriesApi.getAll(),
       ]);
       setPurchases(getRows(purchaseResponse));
       setSuppliers(getRows(supplierResponse));
       setProducts(getRows(productResponse));
+      setCategories(getRows(categoryResponse));
     } catch (error) {
       console.error('Erreur de chargement des achats :', error);
       notify(t.err_load, 'danger');
@@ -335,27 +348,44 @@ const cur = t.currency;
 
   /* ---------- Statistiques ---------- */
   const stats = useMemo(() => {
-    const totalAmount = purchases.reduce((sum, p) => sum + Number(p.total || 0), 0);
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    let totalAmount = 0;
     let monthlyAmount = 0;
-    let monthlyCount = 0;
     let dailyAmount = 0;
-    let dailyCount = 0;
+    let totalQuantity = 0;
+    let monthlyQuantity = 0;
+    let dailyQuantity = 0;
 
-    purchases.forEach((p) => {
-      const date = new Date(p.purchase_date || p.created_at);
+    purchases.forEach((purchase) => {
+      // Les achats annulés ne doivent pas entrer dans les statistiques.
+      if (String(purchase.status || '').toLowerCase() === 'cancelled') return;
+
+      const amount = Number(purchase.total || 0);
+      const itemsQuantity = getPurchaseItems(purchase).reduce(
+        (sum, item) => sum + (Number(item.quantity) || 0),
+        0
+      );
+      totalAmount += amount;
+      totalQuantity += itemsQuantity;
+
+      const rawDate = purchase.purchase_date || purchase.created_at;
+      if (!rawDate) return;
+      const date = new Date(rawDate);
       if (Number.isNaN(date.getTime())) return;
+      const purchaseDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
       if (date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()) {
-        monthlyAmount += Number(p.total || 0);
-        monthlyCount += 1;
+        monthlyAmount += amount;
+        monthlyQuantity += itemsQuantity;
       }
-      if (date.toISOString().split('T')[0] === todayStr) {
-        dailyAmount += Number(p.total || 0);
-        dailyCount += 1;
+      if (purchaseDay === todayStr) {
+        dailyAmount += amount;
+        dailyQuantity += itemsQuantity;
       }
     });
-    return { count: purchases.length, totalAmount, monthlyAmount, monthlyCount, dailyAmount, dailyCount };
+
+    return { count: purchases.length, totalQuantity, dailyQuantity, monthlyQuantity, totalAmount, monthlyAmount, dailyAmount };
   }, [purchases]);
 
   /* ---------- Filtrage ---------- */
@@ -403,40 +433,58 @@ const cur = t.currency;
   const closeForm = () => { if (saving) return; setShowForm(false); resetForm(); };
   const updateForm = (e) => { const { name, value } = e.target; setForm((prev) => ({ ...prev, [name]: value })); };
 
+  const selectedCategory = categories.find((c) => String(c.id) === String(currentItem.category_id));
+  const availableSubcategories = (selectedCategory?.sous_categories || []).filter((sub) => !sub.status || sub.status === 'active');
+
   const updateCurrentItem = (e) => {
     const { name, value } = e.target;
     setCurrentItem((prev) => {
       const next = { ...prev, [name]: value };
-      if (name === 'product_id') {
-        const product = products.find((item) => String(item.id) === String(value));
-        next.unit_price = product?.purchase_price ?? product?.price ?? '';
+      if (name === 'category_id') {
+        next.subcategory_id = '';
+        next.product_id = '';
+        next.unit_price = '';
+      }
+      if (name === 'subcategory_id') {
+        const product = products.find((p) => String(p.subcategory_id) === String(value) && String(p.category_id) === String(next.category_id));
+        next.product_id = product?.id || '';
+        next.unit_price = product?.purchase_price ?? '';
       }
       return next;
     });
   };
 
   const addItemToCart = () => {
-    const product = products.find((item) => String(item.id) === String(currentItem.product_id));
-    if (!product) return notify(t.warn_no_product, 'warning');
+    const category = categories.find((c) => String(c.id) === String(currentItem.category_id));
+    const subcategory = category?.sous_categories?.find((s) => String(s.id) === String(currentItem.subcategory_id));
+    if (!category || !subcategory) return notify(t.warn_no_product, 'warning');
     const quantity = Number(currentItem.quantity);
     const unitPrice = Number(currentItem.unit_price);
     if (!Number.isFinite(quantity) || quantity <= 0) return notify(t.warn_qty, 'warning');
     if (!Number.isFinite(unitPrice) || unitPrice < 0) return notify(t.warn_price, 'warning');
 
-    const existingIndex = cart.findIndex((item) => String(item.product_id) === String(product.id));
+    const key = `${category.id}-${subcategory.id}`;
+    const existingIndex = cart.findIndex((item) => `${item.category_id}-${item.subcategory_id}` === key);
     if (existingIndex >= 0) {
-      setCart((prev) => prev.map((item, index) =>
-        index === existingIndex
-          ? { ...item, quantity: Number(item.quantity) + quantity, total: (Number(item.quantity) + quantity) * Number(item.unit_price) }
-          : item
-      ));
+      setCart((prev) => prev.map((item, index) => index === existingIndex
+        ? { ...item, quantity: Number(item.quantity) + quantity, unit_price: unitPrice, total: (Number(item.quantity) + quantity) * unitPrice }
+        : item));
     } else {
-      setCart((prev) => [...prev, { product_id: product.id, product_name: product.name, quantity, unit_price: unitPrice, total: quantity * unitPrice }]);
+      const product = products.find((p) => String(p.category_id) === String(category.id) && String(p.subcategory_id) === String(subcategory.id));
+      setCart((prev) => [...prev, {
+        product_id: product?.id || '',
+        category_id: category.id,
+        subcategory_id: subcategory.id,
+        product_name: subcategory.name,
+        quantity,
+        unit_price: unitPrice,
+        total: quantity * unitPrice
+      }]);
     }
     setCurrentItem({ ...emptyItem(), quantity: 1 });
   };
 
-  const removeCartItem = (productId) => setCart((prev) => prev.filter((item) => String(item.product_id) !== String(productId)));
+  const removeCartItem = (key) => setCart((prev) => prev.filter((item) => `${item.category_id}-${item.subcategory_id}` !== String(key)));
 
   const openEditForm = (purchase) => {
     setEditingPurchase(purchase);
@@ -446,13 +494,18 @@ const cur = t.currency;
       notes: purchase.notes || '',
     });
     const items = getPurchaseItems(purchase);
-    setCart(items.map((item) => ({
-      product_id: item.product_id,
-      product_name: item.products?.name || products.find((p) => String(p.id) === String(item.product_id))?.name || t.product_unknown,
-      quantity: Number(item.quantity || 1),
-      unit_price: Number(item.unit_price || 0),
-      total: Number(item.total) || Number(item.quantity || 0) * Number(item.unit_price || 0),
-    })));
+    setCart(items.map((item) => {
+      const product = item.products || products.find((p) => String(p.id) === String(item.product_id));
+      return {
+        product_id: item.product_id,
+        category_id: product?.category_id || '',
+        subcategory_id: product?.subcategory_id || '',
+        product_name: product?.name || t.product_unknown,
+        quantity: Number(item.quantity || 1),
+        unit_price: Number(item.unit_price || 0),
+        total: Number(item.total) || Number(item.quantity || 0) * Number(item.unit_price || 0),
+      };
+    }));
     setCurrentItem(emptyItem());
     setShowForm(true);
   };
@@ -467,7 +520,8 @@ const cur = t.currency;
       total: cartTotal,
       status: 'received',
       items: cart.map((item) => ({
-        product_id: Number(item.product_id),
+        category_id: Number(item.category_id),
+        subcategory_id: Number(item.subcategory_id),
         quantity: Number(item.quantity),
         unit_price: Number(item.unit_price),
         total: Number(item.quantity) * Number(item.unit_price),
@@ -618,6 +672,33 @@ const cur = t.currency;
       item.products?.name || products.find((p) => String(p.id) === String(item.product_id))?.name || t.product_unknown
     );
     return names.length > 0 ? names.join(', ') : '—';
+  };
+
+  // Récupère les catégories liées aux produits de chaque achat.
+  const getPurchaseCategories = (purchase) => {
+    const names = getPurchaseItems(purchase).map((item) => {
+      const product = item.products || products.find(
+        (p) => String(p.id) === String(item.product_id)
+      );
+
+      const categoryId = item.category_id ?? product?.category_id;
+      const subcategoryId = item.subcategory_id ?? product?.subcategory_id;
+
+      const directCategory =
+        item.categories ||
+        item.category ||
+        categories.find((category) => String(category.id) === String(categoryId));
+
+      const categoryFromSubcategory = categories.find((category) =>
+        (category.sous_categories || []).some(
+          (subcategory) => String(subcategory.id) === String(subcategoryId)
+        )
+      );
+
+      return directCategory?.name || categoryFromSubcategory?.name || '';
+    }).filter(Boolean);
+
+    return [...new Set(names)].join(', ') || '—';
   };
 
   /* =======================================================
@@ -1058,7 +1139,7 @@ const cur = t.currency;
 
 .ep-table {
   width: 100%;
-  min-width: 960px;
+  min-width: 1080px;
   border-collapse: collapse;
   background: #fff;
 }
@@ -2044,7 +2125,7 @@ const cur = t.currency;
       {notice && (
         <div className={`ep-toast ${notice.type}`} role="alert">
           <span style={{ fontSize: 16 }}>
-            {notice.type === 'danger' ? '⚠️' : notice.type === 'warning' ? '⚡' : '✓'}
+            {notice.type === 'danger' ? '⚠' : notice.type === 'warning' ? '⚡' : '✓'}
           </span>
           <div style={{ flex: 1 }}>{notice.message}</div>
           <button type="button" className="ep-toast-close" onClick={() => setNotice(null)}>×</button>
@@ -2077,7 +2158,7 @@ const cur = t.currency;
         <div className="ep-card tone-amber">
           <div className="ep-card-info">
             <h3>{t.stat_daily}</h3>
-            <div className="value">{stats.dailyCount}</div>
+            <div className="value">{Number(stats.dailyQuantity || 0).toLocaleString(t.locale)}</div>
             <div className="sub">{t.stat_daily_sub(formatMoney(stats.dailyAmount, cur))}</div>
           </div>
           <div className="ep-icon"><i className="fas fa-calendar-day" /></div>
@@ -2085,7 +2166,7 @@ const cur = t.currency;
         <div className="ep-card tone-blue">
           <div className="ep-card-info">
             <h3>{t.stat_monthly}</h3>
-            <div className="value">{stats.monthlyCount}</div>
+            <div className="value">{Number(stats.monthlyQuantity || 0).toLocaleString(t.locale)}</div>
             <div className="sub">{t.stat_monthly_sub(formatMoney(stats.monthlyAmount, cur))}</div>
           </div>
           <div className="ep-icon"><i className="fas fa-calendar-alt" /></div>
@@ -2093,7 +2174,7 @@ const cur = t.currency;
         <div className="ep-card tone-green">
           <div className="ep-card-info">
             <h3>{t.stat_total}</h3>
-            <div className="value">{stats.count}</div>
+            <div className="value">{Number(stats.totalQuantity || 0).toLocaleString(t.locale)}</div>
             <div className="sub">{t.stat_total_sub}</div>
           </div>
           <div className="ep-icon"><i className="fas fa-shopping-cart" /></div>
@@ -2185,15 +2266,18 @@ const cur = t.currency;
             <table className="ep-table">
               <thead>
                 <tr>
-                  <th>{t.th_ref}</th>
-                  <th>{t.th_supplier}</th>
+                 
+              
                   <th>{t.th_date}</th>
                   <th>{t.th_products}</th>
+                  <th>{t.th_category}</th>
                   <th className="ep-col-center">{t.th_qty}</th>
                   <th className="ep-col-end">{t.th_unit_price}</th>
                   <th className="ep-col-end">{t.th_total}</th>
                   <th>{t.th_status}</th>
+                     <th>{t.th_supplier}</th>
                   <th className="ep-col-end">{t.th_actions}</th>
+                   
                 </tr>
               </thead>
               <tbody>
@@ -2203,22 +2287,20 @@ const cur = t.currency;
                   const totalQty = items.reduce((sum, item) => sum + Number(item.quantity), 0);
                   const firstUnitPrice = items.length > 0 ? items[0].unit_price : 0;
                   const productNames = getProductNames(purchase);
+                  const purchaseCategories = getPurchaseCategories(purchase);
                   return (
                     <tr key={purchase.id}>
-                      <td>
-                        <span className="ep-ref">{purchase.purchase_number || `ACH-${purchase.id}`}</span>
-                        <span className="ep-subtext">{t.id_label(purchase.id)}</span>
-                      </td>
-                      <td>
-                        <div className="ep-supplier-cell">
-                          <div className="ep-supplier-avatar">{supplierName.charAt(0).toUpperCase()}</div>
-                          <div className="ep-supplier-name">{supplierName}</div>
-                        </div>
-                      </td>
+                  
+                   
                       <td>{formatDate(purchase.purchase_date || purchase.created_at, t.locale)}</td>
                       <td style={{ color: 'var(--muted)' }}>
                         <span style={{ display: 'inline-block', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={productNames}>
                           {productNames}
+                        </span>
+                      </td>
+                      <td style={{ color: 'var(--muted)' }}>
+                        <span style={{ display: 'inline-block', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={purchaseCategories}>
+                          {purchaseCategories}
                         </span>
                       </td>
                       <td className="ep-col-center">
@@ -2228,6 +2310,12 @@ const cur = t.currency;
                       <td className="ep-col-end ep-money ep-money-total">{formatMoney(purchase.total, cur)}</td>
                       <td>
                         <span className={`ep-badge badge-${statusTone(purchase.status)}`}>{statusLabel(purchase.status)}</span>
+                      </td>
+                         <td>
+                        <div className="ep-supplier-cell">
+                          <div className="ep-supplier-avatar">{supplierName.charAt(0).toUpperCase()}</div>
+                          <div className="ep-supplier-name">{supplierName}</div>
+                        </div>
                       </td>
                       <td className="ep-col-end">
                         <div className="ep-actions">
@@ -2281,32 +2369,22 @@ const cur = t.currency;
             </div>
             <div className="ep-modal-body">
               <div className="ep-section-title"><span className="ep-section-num">1</span> {t.section_general}</div>
-              <div className="ep-grid2">
-                <div className="ep-form-group">
-                  <label htmlFor="pch-number">{t.f_number}</label>
-                  <input id="pch-number" type="text" name="purchase_number" placeholder={t.f_number_ph} value={form.purchase_number} onChange={updateForm} />
-                </div>
-                <div className="ep-form-group">
-                  <label htmlFor="pch-supplier">{t.f_supplier}</label>
-                  <select id="pch-supplier" name="supplier_id" value={form.supplier_id} onChange={updateForm}>
-                    <option value="">{t.f_supplier_ph}</option>
-                    {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="ep-form-group">
-                <label htmlFor="pch-notes">{t.f_notes}</label>
-                <textarea id="pch-notes" name="notes" rows={2} placeholder={t.f_notes_ph} value={form.notes} onChange={updateForm} />
-              </div>
-
+              
               <div className="ep-section-title"><span className="ep-section-num">2</span> {t.section_products}</div>
               <div className="ep-item-form">
                 <div className="ep-item-form-grid">
                   <div className="ep-form-group" style={{ marginBottom: 0 }}>
-                    <label>{t.f_product}</label>
-                    <select name="product_id" value={currentItem.product_id} onChange={updateCurrentItem}>
-                      <option value="">{t.f_product_ph}</option>
-                      {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    <label>{t.f_category}</label>
+                    <select name="category_id" value={currentItem.category_id} onChange={updateCurrentItem}>
+                      <option value="">{t.f_category_ph}</option>
+                      {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="ep-form-group" style={{ marginBottom: 0 }}>
+                    <label>{t.f_subcategory}</label>
+                    <select name="subcategory_id" value={currentItem.subcategory_id} onChange={updateCurrentItem} disabled={!currentItem.category_id}>
+                      <option value="">{t.f_subcategory_ph}</option>
+                      {availableSubcategories.map((sub) => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
                     </select>
                   </div>
                   <div className="ep-form-group" style={{ marginBottom: 0 }}>
@@ -2317,7 +2395,7 @@ const cur = t.currency;
                     <label>{t.f_price}</label>
                     <input type="number" name="unit_price" min="0" step="0.01" value={currentItem.unit_price} onChange={updateCurrentItem} />
                   </div>
-                  <button type="button" className="ep-btn-add-item" onClick={addItemToCart} disabled={products.length === 0}>
+                  <button type="button" className="ep-btn-add-item" onClick={addItemToCart} disabled={!currentItem.category_id || !currentItem.subcategory_id}>
                     <i className="fas fa-plus" style={{ marginInlineEnd: 4 }} /> {t.btn_add}
                   </button>
                 </div>
@@ -2339,13 +2417,13 @@ const cur = t.currency;
                       <tr><td colSpan="5" className="ep-cart-empty">{t.cart_empty}</td></tr>
                     ) : (
                       cart.map((item) => (
-                        <tr key={item.product_id}>
+                        <tr key={`${item.category_id}-${item.subcategory_id}`}>
                           <td style={{ fontWeight: 700 }}>{item.product_name}</td>
                           <td>{item.quantity}</td>
                           <td>{formatMoney(item.unit_price, cur)}</td>
                           <td style={{ fontWeight: 800 }}>{formatMoney(Number(item.quantity) * Number(item.unit_price), cur)}</td>
                           <td className="ep-col-end">
-                            <button type="button" className="btn-icon btn-delete" onClick={() => removeCartItem(item.product_id)} title={t.delete}>
+                            <button type="button" className="btn-icon btn-delete" onClick={() => removeCartItem(`${item.category_id}-${item.subcategory_id}`)} title={t.delete}>
                               <i className="fas fa-trash" />
                             </button>
                           </td>
@@ -2364,6 +2442,21 @@ const cur = t.currency;
                 <strong><bdi className="ep-amt">{formatMoney(cartTotal, cur)}</bdi></strong>
               </div>
             </div>
+            <div className="ep-grid2">
+               
+                <div className="ep-form-group">
+                  <label htmlFor="pch-supplier">{t.f_supplier}</label>
+                  <select id="pch-supplier" name="supplier_id" value={form.supplier_id} onChange={updateForm}>
+                    <option value="">{t.f_supplier_ph}</option>
+                    {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="ep-form-group">
+                <label htmlFor="pch-notes">{t.f_notes}</label>
+                <textarea id="pch-notes" name="notes" rows={2} placeholder={t.f_notes_ph} value={form.notes} onChange={updateForm} />
+              </div>
+
             <div className="ep-modal-footer">
               <button type="button" className="ep-btn ep-btn-cancel" onClick={closeForm} disabled={saving}>{t.cancel}</button>
               <button type="button" className="ep-btn ep-btn-save" onClick={savePurchase} disabled={saving || cart.length === 0}>

@@ -1,18 +1,13 @@
 // src/pages/VentesPage.jsx
-// Version bilingue Français / العربية (RTL) — design unifié
 import React, { useEffect, useMemo, useState } from 'react';
 import { productsApi, customersApi, salesApi } from '../../api';
 import { useLanguage } from '../../context/LanguageContext';
-/* =========================================================
-   CONSTANTES / TRADUCTIONS
-========================================================= */
 
 const STORE = {
   name: 'GESTION STOCK',
   address: 'Nouakchott, Mauritanie',
   phone: '+222 XX XX XX XX',
 };
-
 const I18N = {
   fr: {
     dir: 'ltr',
@@ -302,12 +297,6 @@ const I18N = {
   },
 };
 
-
-
-/* =========================================================
-   UTILITAIRES
-========================================================= */
-
 const formatNumber = (value) =>
   new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(Number(value) || 0);
 
@@ -322,16 +311,13 @@ const formatDate = (value, locale) => {
 
 const escapeHtml = (value) =>
   String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-/* =========================================================
+/* 
    COMPOSANT
-========================================================= */
-
+ */
 const VentesPage = () => {
   const { lang } = useLanguage(); // langue globale (menu)
 const t = I18N[lang];
 const cur = t.currency;
-
   // Data
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
@@ -342,7 +328,6 @@ const cur = t.currency;
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-
   // Filters
   const [searchSale, setSearchSale] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -380,7 +365,6 @@ const cur = t.currency;
     const timer = window.setTimeout(() => { setError(''); setSuccess(''); }, 4500);
     return () => window.clearTimeout(timer);
   }, [error, success]);
-
   useEffect(() => { fetchSales(); fetchProducts(); fetchCustomers(); }, []);
 
   /* ---------- Chargements ---------- */
@@ -406,7 +390,6 @@ const cur = t.currency;
     } catch (err) { console.error(err); setProducts([]); }
     finally { setLoadingProducts(false); }
   };
-
   const fetchCustomers = async () => {
     try {
       const response = await customersApi.getAll();
@@ -435,8 +418,7 @@ const cur = t.currency;
     };
     return statuses[status] || { label: status || '—', tone: 'gray', icon: 'fa-question-circle' };
   };
-
-  /* ---------- Calculs panier ---------- */
+  /* Calculs panier */
   const subtotal = useMemo(() => cart.reduce((s, i) => s + Number(i.price) * Number(i.quantity || 0), 0), [cart]);
   const discountValue = Math.min(Math.max(Number(discount) || 0, 0), subtotal);
   const total = Math.max(subtotal - discountValue, 0);
@@ -458,7 +440,6 @@ const cur = t.currency;
       return matchesSearch && matchesStatus && matchesStart && matchesEnd;
     });
   }, [sales, searchSale, filterStatus, startDateFilter, endDateFilter, t.walk_in]);
-
   const stats = useMemo(() => {
     const validSales = sales.filter((s) => s.status !== 'cancelled');
     const now = new Date();
@@ -480,10 +461,8 @@ const cur = t.currency;
       dailySales, dailyRevenue, monthlySales, monthlyRevenue,
     };
   }, [sales]);
-
   const hasFilters = Boolean(searchSale || filterStatus !== 'all' || startDateFilter || endDateFilter);
   const resetFilters = () => { setSearchSale(''); setFilterStatus('all'); setStartDateFilter(''); setEndDateFilter(''); };
-
   /* ---------- Panier ---------- */
   const addToCart = (product) => {
     const stock = Number(product.quantity) || 0;
@@ -503,7 +482,6 @@ const cur = t.currency;
     });
     setError('');
   };
-
   const updateQuantity = (productId, delta) => {
     setCart((prev) => prev.map((item) => {
       if (String(item.product_id) !== String(productId)) return item;
@@ -511,7 +489,6 @@ const cur = t.currency;
       return { ...item, quantity: qty };
     }));
   };
-
   const handleManualQuantityChange = (productId, value) => {
     if (value === '') return setCart((prev) => prev.map((i) => String(i.product_id) === String(productId) ? { ...i, quantity: '' } : i));
     let q = parseInt(value, 10);
@@ -521,14 +498,12 @@ const cur = t.currency;
     q = Math.max(1, Math.min(Number(item.stock), q));
     setCart((prev) => prev.map((e) => String(e.product_id) === String(productId) ? { ...e, quantity: q } : e));
   };
-
   const handleQuantityBlur = (productId) => {
     setCart((prev) => prev.map((item) => String(item.product_id) !== String(productId) ? item : { ...item, quantity: Math.max(1, Math.min(Number(item.stock), Number(item.quantity) || 1)) }));
   };
 
   const removeFromCart = (productId) => setCart((prev) => prev.filter((i) => String(i.product_id) !== String(productId)));
   const clearCart = () => { setCart([]); setDiscount(''); setAmountReceived(''); setCustomerId(''); setPaymentMethod('cash'); setSearch(''); setNotes(''); };
-
   /* ---------- Scan ---------- */
   const handleBarcodeSearch = async (code) => {
     const clean = String(code || '').trim();
@@ -543,7 +518,6 @@ const cur = t.currency;
       setSearch(''); setScannerCode(''); setShowScanner(false);
     } catch { showError(t.err_scan); }
   };
-
   const handleSearchKeyDown = (e) => { if (e.key === 'Enter') { e.preventDefault(); if (search.trim()) handleBarcodeSearch(search); } };
 
   /* ---------- Encaissement ---------- */
@@ -716,10 +690,6 @@ const cur = t.currency;
   };
 
   const closeSaleModal = () => { if (processing) return; setShowModal(false); };
-
-  /* =======================================================
-     AFFICHAGE
-  ======================================================= */
 
   return (
     <div className="expenses-page" dir={t.dir} lang={lang}>
@@ -924,12 +894,6 @@ const cur = t.currency;
           .ep-modal-footer .ep-btn{flex:1}
           .ep-modal-footer.center{flex-direction:column-reverse}
         }
-          
-/* =====================================================
-   RESPONSIVE IMPROVEMENTS — VENTES PAGE
-   Desktop / Tablet / Mobile — RTL & LTR
-===================================================== */
-
 .expenses-page {
   width: 100%;
   min-width: 0;
@@ -1390,7 +1354,6 @@ const cur = t.currency;
   .ep-modal-footer {
     flex-wrap: wrap;
   }
-
   .ep-modal-footer .ep-btn {
     flex: 1 1 100%;
   }
@@ -1864,7 +1827,6 @@ const cur = t.currency;
           </div>
         </div>
       )}
-
       {/* Modal détails vente */}
       {selectedSale && (
         <div className="ep-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && setSelectedSale(null)}>

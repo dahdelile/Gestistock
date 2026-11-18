@@ -1368,6 +1368,7 @@ const cur = t.currency;
   text-align: left;
 }
 
+
 .expenses-page input,
 .expenses-page textarea,
 .expenses-page select {

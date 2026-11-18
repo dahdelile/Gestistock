@@ -2457,6 +2457,7 @@ const cur = t.currency;
                 <textarea id="pch-notes" name="notes" rows={2} placeholder={t.f_notes_ph} value={form.notes} onChange={updateForm} />
               </div>
 
+
             <div className="ep-modal-footer">
               <button type="button" className="ep-btn ep-btn-cancel" onClick={closeForm} disabled={saving}>{t.cancel}</button>
               <button type="button" className="ep-btn ep-btn-save" onClick={savePurchase} disabled={saving || cart.length === 0}>

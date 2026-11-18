@@ -806,7 +806,7 @@ const VentesPage = () => {
         .ep-filter-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
         .ep-reset{height:38px;padding:0 13px;border:1px solid var(--line);border-radius:9px;background:#fff;color:#4b5b75;font:inherit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}
         .ep-reset:hover{background:#f1f5fb}
-        .ep-table-wrap{overflow-x:auto;width:100%;max-width:100%}
+        .ep-table-wrap{overflow-x:auto;width:100%;max-width:100%;-webkit-overflow-scrolling:touch}
         .ep-table{width:100%;min-width:1180px;border-collapse:collapse;white-space:normal}
         .ep-table th{background:#f3f6fc;color:#5b6b85;text-align:start;padding:11px 12px;font-size:11px;font-weight:800;letter-spacing:.4px;border-bottom:1px solid var(--line);white-space:nowrap;overflow-wrap:anywhere;user-select:none}
         .ep-table th.sortable{cursor:pointer}
@@ -874,6 +874,7 @@ const VentesPage = () => {
         .ep-delete-icon{display:inline-grid;place-items:center;width:58px;height:58px;margin-bottom:14px;border-radius:50%;background:var(--red-soft);color:var(--red);font-size:24px}
         .ep-delete-body h4{margin:0 0 6px;font-size:17px;font-weight:800}
         .ep-delete-body p{margin:0 0 10px;color:var(--muted);font-size:13px}
+        /* ===== STYLE REFERENCE : compact ===== */
         .expenses-page { padding: 0; background: #f4f5f7; }
         .expenses-page .ep-stats { padding: 22px 10px 0; gap: 24px; margin-bottom: 24px; }
         .expenses-page .ep-card { min-height: 92px; padding: 16px 18px; border: 0; border-radius: 0; box-shadow: 0 2px 5px rgba(0,0,0,.16); color: #fff; }
@@ -905,39 +906,55 @@ const VentesPage = () => {
         .expenses-page .ep-filters { grid-template-columns:1.2fr 1fr 1fr 1fr 1fr 1fr auto; padding:14px 12px; background:#fff; }
         .expenses-page .ep-fg label { font-size:12px; letter-spacing:0; text-transform:none; }
         .expenses-page .ep-filter-input, .expenses-page .ep-reset { height:38px; font-size:13px; border-radius:4px; }
-        .expenses-page .ep-table { min-width:1150px; }
-        .expenses-page .ep-table th { padding:13px 10px; background:#222833; color:#fff; border:1px solid #424b58; font-size:13px; }
+        /* ✅ CORRIGÉ : tableau compact pour mobile, comme le site de référence */
+        .expenses-page .ep-table { min-width:760px; }
+        .expenses-page .ep-table th { padding:9px 8px; background:#222833; color:#fff; border:1px solid #424b58; font-size:12px; white-space:nowrap; }
         .expenses-page .ep-table th.sortable:hover { background:#2f3744; }
-        .expenses-page .ep-table td { padding:11px 10px; border:1px solid #d8dee8; font-size:13px; color:#172033; }
+        .expenses-page .ep-table td { padding:8px 8px; border:1px solid #d8dee8; font-size:12px; color:#172033; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
         .expenses-page .ep-table tbody tr:nth-child(odd) td { background:#f0f1f2; }
         .expenses-page .ep-table tbody tr:nth-child(even) td { background:#fff; }
         .expenses-page .ep-table tbody tr:hover td { background:#e8efff; }
-        .expenses-page .ep-badge { font-size:11px; padding:4px 8px; }
-        .expenses-page .ep-customer-name, .expenses-page .ep-ref { font-size:13px; }
+        .expenses-page .ep-badge { font-size:11px; padding:3px 7px; }
+        .expenses-page .ep-customer-name, .expenses-page .ep-ref { font-size:12px; }
         @media (max-width:900px) {
           .expenses-page .ep-stats { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
           .expenses-page .ep-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
           .expenses-page .ep-fg-search { grid-column:1/-1; }
         }
+        /* ✅ CORRIGÉ ICI : en mobile on garde 2 colonnes, pas 1 colonne */
         @media (max-width:560px) {
           .expenses-page .ep-stats { grid-template-columns:repeat(2,minmax(0,1fr)); padding:12px 8px 0; gap:8px; }
-          .expenses-page .ep-card { min-height:82px; padding:10px; }
+          .expenses-page .ep-card { min-height:68px; padding:10px 11px; }
           .expenses-page .ep-card-info h3 { font-size:11px; }
-          .expenses-page .ep-card-info .value { font-size:21px; }
+          .expenses-page .ep-card-info .value { font-size:18px; }
+          .expenses-page .ep-card-info .sub { font-size:10px; }
           .expenses-page .ep-icon { font-size:20px; flex-basis:24px; }
-          .expenses-page .ep-hero { padding:10px; gap:10px; }
+          .expenses-page .ep-hero { padding:9px 10px; gap:10px; min-height:48px; }
           .expenses-page .ep-title h1 { font-size:17px; }
           .expenses-page .ep-hero-actions { width:auto; }
-          .expenses-page .ep-btn-add, .expenses-page .ep-hero-refresh { padding:8px; font-size:11px; }
+          .expenses-page .ep-btn-add, .expenses-page .ep-hero-refresh { padding:8px 10px; font-size:12px; }
           .expenses-page .ep-panel { margin-inline:8px; }
-          .expenses-page .ep-filters { grid-template-columns:1fr; }
-          .expenses-page .ep-fg-search { grid-column:auto; }
+          .expenses-page .ep-filters { grid-template-columns:1fr 1fr; gap:8px; padding:10px; }
+          .expenses-page .ep-fg-search { grid-column:1/-1; }
+          .expenses-page .ep-filter-input, .expenses-page .ep-reset { height:36px; font-size:12px; }
+          .expenses-page .ep-table { min-width:720px; }
+          .expenses-page .ep-table th { padding:8px 6px; font-size:11px; }
+          .expenses-page .ep-table td { padding:7px 6px; font-size:11px; max-width:140px; }
           .expenses-page .ep-modal-overlay { padding: .4rem; align-items: center; }
           .expenses-page .ep-modal { max-height: calc(100dvh - .8rem); border-radius: .5rem; }
           .expenses-page .ep-modal-header { padding: .8rem 1rem; }
           .expenses-page .ep-modal-body { padding: 1rem; }
           .expenses-page .ep-modal-footer { padding: .7rem 1rem; flex-wrap: wrap; }
           .expenses-page .ep-modal-footer .ep-btn { flex: 1 1 auto; }
+        }
+        @media (max-width:420px) {
+          .expenses-page .ep-stats { gap:6px; padding:8px 6px 0; }
+          .expenses-page .ep-card { min-height:64px; padding:8px 9px; }
+          .expenses-page .ep-card-info h3 { font-size:10px; }
+          .expenses-page .ep-card-info .value { font-size:16px; }
+          .expenses-page .ep-panel { margin-inline:6px; }
+          .expenses-page .ep-filters { padding:8px; gap:7px; }
+          .expenses-page .ep-detail-grid { grid-template-columns:1fr; }
         }
         .expenses-page[dir="rtl"] { text-align: right; }
         .expenses-page[dir="ltr"] { text-align: left; }

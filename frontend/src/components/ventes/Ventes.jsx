@@ -1384,4 +1384,5 @@ const VentesPage = () => {
   );
 };
 
+
 export default VentesPage;

@@ -8,347 +8,421 @@ const STORE = {
   address: 'Nouakchott, Mauritanie',
   phone: '+222 XX XX XX XX',
 };
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const toNumOrNull = (v) => {
+  if (v === '' || v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const toNumOrZero = (v) => toNumOrNull(v) ?? 0;
+const toTextOrNull = (v) => {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+};
+
+/* ============================================================
+   TRADUCTIONS
+   ============================================================ */
 const I18N = {
   fr: {
-    dir: 'ltr',
-    locale: 'fr-FR',
-    currency: 'MRU',
-    eyebrow: 'ESPACE COMMERCIAL',
-    title: 'Gestion des ventes',
-    subtitle: 'Suivez vos transactions, encaissez et gérez vos factures.',
-    add: 'Nouvelle vente',
-    refresh: 'Actualiser',
-    stat_revenue: 'Montant global',
-    stat_revenue_sub: 'MRU · Toutes les ventes',
-    stat_count: 'Total ventes',
-    stat_count_sub: 'Transactions enregistrées',
-    stat_month: 'Ventes du mois',
-    stat_month_sub: (v) => `Revenus : ${v}`,
-    stat_day: 'Ventes du jour',
-    stat_day_sub: (v) => `Revenus : ${v}`,
-    history: 'Historique des ventes',
-    history_sub: 'Retrouvez les factures et les transactions enregistrées.',
-    search_ph: 'N° facture ou nom du client...',
-    all_status: 'Tous les statuts',
-    paid: 'Payée',
-    partial: 'Partielle / Crédit',
-    draft: 'Brouillon',
-    cancelled: 'Annulée',
-    start_date: 'Date de début',
-    end_date: 'Date de fin',
-    results: (n) => `${n} résultat(s)`,
-    loading: 'Chargement des ventes...',
-    none_title: 'Aucune vente trouvée',
-    none_sub: 'Modifiez votre recherche ou créez une nouvelle vente.',
-    none_add: 'Nouvelle vente',
-    th_index: '#',
-    th_invoice: 'Facture',
-    th_customer: 'Client',
-    th_products: 'Produit(s)',
-    th_qty: 'Quantité',
-    th_unit: 'Prix unitaire',
-    th_total: 'Prix total',
-    th_obs: 'Observation',
-    th_status: 'Statut',
-    th_date: 'Date',
-    th_actions: 'Actions',
-    view: 'Voir les détails',
-    edit: 'Modifier',
-    delete: 'Supprimer',
-    print: 'Imprimer',
-    export: 'Exporter',
-    // Payment labels
-    cash: 'Espèces',
-    bankily: 'Bankily',
-    masrivi: 'Masrivi',
-    sedad: 'Sedad',
-    credit: 'Crédit',
-    card: 'Carte',
-    walk_in: 'Client comptant',
+    dir: 'ltr', locale: 'fr-FR', currency: 'MRU',
+    eyebrow: 'ESPACE COMMERCIAL', title: 'Gestion des ventes', subtitle: 'Suivez vos transactions et gérez vos factures.',
+    add: 'Nouvelle vente', refresh: 'Actualiser',
+    stat_revenue: 'Montant global', stat_revenue_sub: 'MRU · Toutes les ventes',
+    stat_count: 'Total ventes', stat_count_sub: 'Transactions enregistrées',
+    stat_month: 'Ventes du mois', stat_month_sub: (v) => `Revenus : ${v}`,
+    stat_day: 'Ventes du jour', stat_day_sub: (v) => `Revenus : ${v}`,
+    history: 'Historique des ventes', search_ph: 'N° facture ou nom du client...',
+    all_status: 'Tous les statuts', all_payments: 'Tous les paiements', all_categories: 'Toutes les catégories',
+    paid: 'Payée', partial: 'Crédit', draft: 'Brouillon', cancelled: 'Annulée',
+    th_index: '#', th_invoice: 'Facture', th_customer: 'Client', th_products: 'Produit(s)', th_category: 'Catégorie', th_qty: 'Qté',
+    th_unit: 'P.U.', th_total: 'Total', th_obs: 'Observation',
+    th_status: 'Statut', th_date: 'Date', th_actions: 'Actions',
+    view: 'Voir', edit: 'Modifier', delete: 'Supprimer', print: 'Imprimer', export: 'Exporter',
+    cash: 'Espèces', bankily: 'Bankily', masrivi: 'Masrivi', sedad: 'Sedad', credit: 'Crédit', walk_in: 'Client comptant',
     units: (n) => `${n} unité(s)`,
-    // POS modal
-    pos_title: 'Point de vente',
-    pos_sub: 'Sélectionnez les articles et procédez à l’encaissement.',
-    catalogue: 'Catalogue produits',
-    product_count: (n) => `${n} produits`,
-    product_search_ph: 'Nom, référence ou code-barres...',
-    scan: 'Scanner',
-    loading_products: 'Chargement des produits...',
-    out_of_stock: 'Épuisé',
-    stock_label: (n) => `Stock : ${n}`,
-    no_category: 'Non catégorisé',
-    cart_title: 'Panier',
-    cart_count: (n) => `${n} article(s)`,
-    cart_empty: 'Panier vide',
-    cart_empty_sub: 'Cliquez sur un produit pour l’ajouter.',
-    per_unit: 'MRU / unité',
-    customer: 'Client',
-    customer_required: 'Obligatoire pour le crédit',
-    discount: 'Remise',
-    subtotal: 'Sous-total',
-    total_to_pay: 'TOTAL À PAYER',
-    payment_method: 'Mode de paiement',
-    amount_received: 'Montant reçu',
-    amount_placeholder: 'Montant reçu',
-    missing: (v) => `Il manque ${v}`,
-    change: 'Monnaie à rendre',
-    credit_info: 'La vente sera enregistrée à crédit. Un client doit être sélectionné.',
-    notes: 'Observation (Optionnel)',
-    notes_ph: 'Ajouter une note à cette vente...',
-    checkout: (v) => `Encaisser ${v}`,
-    processing: 'Enregistrement...',
-    clear_cart: 'Vider le panier',
-    close: 'Fermer',
-    cancel: 'Annuler',
-    // Scanner modal
-    scanner_title: 'Recherche par code-barres',
-    scanner_label: 'Code-barres du produit',
-    scanner_ph: 'Saisissez ou scannez le code...',
-    scanner_hint: 'Cette fenêtre permet la saisie manuelle ou l’utilisation d’un lecteur de codes-barres.',
-    add_to_cart: 'Ajouter au panier',
-    // Details modal
-    details_title: 'Détails de la vente',
-    invoice: 'Facture',
-    date: 'Date',
-    sold_items: 'Articles vendus',
-    no_items: "Aucun détail d'article disponible.",
-    total_amount: 'Montant total',
-    // Edit modal
-    edit_title: 'Modifier la vente',
-    edit_articles: 'Articles',
-    edit_qty: 'Qté',
-    edit_unit: 'Prix Unitaire',
-    edit_total: 'Total',
-    edit_status: 'Statut de la vente',
-    edit_notes: 'Observation',
-    edit_notes_ph: 'Ajouter ou modifier une note...',
-    save: 'Enregistrer',
-    saving: 'Enregistrement...',
-    // Delete
-    delete_title: 'Confirmer la suppression',
-    delete_q: 'Supprimer cette vente ?',
-    delete_invoice: (n) => `Facture ${n}`,
-    delete_warn: 'Vérifiez que votre API gère correctement la restauration du stock lors de la suppression.',
-    delete_confirm: 'Oui, supprimer',
-    deleting: 'Suppression...',
-    // Invoice after checkout
-    success_invoice: 'Vente enregistrée avec succès',
-    facture: 'FACTURE',
-    thanks: 'Merci pour votre achat !',
-    thanks_sub: 'Nous vous remercions de votre confiance.',
-    print_invoice: 'Imprimer la facture',
-    new_sale: 'Nouvelle vente',
-    // Errors
-    err_load: 'Impossible de charger les ventes.',
-    err_empty: 'Panier vide.',
-    err_invalid_amount: 'Montant invalide.',
-    err_missing_cash: (v) => `Il manque ${v}`,
-    err_credit_customer: 'Sélectionnez un client pour le crédit.',
-    err_save: 'Erreur encaissement.',
-    err_edit: 'Erreur modification.',
-    err_delete: 'Erreur suppression.',
-    err_scan: 'Erreur scanner.',
-    ok_sale: 'Vente enregistrée.',
-    ok_edit: 'Vente modifiée.',
-    ok_delete: 'Vente supprimée.',
-    warn_out_of_stock: (n) => `Le produit « ${n} » est en rupture de stock.`,
-    warn_max_stock: (n) => `Stock max atteint pour « ${n} ».`,
-    warn_no_product: 'Aucun produit trouvé.',
-    switch_title: 'Changer de langue',
+    form_title: 'Nouvelle vente', form_sub: 'Renseignez les informations de la transaction.',
+    f_invoice: 'Numéro facture', f_customer: 'Client', f_date: 'Date de vente',
+    f_status: 'Statut', f_payment: 'Mode de paiement', f_notes: 'Observation',
+    f_category: 'Catégorie', f_product: 'Produit', f_qty: 'Quantité', f_price: 'Prix unitaire', f_add_item: 'Ajouter article',
+    purchase_price: "Prix d'achat", sale_price_ph: "Prix de vente",
+    stock_available: (n) => `Stock dispo : ${n}`,
+    err_stock: (n) => `Stock insuffisant. Il ne reste que ${n} unité(s).`,
+    err_qty_invalid: 'Quantité invalide.',
+    no_items: 'Aucun article ajouté', saving: 'Enregistrement...', save: 'Enregistrer', cancel: 'Annuler',
+    err_save: 'Erreur lors de l\'enregistrement.', ok_sale: 'Vente enregistrée avec succès.',
+    err_customer_credit: 'Sélectionnez un client pour le crédit.',
+    err_price_invalid: 'Saisissez un prix unitaire valide.',
+    edit_title: 'Modifier la vente', delete_q: 'Supprimer cette vente ?', delete_confirm: 'Oui, supprimer', deleting: 'Suppression...',
+    details_title: 'Détails de la vente', success_invoice: 'Vente enregistrée', facture: 'FACTURE',
+    thanks: 'Merci pour votre achat !', thanks_sub: 'Nous vous remercions de votre confiance.',
+    err_load: 'Impossible de charger les ventes.', err_edit: 'Erreur modification.', err_delete: 'Erreur suppression.',
+    ok_edit: 'Vente modifiée.', ok_delete: 'Vente supprimée.', close: 'Fermer',
+    footer_total: 'Total affiché', footer_count: (n) => `${n} vente(s)`,
+    export_all: 'Exporter en Excel', sort_by: 'Trier',
+    no_data: 'Aucune vente trouvée.', no_data_sub: 'Modifiez votre recherche ou créez une nouvelle vente.',
+    loading_sales: 'Chargement des ventes...',
   },
   ar: {
-    dir: 'rtl',
-    locale: 'ar-u-nu-latn',
-    currency: 'أوقية',
-    eyebrow: 'فضاء المبيعات',
-    title: 'إدارة المبيعات',
-    subtitle: 'تابع معاملاتك، استلم المدفوعات وأدر فواتيرك.',
-    add: 'بيع جديد',
-    refresh: 'تحديث',
-    stat_revenue: 'المبلغ الإجمالي',
-    stat_revenue_sub: 'أوقية · كل المبيعات',
-    stat_count: 'إجمالي المبيعات',
-    stat_count_sub: 'المعاملات المسجلة',
-    stat_month: 'مبيعات الشهر',
-    stat_month_sub: (v) => `الإيرادات: ${v}`,
-    stat_day: 'مبيعات اليوم',
-    stat_day_sub: (v) => `الإيرادات: ${v}`,
-    history: 'سجل المبيعات',
-    history_sub: 'اطلع على الفواتير والمعاملات المسجلة.',
-    search_ph: 'رقم الفاتورة أو اسم العميل...',
-    all_status: 'كل الحالات',
-    paid: 'مدفوعة',
-    partial: 'جزئية / آجل',
-    draft: 'مسودة',
-    cancelled: 'ملغاة',
-    start_date: 'تاريخ البداية',
-    end_date: 'تاريخ النهاية',
-    results: (n) => `${n} نتيجة`,
-    loading: 'جارٍ تحميل المبيعات...',
-    none_title: 'لا توجد مبيعات',
-    none_sub: 'عدّل البحث أو أنشئ بيعًا جديدًا.',
-    none_add: 'بيع جديد',
-    th_index: '#',
-    th_invoice: 'الفاتورة',
-    th_customer: 'العميل',
-    th_products: 'المنتج (المنتجات)',
-    th_qty: 'الكمية',
-    th_unit: 'سعر الوحدة',
-    th_total: 'السعر الإجمالي',
-    th_obs: 'ملاحظة',
-    th_status: 'الحالة',
-    th_date: 'التاريخ',
-    th_actions: 'إجراءات',
-    view: 'عرض التفاصيل',
-    edit: 'تعديل',
-    delete: 'حذف',
-    print: 'طباعة',
-    export: 'تصدير',
-    cash: 'نقدًا',
-    bankily: 'بنكيلي',
-    masrivi: 'مصرفي',
-    sedad: 'سداد',
-    credit: 'آجل',
-    card: 'بطاقة',
-    walk_in: 'عميل نقدي',
+    dir: 'rtl', locale: 'ar-u-nu-latn', currency: 'أوقية',
+    eyebrow: 'فضاء المبيعات', title: 'إدارة المبيعات', subtitle: 'تابع معاملاتك وأدر فواتيرك.',
+    add: 'بيع جديد', refresh: 'تحديث',
+    stat_revenue: 'المبلغ الإجمالي', stat_revenue_sub: 'أوقية · كل المبيعات',
+    stat_count: 'إجمالي المبيعات', stat_count_sub: 'المعاملات المسجلة',
+    stat_month: 'مبيعات الشهر', stat_month_sub: (v) => `الإيرادات: ${v}`,
+    stat_day: 'مبيعات اليوم', stat_day_sub: (v) => `الإيرادات: ${v}`,
+    history: 'سجل المبيعات', search_ph: 'رقم الفاتورة أو اسم العميل...',
+    all_status: 'كل الحالات', all_payments: 'كل طرق الدفع', all_categories: 'كل الفئات',
+    paid: 'مدفوعة', partial: 'آجل', draft: 'مسودة', cancelled: 'ملغاة',
+    th_index: '#', th_invoice: 'الفاتورة', th_customer: 'العميل', th_products: 'المنتج', th_category: 'الفئة', th_qty: 'الكمية',
+    th_unit: 'السعر', th_total: 'الإجمالي', th_obs: 'ملاحظة',
+    th_status: 'الحالة', th_date: 'التاريخ', th_actions: 'إجراءات',
+    view: 'عرض', edit: 'تعديل', delete: 'حذف', print: 'طباعة', export: 'تصدير',
+    cash: 'نقدًا', bankily: 'بنكيلي', masrivi: 'مصرفي', sedad: 'سداد', credit: 'آجل', walk_in: 'عميل نقدي',
     units: (n) => `${n} وحدة`,
-    pos_title: 'نقطة البيع',
-    pos_sub: 'اختر المنتجات ثم أكمل الدفع.',
-    catalogue: 'كتالوج المنتجات',
-    product_count: (n) => `${n} منتج`,
-    product_search_ph: 'الاسم، المرجع أو الباركود...',
-    scan: 'مسح',
-    loading_products: 'جارٍ تحميل المنتجات...',
-    out_of_stock: 'نفد',
-    stock_label: (n) => `المخزون: ${n}`,
-    no_category: 'غير مصنف',
-    cart_title: 'السلة',
-    cart_count: (n) => `${n} عنصر`,
-    cart_empty: 'السلة فارغة',
-    cart_empty_sub: 'انقر على منتج لإضافته.',
-    per_unit: 'أوقية / وحدة',
-    customer: 'العميل',
-    customer_required: 'مطلوب للبيع بالآجل',
-    discount: 'تخفيض',
-    subtotal: 'المجموع الفرعي',
-    total_to_pay: 'المجموع المستحق',
-    payment_method: 'طريقة الدفع',
-    amount_received: 'المبلغ المستلم',
-    amount_placeholder: 'المبلغ المستلم',
-    missing: (v) => `ينقص ${v}`,
-    change: 'الباقي',
-    credit_info: 'سيتم تسجيل البيع بالآجل. يجب اختيار عميل.',
-    notes: 'ملاحظة (اختياري)',
-    notes_ph: 'أضف ملاحظة لهذا البيع...',
-    checkout: (v) => `تحصيل ${v}`,
-    processing: 'جارٍ التسجيل...',
-    clear_cart: 'تفريغ السلة',
-    close: 'إغلاق',
-    cancel: 'إلغاء',
-    scanner_title: 'البحث بالباركود',
-    scanner_label: 'باركود المنتج',
-    scanner_ph: 'أدخل أو امسح الرمز...',
-    scanner_hint: 'تسمح هذه النافذة بالإدخال اليدوي أو استخدام قارئ باركود.',
-    add_to_cart: 'أضف إلى السلة',
-    details_title: 'تفاصيل البيع',
-    invoice: 'الفاتورة',
-    date: 'التاريخ',
-    sold_items: 'المنتجات المباعة',
-    no_items: 'لا توجد تفاصيل لهذا البيع.',
-    total_amount: 'المبلغ الإجمالي',
-    edit_title: 'تعديل البيع',
-    edit_articles: 'المنتجات',
-    edit_qty: 'الكمية',
-    edit_unit: 'سعر الوحدة',
-    edit_total: 'الإجمالي',
-    edit_status: 'حالة البيع',
-    edit_notes: 'ملاحظة',
-    edit_notes_ph: 'أضف أو عدّل ملاحظة...',
-    save: 'حفظ',
-    saving: 'جارٍ الحفظ...',
-    delete_title: 'تأكيد الحذف',
-    delete_q: 'حذف هذا البيع؟',
-    delete_invoice: (n) => `الفاتورة ${n}`,
-    delete_warn: 'تأكد أن واجهتك تتعامل مع استعادة المخزون عند الحذف.',
-    delete_confirm: 'نعم، احذف',
-    deleting: 'جارٍ الحذف...',
-    success_invoice: 'تم تسجيل البيع بنجاح',
-    facture: 'فاتورة',
-    thanks: 'شكرًا لشرائك!',
-    thanks_sub: 'نشكرك على ثقتك.',
-    print_invoice: 'طباعة الفاتورة',
-    new_sale: 'بيع جديد',
-    err_load: 'تعذّر تحميل المبيعات.',
-    err_empty: 'السلة فارغة.',
-    err_invalid_amount: 'المبلغ غير صالح.',
-    err_missing_cash: (v) => `ينقص ${v}`,
-    err_credit_customer: 'اختر عميلًا للبيع بالآجل.',
-    err_save: 'حدث خطأ أثناء التحصيل.',
-    err_edit: 'حدث خطأ أثناء التعديل.',
-    err_delete: 'حدث خطأ أثناء الحذف.',
-    err_scan: 'خطأ في الماسح.',
-    ok_sale: 'تم تسجيل البيع.',
-    ok_edit: 'تم تعديل البيع.',
-    ok_delete: 'تم حذف البيع.',
-    warn_out_of_stock: (n) => `المنتج «${n}» نفد من المخزون.`,
-    warn_max_stock: (n) => `الحد الأقصى للمخزون وصل للمنتج «${n}».`,
-    warn_no_product: 'لم يتم العثور على منتج.',
-    switch_title: 'تغيير اللغة',
+    form_title: 'بيع جديد', form_sub: 'أدخل معلومات المعاملة.',
+    f_invoice: 'رقم الفاتورة', f_customer: 'العميل', f_date: 'تاريخ البيع',
+    f_status: 'الحالة', f_payment: 'طريقة الدفع', f_notes: 'ملاحظة',
+    f_category: 'الفئة', f_product: 'المنتج', f_qty: 'الكمية', f_price: 'سعر الوحدة', f_add_item: 'إضافة صنف',
+    purchase_price: "سعر الشراء", sale_price_ph: "سعر البيع",
+    stock_available: (n) => `المخزون المتاح: ${n}`,
+    err_stock: (n) => `المخزون غير كافٍ. تبقى فقط ${n} وحدة.`,
+    err_qty_invalid: 'الكمية غير صالحة.',
+    no_items: 'لم يتم إضافة أصناف', saving: 'جارٍ التسجيل...', save: 'حفظ', cancel: 'إلغاء',
+    err_save: 'خطأ في التسجيل.', ok_sale: 'تم تسجيل البيع بنجاح.',
+    err_customer_credit: 'اختر عميلًا للبيع بالآجل.',
+    err_price_invalid: 'أدخل سعر وحدة صحيحًا.',
+    edit_title: 'تعديل البيع', delete_q: 'حذف هذا البيع؟', delete_confirm: 'نعم، احذف', deleting: 'جارٍ الحذف...',
+    details_title: 'تفاصيل البيع', success_invoice: 'تم التسجيل', facture: 'فاتورة',
+    thanks: 'شكرًا لك!', thanks_sub: 'نشكرك على ثقتك.',
+    err_load: 'تعذّر التحميل.', err_edit: 'خطأ في التعديل.', err_delete: 'خطأ في الحذف.',
+    ok_edit: 'تم التعديل.', ok_delete: 'تم الحذف.', close: 'إغلاق',
+    footer_total: 'إجمالي المعروض', footer_count: (n) => `${n} عملية بيع`,
+    export_all: 'تصدير إلى Excel', sort_by: 'ترتيب',
+    no_data: 'لا توجد مبيعات.', no_data_sub: 'عدّل البحث أو أنشئ بيعًا جديدًا.',
+    loading_sales: 'جارٍ تحميل المبيعات...',
   },
 };
 
-const formatNumber = (value) =>
-  new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(Number(value) || 0);
-
-const formatDate = (value, locale) => {
-  if (!value) return '—';
-  const d = new Date(value);
+const formatNumber = (v) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(Number(v) || 0);
+const formatDate = (v, locale) => {
+  if (!v) return '—';
+  const d = new Date(v);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString(locale, {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  return d.toLocaleString(locale, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ============================================================
+   CATEGORIE DU PRODUIT
+   ============================================================ */
+const getItemCategory = (item, productById) => {
+  if (!item) return '—';
+  const fromMap = item.product_id != null ? productById?.[String(item.product_id)] : null;
+  return (
+    fromMap?.categories?.name ||
+    fromMap?.category?.name ||
+    fromMap?.category_name ||
+    item?.categories?.name ||
+    item?.category?.name ||
+    item?.products?.categories?.name ||
+    item?.products?.category?.name ||
+    item?.products?.category_name ||
+    item?.category_name ||
+    item?.category ||
+    '—'
+  );
+};
+const getSaleCategories = (sale, productById) => {
+  const items = sale?.items || sale?.invoice_items || sale?.items_sale || [];
+  const cats = [];
+  items.forEach((it) => {
+    const c = getItemCategory(it, productById);
+    if (c && c !== '—' && !cats.includes(c)) cats.push(c);
   });
+  return cats.length ? cats.join(', ') : '—';
 };
 
-const escapeHtml = (value) =>
-  String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-/* 
-   COMPOSANT
- */
+/* ============================================================
+   MODALE D'AJOUT DE VENTE
+   ============================================================ */
+const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading, t, cur }) => {
+  const buildInitialForm = () => ({
+    invoice_number: `INV-${Date.now().toString().slice(-6)}`,
+    customer_id: '', status: 'paid', payment_method: 'cash',
+    date: new Date().toISOString().slice(0, 16), notes: '',
+  });
+  const [form, setForm] = useState(buildInitialForm);
+  const [items, setItems] = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [newItem, setNewItem] = useState({ product_id: '', quantity: 1, price: '' });
+  const [localError, setLocalError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setForm(buildInitialForm());
+      setItems([]);
+      setCategoryFilter('');
+      setNewItem({ product_id: '', quantity: 1, price: '' });
+      setLocalError('');
+    }
+  }, [isOpen]);
+
+  const productById = useMemo(() => {
+    const m = {};
+    products.forEach((p) => { m[String(p.id)] = p; });
+    return m;
+  }, [products]);
+
+  const categories = useMemo(() => {
+    const cats = products.map(p => p.categories?.name || p.category?.name || p.category_name || 'Non catégorisé');
+    return [...new Set(cats)].sort();
+  }, [products]);
+
+  const displayedProducts = useMemo(() => {
+    if (!categoryFilter) return products;
+    return products.filter(p => (p.categories?.name || p.category?.name || p.category_name || 'Non catégorisé') === categoryFilter);
+  }, [products, categoryFilter]);
+
+  if (!isOpen) return null;
+
+  const handleChange = (e) => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+
+  const handleSelectProduct = (e) => {
+    setNewItem(p => ({ ...p, product_id: e.target.value, price: '' }));
+    setLocalError('');
+  };
+
+  const addItem = () => {
+    if (!newItem.product_id) return setLocalError(t.f_product + ' requis');
+    const prod = products.find(p => String(p.id) === String(newItem.product_id));
+    const price = Number(newItem.price);
+    const qty = Number(newItem.quantity);
+    const stock = Number(prod?.quantity ?? prod?.stock ?? 0);
+    if (!Number.isFinite(price) || price <= 0) return setLocalError(t.err_price_invalid);
+    if (!Number.isFinite(qty) || qty <= 0) return setLocalError(t.err_qty_invalid);
+    const existingQty = items.filter(i => String(i.product_id) === String(newItem.product_id)).reduce((sum, i) => sum + i.quantity, 0);
+    if (existingQty + qty > stock) return setLocalError(t.err_stock(stock - existingQty));
+    setItems(prev => [...prev, {
+      product_id: newItem.product_id,
+      name: prod?.name || 'Produit',
+      category: prod?.categories?.name || prod?.category?.name || prod?.category_name || '—',
+      purchase_price: Number(prod?.purchase_price ?? 0),
+      quantity: qty,
+      price,
+      stock,
+    }]);
+    setNewItem({ product_id: '', quantity: 1, price: '' });
+    setLocalError('');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLocalError('');
+    if (items.length === 0) return setLocalError(t.no_items);
+    const isCredit = form.payment_method === 'credit' || form.status === 'partial';
+    if (isCredit && !form.customer_id) return setLocalError(t.err_customer_credit);
+    const totalNum = items.reduce((s, i) => s + (Number(i.price) * Number(i.quantity)), 0);
+    const payload = {
+      invoice_number: toTextOrNull(form.invoice_number),
+      customer_id: toNumOrNull(form.customer_id),
+      status: toTextOrNull(form.status) || 'paid',
+      payment_method: toTextOrNull(form.payment_method) || 'cash',
+      notes: toTextOrNull(form.notes),
+      invoice_date: form.date ? new Date(form.date).toISOString() : new Date().toISOString(),
+      total: totalNum, grand_total: totalNum, subtotal: totalNum, discount: 0,
+      paid_amount: isCredit ? 0 : totalNum,
+      balance: isCredit ? totalNum : 0,
+      amount_received: isCredit ? 0 : totalNum,
+      change_amount: 0,
+      items: items.map(i => ({
+        product_id: toNumOrNull(i.product_id),
+        quantity: toNumOrZero(i.quantity),
+        price: toNumOrZero(i.price),
+        unit_price: toNumOrZero(i.price),
+        total: toNumOrZero(Number(i.price) * Number(i.quantity)),
+      })),
+    };
+    await onSubmit(payload);
+  };
+
+  const subtotal = items.reduce((s, i) => s + (i.price * i.quantity), 0);
+  const selectedProduct = products.find(p => String(p.id) === String(newItem.product_id));
+
+  return (
+    <div className="ep-modal-overlay" onMouseDown={e => e.target === e.currentTarget && !loading && onClose()}>
+      <div className="ep-modal medium" role="dialog" aria-modal="true">
+        <div className="ep-modal-header">
+          <div>
+            <h3><span className="ep-modal-icon"><i className="fas fa-cash-register" /></span>{t.form_title}</h3>
+            <p>{t.form_sub}</p>
+          </div>
+          <button type="button" className="btn-icon" onClick={onClose} disabled={loading}><i className="fas fa-times" /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="ep-modal-body">
+            {localError && (
+              <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: 'var(--red-soft)', color: '#a3212e', fontSize: 13 }}>
+                <i className="fas fa-exclamation-circle" style={{ marginInlineEnd: 6 }} />{localError}
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginBottom: 12 }}>
+              <div className="ep-form-group" style={{ marginBottom: 0 }}>
+                <label>{t.f_customer}</label>
+                <select name="customer_id" value={form.customer_id} onChange={handleChange}>
+                  <option value="">{t.walk_in}</option>
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div className="ep-form-group">
+                <label>{t.f_date}</label>
+                <input type="datetime-local" name="date" value={form.date} onChange={handleChange} />
+              </div>
+              <div className="ep-form-group">
+                <label>{t.f_status}</label>
+                <select name="status" value={form.status} onChange={handleChange}>
+                  <option value="paid">{t.paid}</option>
+                  <option value="partial">{t.partial}</option>
+                  <option value="draft">{t.draft}</option>
+                  <option value="cancelled">{t.cancelled}</option>
+                </select>
+              </div>
+              <div className="ep-form-group">
+                <label>{t.f_payment}</label>
+                <select name="payment_method" value={form.payment_method} onChange={handleChange}>
+                  <option value="cash">{t.cash}</option>
+                  <option value="bankily">{t.bankily}</option>
+                  <option value="masrivi">{t.masrivi}</option>
+                  <option value="sedad">{t.sedad}</option>
+                  <option value="credit">{t.credit}</option>
+                </select>
+              </div>
+            </div>
+            <div className="ep-section-title" style={{ marginTop: 16 }}>
+              <span className="ep-section-num">1</span> Articles de la vente
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'end', flexWrap: 'wrap' }}>
+              <div className="ep-form-group" style={{ width: 150, marginBottom: 0 }}>
+                <label>{t.f_category}</label>
+                <select value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setNewItem(p => ({ ...p, product_id: '' })); }}>
+                  <option value="">Toutes</option>
+                  {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+              </div>
+              <div className="ep-form-group" style={{ flex: 2, marginBottom: 0, minWidth: 180 }}>
+                <label>{t.f_product}</label>
+                <select value={newItem.product_id} onChange={handleSelectProduct}>
+                  <option value="">-- Sélectionner --</option>
+                  {displayedProducts.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.purchase_price ? ` — achat: ${formatNumber(p.purchase_price)} ${cur}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {selectedProduct && (
+                  <small style={{ display: 'block', marginTop: 4, color: 'var(--primary)', fontSize: 11, fontWeight: 700 }}>
+                    <i className="fas fa-boxes" style={{ marginInlineEnd: 4 }} />
+                    {t.stock_available(selectedProduct.quantity ?? selectedProduct.stock ?? 0)}
+                  </small>
+                )}
+              </div>
+              <div className="ep-form-group" style={{ width: 90, marginBottom: 0 }}>
+                <label>{t.f_qty}</label>
+                <input type="number" min="1" max={selectedProduct ? (selectedProduct.quantity ?? selectedProduct.stock ?? 0) : ''} value={newItem.quantity} onChange={e => setNewItem(p => ({ ...p, quantity: e.target.value }))} />
+              </div>
+              <div className="ep-form-group" style={{ width: 130, marginBottom: 0 }}>
+                <label>{t.f_price}</label>
+                <input type="number" min="0" step="0.01" value={newItem.price} onChange={e => setNewItem(p => ({ ...p, price: e.target.value }))} placeholder={t.sale_price_ph} />
+              </div>
+              <button type="button" className="ep-btn ep-btn-save" style={{ height: 38, padding: '0 12px' }} onClick={addItem}>
+                <i className="fas fa-plus" />
+              </button>
+            </div>
+            <table className="ep-items-table" style={{ border: '1px solid var(--line)', borderRadius: 8 }}>
+              <thead>
+                <tr>
+                  <th>{t.f_product}</th>
+                  <th>{t.th_category}</th>
+                  <th className="ep-col-center" style={{ width: 80 }}>{t.f_qty}</th>
+                  <th className="ep-col-end" style={{ width: 110 }}>{t.f_price}</th>
+                  <th className="ep-col-end" style={{ width: 110 }}>{t.th_total}</th>
+                  <th style={{ width: 50 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.length === 0 ? (
+                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>{t.no_items}</td></tr>
+                ) : items.map((item, idx) => (
+                  <tr key={idx}>
+                    <td>{item.name}</td>
+                    <td><span className="ep-badge badge-blue">{item.category || getItemCategory(item, productById)}</span></td>
+                    <td className="ep-col-center">{item.quantity}</td>
+                    <td className="ep-col-end">{formatNumber(item.price)}</td>
+                    <td className="ep-col-end" style={{ fontWeight: 700 }}>{formatNumber(item.price * item.quantity)}</td>
+                    <td className="ep-col-center">
+                      <button type="button" className="btn-icon btn-delete" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}><i className="fas fa-trash-alt" /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: '#f8fafc' }}>
+                  <td colSpan="4" style={{ textAlign: 'right', fontWeight: 700 }}>TOTAL :</td>
+                  <td className="ep-col-end" style={{ fontWeight: 800, fontSize: 16 }}>{formatNumber(subtotal)} {cur}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+            <div className="ep-form-group" style={{ marginTop: 16 }}>
+              <label>{t.f_notes}</label>
+              <textarea rows="2" name="notes" value={form.notes} onChange={handleChange} placeholder="Notes optionnelles..." />
+            </div>
+          </div>
+          <div className="ep-modal-footer">
+            <button type="button" className="ep-btn ep-btn-cancel" onClick={onClose} disabled={loading}>{t.cancel}</button>
+            <button type="submit" className="ep-btn ep-btn-save" disabled={loading || items.length === 0}>
+              {loading ? <><i className="fas fa-spinner fa-spin" style={{ marginInlineEnd: 6 }} />{t.saving}</> : <><i className="fas fa-check" style={{ marginInlineEnd: 6 }} />{t.save}</>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================
+   PAGE PRINCIPALE
+   ============================================================ */
 const VentesPage = () => {
-  const { lang } = useLanguage(); // langue globale (menu)
-const t = I18N[lang];
-const cur = t.currency;
-  // Data
+  const { lang } = useLanguage();
+  const t = I18N[lang];
+  const cur = t.currency;
+
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
-
   const [loadingSales, setLoadingSales] = useState(true);
-  const [loadingProducts, setLoadingProducts] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  // Filters
+
   const [searchSale, setSearchSale] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPayment, setFilterPayment] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
-  const [search, setSearch] = useState('');
 
-  // POS form
-  const [cart, setCart] = useState([]);
-  const [customerId, setCustomerId] = useState('');
-  const [discount, setDiscount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [amountReceived, setAmountReceived] = useState('');
-  const [notes, setNotes] = useState('');
+  const [sortKey, setSortKey] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
 
-  // Modals
-  const [showModal, setShowModal] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
-  const [scannerCode, setScannerCode] = useState('');
-  const [showInvoice, setShowInvoice] = useState(false);
-  const [lastSale, setLastSale] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
   const [saleToEdit, setSaleToEdit] = useState(null);
   const [saleToDelete, setSaleToDelete] = useState(null);
@@ -356,6 +430,8 @@ const cur = t.currency;
   const [editNotes, setEditNotes] = useState('');
   const [editItems, setEditItems] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [lastSale, setLastSale] = useState(null);
 
   const showError = (m) => { setError(m); setSuccess(''); };
   const showSuccess = (m) => { setSuccess(m); setError(''); };
@@ -365,51 +441,56 @@ const cur = t.currency;
     const timer = window.setTimeout(() => { setError(''); setSuccess(''); }, 4500);
     return () => window.clearTimeout(timer);
   }, [error, success]);
+
   useEffect(() => { fetchSales(); fetchProducts(); fetchCustomers(); }, []);
 
-  /* ---------- Chargements ---------- */
   const fetchSales = async () => {
     setLoadingSales(true);
     try {
-      const response = await salesApi.getAll();
-      const data = response?.data;
+      const res = await salesApi.getAll();
+      const data = res?.data;
       setSales(Array.isArray(data) ? data : data?.data || []);
-    } catch (err) {
-      console.error('Erreur ventes:', err);
-      setSales([]);
-      showError(t.err_load);
-    } finally { setLoadingSales(false); }
+    } catch (err) { console.error(err); showError(t.err_load); }
+    finally { setLoadingSales(false); }
   };
 
   const fetchProducts = async () => {
-    setLoadingProducts(true);
     try {
-      const response = await productsApi.getAll();
-      const data = response?.data;
+      const res = await productsApi.getAll();
+      const data = res?.data;
       setProducts(Array.isArray(data) ? data : data?.data || []);
-    } catch (err) { console.error(err); setProducts([]); }
-    finally { setLoadingProducts(false); }
+    } catch (err) { console.error(err); }
   };
+
   const fetchCustomers = async () => {
     try {
-      const response = await customersApi.getAll();
-      const data = response?.data;
+      const res = await customersApi.getAll();
+      const data = res?.data;
       setCustomers(Array.isArray(data) ? data : data?.data || []);
     } catch (err) { console.warn(err); }
   };
 
-  /* ---------- Helpers de statut ---------- */
+  const productById = useMemo(() => {
+    const m = {};
+    products.forEach((p) => { m[String(p.id)] = p; });
+    return m;
+  }, [products]);
+
+  const allCategories = useMemo(() => {
+    const cats = products.map(p => p.categories?.name || p.category?.name || p.category_name).filter(Boolean);
+    return [...new Set(cats)].sort();
+  }, [products]);
+
   const getStatus = (status, paymentMethod) => {
     if (status === 'paid') {
-      switch (paymentMethod) {
-        case 'bankily': return { label: t.bankily, tone: 'violet', icon: 'fa-mobile-alt' };
-        case 'masrivi': return { label: t.masrivi, tone: 'amber', icon: 'fa-mobile-alt' };
-        case 'sedad': return { label: t.sedad, tone: 'green', icon: 'fa-mobile-alt' };
-        case 'credit': return { label: t.credit, tone: 'amber', icon: 'fa-hand-holding-usd' };
-        case 'card': return { label: t.card, tone: 'blue', icon: 'fa-credit-card' };
-        case 'cash':
-        default: return { label: t.cash, tone: 'green', icon: 'fa-money-bill-wave' };
-      }
+      const map = {
+        bankily: { label: t.bankily, tone: 'violet', icon: 'fa-mobile-alt' },
+        masrivi: { label: t.masrivi, tone: 'amber', icon: 'fa-mobile-alt' },
+        sedad: { label: t.sedad, tone: 'green', icon: 'fa-mobile-alt' },
+        credit: { label: t.credit, tone: 'amber', icon: 'fa-hand-holding-usd' },
+        cash: { label: t.cash, tone: 'green', icon: 'fa-money-bill-wave' },
+      };
+      return map[paymentMethod] || map.cash;
     }
     const statuses = {
       partial: { label: t.partial, tone: 'amber', icon: 'fa-clock' },
@@ -418,170 +499,144 @@ const cur = t.currency;
     };
     return statuses[status] || { label: status || '—', tone: 'gray', icon: 'fa-question-circle' };
   };
-  /* Calculs panier */
-  const subtotal = useMemo(() => cart.reduce((s, i) => s + Number(i.price) * Number(i.quantity || 0), 0), [cart]);
-  const discountValue = Math.min(Math.max(Number(discount) || 0, 0), subtotal);
-  const total = Math.max(subtotal - discountValue, 0);
-  const received = Number(amountReceived) || 0;
-  const change = paymentMethod === 'cash' ? Math.max(received - total, 0) : 0;
-  const totalItemsCart = cart.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
 
-  /* ---------- Filtrage + statistiques ---------- */
+  const getSaleItems = (sale) => sale?.items || sale?.invoice_items || sale?.items_sale || [];
+  const getCustomerName = (sale) => {
+    if (!sale) return t.walk_in;
+    const c = customers.find(i => String(i.id) === String(sale.customer_id));
+    return sale.customers?.name || sale.customer?.name || c?.name || t.walk_in;
+  };
+  const getTotalQuantity = (sale) => getSaleItems(sale).reduce((s, i) => s + Number(i.quantity || 0), 0);
+  const getProductNames = (sale) => {
+    const names = getSaleItems(sale).map(i => i.product_name || i.name || i.products?.name || 'Produit');
+    return names.length > 0 ? names.join(', ') : '—';
+  };
+
   const filteredSales = useMemo(() => {
     const q = searchSale.trim().toLowerCase();
     return sales.filter((sale) => {
-      const invoice = String(sale.invoice_number || '').toLowerCase();
-      const customer = String(sale.customers?.name || sale.customer?.name || t.walk_in).toLowerCase();
-      const matchesSearch = !q || invoice.includes(q) || customer.includes(q);
+      const inv = String(sale.invoice_number || '').toLowerCase();
+      const cust = String(sale.customers?.name || sale.customer?.name || t.walk_in).toLowerCase();
+      const prodNames = getProductNames(sale).toLowerCase();
+      const cats = getSaleCategories(sale, productById).toLowerCase();
+      const matchesSearch = !q || inv.includes(q) || cust.includes(q) || prodNames.includes(q) || cats.includes(q);
       const matchesStatus = filterStatus === 'all' || sale.status === filterStatus;
-      const saleDateStr = String(sale.created_at || '').slice(0, 10);
-      const matchesStart = !startDateFilter || saleDateStr >= startDateFilter;
-      const matchesEnd = !endDateFilter || saleDateStr <= endDateFilter;
-      return matchesSearch && matchesStatus && matchesStart && matchesEnd;
+      const matchesPayment = filterPayment === 'all' || sale.payment_method === filterPayment;
+      const matchesCategory = filterCategory === 'all' || getSaleCategories(sale, productById).split(', ').includes(filterCategory);
+      const dStr = String(sale.invoice_date || sale.created_at || '').slice(0, 10);
+      const matchesStart = !startDateFilter || dStr >= startDateFilter;
+      const matchesEnd = !endDateFilter || dStr <= endDateFilter;
+      return matchesSearch && matchesStatus && matchesPayment && matchesCategory && matchesStart && matchesEnd;
     });
-  }, [sales, searchSale, filterStatus, startDateFilter, endDateFilter, t.walk_in]);
+  }, [sales, searchSale, filterStatus, filterPayment, filterCategory, startDateFilter, endDateFilter, t.walk_in, productById]);
+
+  const sortedSales = useMemo(() => {
+    const arr = [...filteredSales];
+    const dir = sortDir === 'asc' ? 1 : -1;
+    arr.sort((a, b) => {
+      const getVal = (s) => {
+        switch (sortKey) {
+          case 'invoice': return String(s.invoice_number || '');
+          case 'customer': return String(s.customers?.name || s.customer?.name || '');
+          case 'category': return getSaleCategories(s, productById);
+          case 'total': return Number(s.grand_total ?? s.total ?? 0);
+          case 'status': return String(s.status || '');
+          case 'created_at':
+          default: return String(s.invoice_date || s.created_at || '');
+        }
+      };
+      const va = getVal(a), vb = getVal(b);
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+      return String(va).localeCompare(String(vb)) * dir;
+    });
+    return arr;
+  }, [filteredSales, sortKey, sortDir, productById]);
+
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+  const sortIcon = (key) => {
+    if (sortKey !== key) return 'fa-sort';
+    return sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
+  };
+
   const stats = useMemo(() => {
-    const validSales = sales.filter((s) => s.status !== 'cancelled');
+    const valid = sales.filter(s => s.status !== 'cancelled');
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    let dailySales = 0, dailyRevenue = 0, monthlySales = 0, monthlyRevenue = 0;
-    validSales.forEach((sale) => {
-      const date = new Date(sale.created_at);
-      if (Number.isNaN(date.getTime())) return;
-      const dStr = date.toISOString().split('T')[0];
-      const amount = Number(sale.grand_total ?? sale.total ?? 0);
-      if (dStr === todayStr) { dailySales++; dailyRevenue += amount; }
-      if (date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()) {
-        monthlySales++; monthlyRevenue += amount;
-      }
+    const today = now.toISOString().split('T')[0];
+    let dailyS = 0, dailyR = 0, monthlyS = 0, monthlyR = 0;
+    valid.forEach(s => {
+      const d = new Date(s.invoice_date || s.created_at);
+      if (Number.isNaN(d.getTime())) return;
+      const ds = d.toISOString().split('T')[0];
+      const amt = Number(s.grand_total ?? s.total ?? 0);
+      if (ds === today) { dailyS++; dailyR += amt; }
+      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) { monthlyS++; monthlyR += amt; }
     });
     return {
-      count: validSales.length,
-      revenue: validSales.reduce((s, x) => s + Number(x.grand_total ?? x.total ?? 0), 0),
-      dailySales, dailyRevenue, monthlySales, monthlyRevenue,
+      count: valid.length,
+      revenue: valid.reduce((a, x) => a + Number(x.grand_total ?? x.total ?? 0), 0),
+      dailyS, dailyR, monthlyS, monthlyR,
     };
   }, [sales]);
-  const hasFilters = Boolean(searchSale || filterStatus !== 'all' || startDateFilter || endDateFilter);
-  const resetFilters = () => { setSearchSale(''); setFilterStatus('all'); setStartDateFilter(''); setEndDateFilter(''); };
-  /* ---------- Panier ---------- */
-  const addToCart = (product) => {
-    const stock = Number(product.quantity) || 0;
-    if (stock <= 0) return showError(t.warn_out_of_stock(product.name));
-    const price = Number(product.sale_price) || 0;
-    setCart((prev) => {
-      const existing = prev.find((i) => String(i.product_id) === String(product.id));
-      if (existing) {
-        if (Number(existing.quantity) >= stock) { showError(t.warn_max_stock(product.name)); return prev; }
-        return prev.map((i) => String(i.product_id) === String(product.id) ? { ...i, quantity: Number(i.quantity) + 1 } : i);
-      }
-      return [...prev, {
-        product_id: product.id, name: product.name, price,
-        purchase_price: Number(product.purchase_price) || 0, quantity: 1, stock,
-        barcode: product.barcode || '', category: product.categories?.name || t.no_category,
-      }];
-    });
-    setError('');
-  };
-  const updateQuantity = (productId, delta) => {
-    setCart((prev) => prev.map((item) => {
-      if (String(item.product_id) !== String(productId)) return item;
-      const qty = Math.max(1, Math.min(Number(item.stock), Number(item.quantity || 0) + delta));
-      return { ...item, quantity: qty };
-    }));
-  };
-  const handleManualQuantityChange = (productId, value) => {
-    if (value === '') return setCart((prev) => prev.map((i) => String(i.product_id) === String(productId) ? { ...i, quantity: '' } : i));
-    let q = parseInt(value, 10);
-    if (Number.isNaN(q)) return;
-    const item = cart.find((e) => String(e.product_id) === String(productId));
-    if (!item) return;
-    q = Math.max(1, Math.min(Number(item.stock), q));
-    setCart((prev) => prev.map((e) => String(e.product_id) === String(productId) ? { ...e, quantity: q } : e));
-  };
-  const handleQuantityBlur = (productId) => {
-    setCart((prev) => prev.map((item) => String(item.product_id) !== String(productId) ? item : { ...item, quantity: Math.max(1, Math.min(Number(item.stock), Number(item.quantity) || 1)) }));
-  };
 
-  const removeFromCart = (productId) => setCart((prev) => prev.filter((i) => String(i.product_id) !== String(productId)));
-  const clearCart = () => { setCart([]); setDiscount(''); setAmountReceived(''); setCustomerId(''); setPaymentMethod('cash'); setSearch(''); setNotes(''); };
-  /* ---------- Scan ---------- */
-  const handleBarcodeSearch = async (code) => {
-    const clean = String(code || '').trim();
-    if (!clean) return;
-    try {
-      const response = await productsApi.getAll();
-      const data = response?.data;
-      const list = Array.isArray(data) ? data : data?.data || [];
-      const product = list.find((p) => String(p.barcode || '').trim() === clean);
-      if (!product) return showError(t.warn_no_product);
-      addToCart(product);
-      setSearch(''); setScannerCode(''); setShowScanner(false);
-    } catch { showError(t.err_scan); }
-  };
-  const handleSearchKeyDown = (e) => { if (e.key === 'Enter') { e.preventDefault(); if (search.trim()) handleBarcodeSearch(search); } };
-
-  /* ---------- Encaissement ---------- */
-  const handleCheckout = async () => {
-    if (cart.length === 0) return showError(t.err_empty);
-    if (total <= 0) return showError(t.err_invalid_amount);
-    if (paymentMethod === 'cash' && received < total) return showError(t.err_missing_cash(`${formatNumber(total - received)} ${cur}`));
-    if (paymentMethod === 'credit' && !customerId) return showError(t.err_credit_customer);
+  const handleAddSubmit = async (payload) => {
     setProcessing(true);
     try {
-      const payload = {
-        invoice_number: `INV-${Date.now().toString().slice(-8)}`,
-        customer_id: customerId || null,
-        total: subtotal, discount: discountValue, grand_total: total,
-        paid_amount: paymentMethod === 'credit' ? 0 : total,
-        balance: paymentMethod === 'credit' ? total : 0,
-        status: paymentMethod === 'credit' ? 'partial' : 'paid',
-        payment_method: paymentMethod,
-        amount_received: paymentMethod === 'cash' ? received : total,
-        change_amount: paymentMethod === 'cash' ? change : 0,
-        notes: notes.trim(),
-        items: cart.map((i) => ({
-          product_id: i.product_id, quantity: Number(i.quantity),
-          unit_price: Number(i.price), price: Number(i.price),
-          total: Number(i.price) * Number(i.quantity),
+      const cleanPayload = {
+        invoice_number: toTextOrNull(payload.invoice_number),
+        customer_id: toNumOrNull(payload.customer_id),
+        status: toTextOrNull(payload.status) || 'paid',
+        payment_method: toTextOrNull(payload.payment_method) || 'cash',
+        notes: toTextOrNull(payload.notes),
+        invoice_date: payload.invoice_date || new Date().toISOString(),
+        total: toNumOrZero(payload.total),
+        grand_total: toNumOrZero(payload.grand_total),
+        subtotal: toNumOrZero(payload.subtotal),
+        discount: toNumOrZero(payload.discount),
+        paid_amount: toNumOrZero(payload.paid_amount),
+        balance: toNumOrZero(payload.balance),
+        amount_received: toNumOrZero(payload.amount_received),
+        change_amount: toNumOrZero(payload.change_amount),
+        items: (payload.items || []).map(i => ({
+          product_id: toNumOrNull(i.product_id),
+          quantity: toNumOrZero(i.quantity),
+          price: toNumOrZero(i.price),
+          unit_price: toNumOrZero(i.unit_price ?? i.price),
+          total: toNumOrZero(i.total ?? (Number(i.price) * Number(i.quantity))),
         })),
       };
-      const response = await salesApi.checkout(payload);
-      const saleData = response?.data || {};
-      const invoiceItems = saleData.items || cart.map((i) => ({
-        product_name: i.name, name: i.name, quantity: Number(i.quantity),
-        price: Number(i.price), total: Number(i.price) * Number(i.quantity),
-      }));
+      const res = await salesApi.checkout(cleanPayload);
+      const saleData = res?.data || {};
       const completed = {
-        ...saleData, invoice_number: saleData.invoice_number || payload.invoice_number,
-        customer_id: saleData.customer_id || customerId || null, items: invoiceItems,
-        subtotal, discount: discountValue,
-        grand_total: Number(saleData.grand_total ?? saleData.total ?? total),
-        total: Number(saleData.grand_total ?? saleData.total ?? total),
-        amount_received: payload.amount_received, change_amount: payload.change_amount,
-        payment_method: paymentMethod, notes, created_at: saleData.created_at || new Date().toISOString(),
+        ...saleData,
+        invoice_number: saleData.invoice_number || cleanPayload.invoice_number,
+        items: saleData.items || cleanPayload.items.map(i => ({ ...i, product_name: i.name })),
+        grand_total: Number(saleData.grand_total ?? saleData.total ?? cleanPayload.grand_total),
+        invoice_date: saleData.invoice_date || cleanPayload.invoice_date,
+        created_at: saleData.created_at || cleanPayload.invoice_date,
       };
-      setLastSale(completed); setShowModal(false); setShowInvoice(true); clearCart();
+      setLastSale(completed);
+      setShowAddModal(false);
+      setShowInvoice(true);
       await Promise.all([fetchProducts(), fetchSales()]);
       showSuccess(t.ok_sale);
     } catch (err) {
-      console.error(err);
+      console.error('Erreur checkout:', err);
       showError(err?.message || t.err_save);
-    } finally { setProcessing(false); }
+    }
+    finally { setProcessing(false); }
   };
-
-  const handleNewSale = () => { setShowInvoice(false); setLastSale(null); clearCart(); setShowModal(true); fetchProducts(); fetchSales(); };
-
-  /* ---------- Édition / suppression ---------- */
-  const getSaleItems = (sale) => sale?.items || sale?.invoice_items || sale?.items_sale || [];
 
   const handleOpenEdit = (sale) => {
     setSaleToEdit(sale);
     setEditStatus(sale.status || 'paid');
     setEditNotes(sale.notes || '');
-    setEditItems(getSaleItems(sale).map((item) => ({
-      ...item,
-      quantity: Number(item.quantity) || 1,
-      price: Number(item.price ?? item.unit_price) || 0,
+    setEditItems(getSaleItems(sale).map(i => ({
+      ...i,
+      quantity: Number(i.quantity) || 1,
+      price: Number(i.price ?? i.unit_price) || 0,
     })));
   };
 
@@ -592,12 +647,15 @@ const cur = t.currency;
     try {
       const newTotal = editItems.reduce((s, i) => s + Number(i.quantity) * Number(i.price), 0);
       await salesApi.updateSale(saleToEdit.id, {
-        status: editStatus, notes: editNotes, total: newTotal, grand_total: newTotal,
+        status: editStatus,
+        notes: toTextOrNull(editNotes),
+        total: toNumOrZero(newTotal),
+        grand_total: toNumOrZero(newTotal),
       });
       setSaleToEdit(null);
       await fetchSales();
       showSuccess(t.ok_edit);
-    } catch (err) { console.error(err); showError(t.err_edit); }
+    } catch (err) { console.error(err); showError(err?.message || t.err_edit); }
     finally { setActionLoading(false); }
   };
 
@@ -605,91 +663,99 @@ const cur = t.currency;
     if (!saleToDelete) return;
     setActionLoading(true);
     try {
-      await salesApi.deleteSale(saleToDelete.id, saleToDelete.invoice_items);
+      await salesApi.deleteSale(saleToDelete.id, getSaleItems(saleToDelete));
       setSaleToDelete(null);
       await Promise.all([fetchSales(), fetchProducts()]);
       showSuccess(t.ok_delete);
-    } catch (err) { console.error(err); showError(t.err_delete); }
+    } catch (err) { console.error(err); showError(err?.message || t.err_delete); }
     finally { setActionLoading(false); }
   };
 
-  /* ---------- Helpers d'affichage ---------- */
-  const getInvoiceNumber = () => lastSale?.invoice_number || `VENTE-${lastSale?.id || Date.now()}`;
-  const getCustomerName = (sale) => {
-    if (!sale) return t.walk_in;
-    const customer = customers.find((i) => String(i.id) === String(sale.customer_id));
-    return sale.customers?.name || sale.customer?.name || customer?.name || t.walk_in;
-  };
-  const getTotalQuantity = (sale) => getSaleItems(sale).reduce((s, i) => s + Number(i.quantity || 0), 0);
-  const getAverageUnitPrice = (sale) => {
-    const qty = getTotalQuantity(sale);
-    return qty > 0 ? Number(sale.grand_total ?? sale.total ?? 0) / qty : 0;
-  };
-  const getProductNames = (sale) => {
-    const names = getSaleItems(sale).map((i) => i.product_name || i.name || i.products?.name || 'Produit');
-    return names.length > 0 ? names.join(', ') : '—';
-  };
-
-  /* ---------- Impression / export ---------- */
   const printInvoice = (saleToPrint = null) => {
     const sale = saleToPrint || lastSale;
     if (!sale) return;
     const items = getSaleItems(sale);
-    const invoiceNumber = sale.invoice_number || `VENTE-${sale.id}`;
-    const invoiceDate = sale.created_at || new Date();
-    const customerName = getCustomerName(sale);
-    const itemsHtml = items.map((item) => {
-      const name = item.product_name || item.name || item.products?.name || 'Produit';
-      const qty = Number(item.quantity) || 0;
-      const price = Number(item.price ?? item.unit_price) || 0;
-      const lineTotal = Number(item.total ?? price * qty);
-      return `<tr><td>${escapeHtml(name)}</td><td class="center">${qty}</td><td class="right">${formatNumber(price)}</td><td class="right">${formatNumber(lineTotal)}</td></tr>`;
+    const invNum = sale.invoice_number || `VENTE-${sale.id}`;
+    const custName = getCustomerName(sale);
+    const itemsHtml = items.map(i => {
+      const n = i.product_name || i.name || i.products?.name || 'Produit';
+      const cat = getItemCategory(i, productById);
+      const q = Number(i.quantity) || 0;
+      const p = Number(i.price ?? i.unit_price) || 0;
+      const lt = Number(i.total ?? q * p);
+      return `<tr><td>${escapeHtml(n)}</td><td>${escapeHtml(cat)}</td><td class="center">${q}</td><td class="right">${formatNumber(p)}</td><td class="right">${formatNumber(lt)}</td></tr>`;
     }).join('');
-    const subtotalInvoice = Number(sale.subtotal ?? sale.total ?? 0);
-    const discountInvoice = Number(sale.discount ?? 0);
-    const totalInvoice = Number(sale.grand_total ?? sale.total ?? 0);
-    const payLabels = { cash: t.cash, bankily: t.bankily, masrivi: t.masrivi, sedad: t.sedad, credit: t.credit, card: t.card };
+    const sub = Number(sale.subtotal ?? sale.total ?? 0);
+    const disc = Number(sale.discount ?? 0);
+    const tot = Number(sale.grand_total ?? sale.total ?? 0);
+    const dateVal = sale.invoice_date || sale.created_at;
     const win = window.open('', '_blank', 'width=900,height=900');
-    if (!win) return showError('Pop-up blocked.');
-    win.document.write(`
-      <!DOCTYPE html><html lang="${lang}" dir="${t.dir}"><head><meta charset="UTF-8"><title>${escapeHtml(invoiceNumber)}</title>
-      <style>*{box-sizing:border-box}body{margin:0;padding:30px;color:#14213d;font-family:${lang === 'ar' ? "'Cairo', " : ''}Arial,sans-serif}.invoice{max-width:800px;margin:auto}.header{text-align:center;border-bottom:2px solid #14213d;padding-bottom:18px}.store{font-size:26px;font-weight:800}.muted{color:#66748b;line-height:1.7}h2{text-align:center;margin:24px 0}.meta{display:flex;justify-content:space-between;gap:15px;margin:25px 0}.meta>div{flex:1;overflow-wrap:anywhere}.label{display:block;font-size:11px;color:#66748b;margin-bottom:5px}table{width:100%;border-collapse:collapse;margin-top:20px}th{background:#e8efff;text-align:${t.dir === 'rtl' ? 'right' : 'left'}}th,td{padding:11px 9px;border-bottom:1px solid #e3e9f2}.center{text-align:center}.right{text-align:${t.dir === 'rtl' ? 'left' : 'right'}}.totals{width:330px;max-width:100%;margin:22px 0 0 auto}.total-row{display:flex;justify-content:space-between;padding:8px 0}.grand{border-top:2px solid #14213d;border-bottom:2px solid #14213d;font-size:19px;font-weight:800;padding:13px 0}.footer{margin-top:40px;border-top:1px solid #ddd;padding-top:18px;text-align:center;color:#66748b}.notes{margin-top:20px;padding:10px;background:#f7f9fd;border-${t.dir === 'rtl' ? 'right' : 'left'}:3px solid #1f5eea;font-size:13px}@media print{body{padding:0}}</style></head><body>
-        <div class="invoice">
-          <div class="header"><div class="store">${escapeHtml(STORE.name)}</div><div class="muted">${escapeHtml(STORE.address)}<br>${escapeHtml(STORE.phone)}</div></div>
-          <h2>${t.facture}</h2>
-          <div class="meta"><div><span class="label">N°</span><strong>${escapeHtml(invoiceNumber)}</strong></div><div><span class="label">${t.date.toUpperCase()}</span><strong>${escapeHtml(formatDate(invoiceDate, t.locale))}</strong></div><div><span class="label">${t.customer.toUpperCase()}</span><strong>${escapeHtml(customerName)}</strong></div></div>
-          <table><thead><tr><th>${t.th_products}</th><th class="center">${t.edit_qty}</th><th class="right">${t.th_unit}</th><th class="right">${t.th_total}</th></tr></thead><tbody>${itemsHtml}</tbody></table>
-          <div class="totals"><div class="total-row"><span>${t.subtotal}</span><strong>${formatNumber(subtotalInvoice)} ${cur}</strong></div><div class="total-row"><span>${t.discount}</span><strong>- ${formatNumber(discountInvoice)} ${cur}</strong></div><div class="total-row grand"><span>${t.total_to_pay}</span><span>${formatNumber(totalInvoice)} ${cur}</span></div><div class="total-row"><span>${t.payment_method}</span><strong>${escapeHtml(payLabels[sale.payment_method] || t.cash)}</strong></div>${sale.payment_method === 'cash' ? `<div class="total-row"><span>${t.amount_received}</span><strong>${formatNumber(sale.amount_received)} ${cur}</strong></div><div class="total-row"><span>${t.change}</span><strong>${formatNumber(sale.change_amount)} ${cur}</strong></div>` : ''}</div>
-          ${sale.notes ? `<div class="notes"><strong>${t.edit_notes}:</strong> ${escapeHtml(sale.notes)}</div>` : ''}
-          <div class="footer">${t.thanks}<br>${t.thanks_sub}</div>
-        </div>
-      </body></html>
-    `);
-    win.document.close(); win.focus();
-    win.onload = () => win.print();
+    if (!win) return showError('Pop-up bloqué.');
+    win.document.write(`<!DOCTYPE html><html lang="${lang}" dir="${t.dir}"><head><meta charset="UTF-8"><title>${invNum}</title>
+    <style>*{box-sizing:border-box}body{margin:0;padding:30px;color:#14213d;font-family:${lang === 'ar' ? "'Cairo'," : ''}Arial,sans-serif}.inv{max-width:800px;margin:auto}.hdr{text-align:center;border-bottom:2px solid #14213d;padding-bottom:18px}.store{font-size:26px;font-weight:800}.muted{color:#66748b}h2{text-align:center;margin:24px 0}.meta{display:flex;justify-content:space-between;gap:15px;margin:25px 0}.meta>div{flex:1}.lbl{display:block;font-size:11px;color:#66748b;margin-bottom:5px}table{width:100%;border-collapse:collapse;margin-top:20px}th{background:#e8efff;text-align:${t.dir === 'rtl' ? 'right' : 'left'}}th,td{padding:11px 9px;border-bottom:1px solid #e3e9f2}.center{text-align:center}.right{text-align:${t.dir === 'rtl' ? 'left' : 'right'}}.totals{width:330px;margin:22px 0 0 auto}.row{display:flex;justify-content:space-between;padding:8px 0}.grand{border-top:2px solid #14213d;border-bottom:2px solid #14213d;font-size:19px;font-weight:800;padding:13px 0}.footer{margin-top:40px;border-top:1px solid #ddd;padding-top:18px;text-align:center;color:#66748b}@media print{body{padding:0}}</style></head><body>
+    <div class="inv"><div class="hdr"><div class="store">${escapeHtml(STORE.name)}</div><div class="muted">${escapeHtml(STORE.address)}<br>${escapeHtml(STORE.phone)}</div></div>
+    <h2>${t.facture}</h2><div class="meta"><div><span class="lbl">N°</span><strong>${escapeHtml(invNum)}</strong></div><div><span class="lbl">${t.th_date.toUpperCase()}</span><strong>${escapeHtml(formatDate(dateVal, t.locale))}</strong></div><div><span class="lbl">${t.f_customer.toUpperCase()}</span><strong>${escapeHtml(custName)}</strong></div></div>
+    <table><thead><tr><th>${t.f_product}</th><th>${t.th_category}</th><th class="center">${t.f_qty}</th><th class="right">${t.f_price}</th><th class="right">${t.th_total}</th></tr></thead><tbody>${itemsHtml}</tbody></table>
+    <div class="totals"><div class="row"><span>Sous-total</span><strong>${formatNumber(sub)} ${cur}</strong></div><div class="row"><span>Remise</span><strong>- ${formatNumber(disc)} ${cur}</strong></div><div class="row grand"><span>TOTAL</span><span>${formatNumber(tot)} ${cur}</span></div></div>
+    <div class="footer">${t.thanks}<br>${t.thanks_sub}</div></div></body></html>`);
+    win.document.close(); win.focus(); win.onload = () => win.print();
   };
 
   const exportSale = (sale) => {
     const items = getSaleItems(sale);
     const rows = [
       [t.th_invoice, sale.invoice_number || sale.id],
-      [t.th_date, formatDate(sale.created_at, t.locale)],
-      [t.th_customer, getCustomerName(sale)],
+      [t.th_date, formatDate(sale.invoice_date || sale.created_at, t.locale)],
+      [t.f_customer, getCustomerName(sale)],
       [t.th_status, getStatus(sale.status, sale.payment_method).label],
-      [t.th_obs, sale.notes || '—'], [],
-      [t.th_products, t.edit_qty, t.th_unit, t.th_total],
-      ...items.map((i) => [i.product_name || i.name || 'Produit', i.quantity || 0, i.price || 0, i.total ?? Number(i.quantity || 0) * Number(i.price || 0)]),
-      [], [t.total_amount, '', '', Number((sale.grand_total ?? sale.total) || 0)],
+      [],
+      [t.f_product, t.th_category, t.f_qty, t.f_price, t.th_total],
+      ...items.map(i => [i.product_name || i.name, getItemCategory(i, productById), i.quantity, i.price, i.total ?? i.quantity * i.price]),
+      [],
+      ['TOTAL', '', '', '', sale.grand_total ?? sale.total],
     ];
-    const csv = rows.map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url; link.download = `Vente_${sale.invoice_number || sale.id}.csv`;
+    link.href = url;
+    link.download = `Vente_${sale.invoice_number || sale.id}.csv`;
     document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
   };
 
-  const closeSaleModal = () => { if (processing) return; setShowModal(false); };
+  const exportFilteredSales = () => {
+    const rows = [
+      [t.th_invoice, t.th_customer, t.th_products, t.th_category, t.th_qty, t.th_total, t.th_status, t.f_payment, t.th_date],
+      ...filteredSales.map(s => [
+        s.invoice_number || `VENTE-${s.id}`,
+        getCustomerName(s),
+        getProductNames(s),
+        getSaleCategories(s, productById),
+        getTotalQuantity(s),
+        Number(s.grand_total ?? s.total ?? 0),
+        getStatus(s.status, s.payment_method).label,
+        getStatus(s.status, s.payment_method).label,
+        formatDate(s.invoice_date || s.created_at, t.locale),
+      ]),
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Ventes_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+  };
+
+  const hasFilters = Boolean(searchSale || filterStatus !== 'all' || filterPayment !== 'all' || filterCategory !== 'all' || startDateFilter || endDateFilter);
+  const resetFilters = () => {
+    setSearchSale('');
+    setFilterStatus('all');
+    setFilterPayment('all');
+    setFilterCategory('all');
+    setStartDateFilter('');
+    setEndDateFilter('');
+  };
 
   return (
     <div className="expenses-page" dir={t.dir} lang={lang}>
@@ -698,16 +764,11 @@ const cur = t.currency;
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
         .expenses-page {
           --ink:#14213d;--muted:#66748b;--line:#e3e9f2;--bg:#f2f5fb;--card:#fff;
-          --primary:#1f5eea;--primary-soft:#e8efff;
-          --green:#0f9d74;--green-soft:#def7ee;
-          --violet:#6a4de0;--violet-soft:#ece8fd;
-          --amber:#e08a0b;--amber-soft:#fff0d6;
-          --red:#d63c4a;--red-soft:#fde8ea;
-          --teal:#0e8fa8;--teal-soft:#dcf3f8;
-          --rose:#c2417c;--rose-soft:#fbe6f0;
-          min-height:100vh;padding:clamp(14px,2.2vw,28px);
-          background:radial-gradient(1000px 340px at 100% -80px,rgba(31,94,234,.08),transparent 70%),var(--bg);
-          color:var(--ink);font-family:Inter,'Segoe UI',system-ui,Tahoma,Arial,sans-serif;
+          --primary:#1f5eea;--primary-soft:#e8efff;--green:#0f9d74;--green-soft:#def7ee;
+          --violet:#6a4de0;--violet-soft:#ece8fd;--amber:#e08a0b;--amber-soft:#fff0d6;
+          --red:#d63c4a;--red-soft:#fde8ea;--rose:#c2417c;--rose-soft:#fbe6f0;
+          min-height:100vh;padding:clamp(14px,2.2vw,28px);background:radial-gradient(1000px 340px at 100% -80px,rgba(31,94,234,.08),transparent 70%),var(--bg);
+          color:var(--ink);font-family:Inter,'Segoe UI',system-ui,Tahoma,Arial,sans-serif;width:100%;min-width:0;overflow-x:hidden;font-size:14px;
         }
         .expenses-page[lang="ar"]{font-family:Cairo,'Noto Sans Arabic',Tahoma,'Segoe UI',Arial,sans-serif}
         .expenses-page *{box-sizing:border-box}
@@ -715,14 +776,11 @@ const cur = t.currency;
         .ep-amt{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
         .ep-hero{position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px;padding:clamp(20px,3vw,30px);margin-bottom:20px;border-radius:20px;color:#fff;background:linear-gradient(125deg,#0f2f66 0%,#1b55c9 58%,#2aa3d9 100%);box-shadow:0 14px 32px rgba(21,74,170,.2)}
         .ep-hero::after{content:"";position:absolute;z-index:-1;width:250px;height:250px;inset-inline-end:-70px;top:-115px;border:32px solid rgba(255,255,255,.09);border-radius:50%}
-        .ep-eyebrow{font-size:21px;font-weight:800;letter-spacing:1.8px;opacity:.78}
+        .ep-eyebrow{font-size:12px;font-weight:800;letter-spacing:1.8px;opacity:.78}
         .ep-title h1{margin:6px 0 4px;font-size:clamp(22px,2.8vw,30px);font-weight:800;display:flex;align-items:center;gap:12px;line-height:1.25}
         .ep-title-icon{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.16);font-size:18px}
-        .ep-title p{margin:0;color:rgba(255,255,255,.82);font-size:21px}
+        .ep-title p{margin:0;color:rgba(255,255,255,.82);font-size:13px}
         .ep-hero-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
-        .ep-lang{display:inline-flex;padding:3px;border-radius:11px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25)}
-        .ep-lang button{border:0;padding:7px 12px;border-radius:8px;background:transparent;color:#fff;font:inherit;font-size:12px;font-weight:800;cursor:pointer}
-        .ep-lang button.on{background:#fff;color:#153f92}
         .ep-btn-add{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border:0;border-radius:11px;background:#fff;color:#174078;font:inherit;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.14);transition:.18s}
         .ep-btn-add:hover{transform:translateY(-2px)}
         .ep-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:20px}
@@ -730,690 +788,166 @@ const cur = t.currency;
         .ep-card:hover{transform:translateY(-2px);box-shadow:0 12px 24px rgba(20,33,61,.08)}
         .ep-card::after{content:"";position:absolute;inset-inline-end:-30px;bottom:-42px;width:105px;height:105px;border-radius:50%;background:var(--accent-soft);opacity:.7}
         .ep-card-info{position:relative;z-index:1;min-width:0}
-        .ep-card-info h3{margin:0 0 9px;font-size:20px;color:var(--muted);font-weight:800}
+        .ep-card-info h3{margin:0 0 9px;font-size:13px;color:var(--muted);font-weight:800}
         .ep-card-info .value{font-size:clamp(20px,2vw,26px);font-weight:800;letter-spacing:-.3px;color:var(--ink);overflow-wrap:anywhere}
-        .ep-card-info .sub{margin-top:5px;font-size:20px;color:var(--accent);font-weight:700}
+        .ep-card-info .sub{margin-top:5px;font-size:12px;color:var(--accent);font-weight:700}
         .ep-icon{position:relative;z-index:1;flex:0 0 44px;width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font-size:21px;background:var(--accent-soft);color:var(--accent)}
-        .tone-blue{--accent:var(--primary);--accent-soft:var(--primary-soft)}
-        .tone-amber{--accent:var(--amber);--accent-soft:var(--amber-soft)}
-        .tone-violet{--accent:var(--violet);--accent-soft:var(--violet-soft)}
-        .tone-green{--accent:var(--green);--accent-soft:var(--green-soft)}
+        .tone-blue{--accent:var(--primary);--accent-soft:var(--primary-soft)}.tone-amber{--accent:var(--amber);--accent-soft:var(--amber-soft)}
+        .tone-violet{--accent:var(--violet);--accent-soft:var(--violet-soft)}.tone-green{--accent:var(--green);--accent-soft:var(--green-soft)}
         .tone-rose{--accent:var(--rose);--accent-soft:var(--rose-soft)}
         .ep-panel{background:var(--card);border-radius:16px;border:1px solid var(--line);overflow:hidden;box-shadow:0 4px 14px rgba(20,33,61,.035);margin-bottom:20px}
         .ep-panel-head{padding:16px 20px;border-bottom:1px solid var(--line);background:#fbfcff;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px}
-        .ep-panel-head h5{margin:0 0 4px;font-size:21px;font-weight:800}
-        .ep-panel-head p{margin:0;font-size:20px;color:var(--muted)}
-        .ep-filters{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr auto;gap:10px;align-items:end;padding:15px 20px;background:#fbfcff;border-bottom:1px solid var(--line)}
+        .ep-panel-head h5{margin:0 0 4px;font-size:16px;font-weight:800}
+        .ep-panel-head p{margin:0;font-size:12px;color:var(--muted)}
+        .ep-filters{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;padding:15px 20px;background:#fbfcff;border-bottom:1px solid var(--line)}
         .ep-fg{display:flex;flex-direction:column;gap:5px;min-width:0}
-        .ep-fg label{font-size:20px;font-weight:800;color:#4b5b75;text-transform:uppercase;letter-spacing:.4px}
-        .ep-filter-input{width:100%;height:40px;border:1px solid #d9e1ed;border-radius:9px;padding:0 12px;font:inherit;font-size:20px;color:#2a3a55;background:#fff;outline:none}
+        .ep-fg label{font-size:11px;font-weight:800;color:#4b5b75;text-transform:none;letter-spacing:0}
+        .ep-filter-input{width:100%;height:38px;border:1px solid #d9e1ed;border-radius:9px;padding:0 12px;font:inherit;font-size:13px;color:#2a3a55;background:#fff;outline:none}
         .ep-filter-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
-        .ep-reset{height:40px;padding:0 13px;border:1px solid var(--line);border-radius:9px;background:#fff;color:#4b5b75;font:inherit;font-size:20px;font-weight:800;cursor:pointer;white-space:nowrap}
+        .ep-reset{height:38px;padding:0 13px;border:1px solid var(--line);border-radius:9px;background:#fff;color:#4b5b75;font:inherit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}
         .ep-reset:hover{background:#f1f5fb}
-        .ep-table-wrap{overflow-x:auto}
-        .ep-table{width:100%;min-width:1080px;border-collapse:collapse}
-        .ep-table th{background:#f3f6fc;color:#5b6b85;text-align:start;padding:14px 16px;font-size:21px;font-weight:800;letter-spacing:.4px;border-bottom:1px solid var(--line);white-space:nowrap}
-        .ep-table td{padding:13px 16px;border-bottom:1px solid #f0f3f8;font-size:21px;color:#44546d;vertical-align:middle}
+        .ep-table-wrap{overflow-x:auto;width:100%;max-width:100%}
+        .ep-table{width:100%;min-width:1180px;border-collapse:collapse;white-space:normal}
+        .ep-table th{background:#f3f6fc;color:#5b6b85;text-align:start;padding:11px 12px;font-size:11px;font-weight:800;letter-spacing:.4px;border-bottom:1px solid var(--line);white-space:nowrap;overflow-wrap:anywhere;user-select:none}
+        .ep-table th.sortable{cursor:pointer}
+        .ep-table th.sortable:hover{background:#e8eef9}
+        .ep-table td{padding:10px 12px;border-bottom:1px solid #f0f3f8;font-size:12px;color:#44546d;vertical-align:middle;overflow-wrap:anywhere}
         .ep-table tbody tr:nth-child(even) td{background:#fafbfe}
         .ep-table tbody tr:hover td{background:#eff4ff}
         .ep-table tr:last-child td{border-bottom:0}
-        .ep-col-end{text-align:end!important}
-        .ep-col-center{text-align:center!important}
+        .ep-col-end{text-align:end!important}.ep-col-center{text-align:center!important}
         .ep-state{padding:40px 18px!important;text-align:center;color:#8896ab!important}
         .ep-spinner{display:inline-block;width:22px;height:22px;margin-inline-end:10px;vertical-align:middle;border:3px solid #dbeafe;border-top-color:var(--primary);border-radius:50%;animation:ep-spin .75s linear infinite}
         @keyframes ep-spin{to{transform:rotate(360deg)}}
-        @media (prefers-reduced-motion:reduce){.ep-spinner{animation-duration:2s}.ep-card,.ep-btn-add{transition:none}}
         .ep-customer-cell{display:flex;align-items:center;gap:10px;min-width:150px}
         .ep-avatar{flex:0 0 34px;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--primary-soft);color:var(--primary);font-size:13px}
-        .ep-customer-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;color:#2a3a55}
-        .ep-subtext{display:block;margin-top:3px;font-size:20px;color:var(--muted)}
-        .ep-ref{color:var(--primary);font-weight:800}
-        .ep-badge{display:inline-block;padding:5px 11px;border-radius:999px;font-size:21px;font-weight:800;white-space:nowrap}
-        .badge-blue{background:var(--primary-soft);color:#164aba}
-        .badge-violet{background:var(--violet-soft);color:#4a32b0}
-        .badge-green{background:var(--green-soft);color:#0b6a4e}
-        .badge-amber{background:var(--amber-soft);color:#94590a}
-        .badge-rose{background:var(--rose-soft);color:#9c2a62}
-        .badge-teal{background:var(--teal-soft);color:#0a6577}
-        .badge-gray{background:#eef2f8;color:#4b5b75}
+        .ep-customer-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;color:#2a3a55;font-size:12px}
+        .ep-ref{color:var(--primary);font-weight:800;font-size:12px}
+        .ep-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap}
+        .badge-blue{background:var(--primary-soft);color:#164aba}.badge-violet{background:var(--violet-soft);color:#4a32b0}
+        .badge-green{background:var(--green-soft);color:#0b6a4e}.badge-amber{background:var(--amber-soft);color:#94590a}
+        .badge-rose{background:var(--rose-soft);color:#9c2a62}.badge-gray{background:#eef2f8;color:#4b5b75}
         .ep-money{font-weight:800;color:var(--ink);white-space:nowrap}
         .ep-money-total{color:#0b6a4e}
-        .ep-actions{display:flex;gap:6px;justify-content:flex-end}
+        .ep-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:nowrap}
         .btn-icon{width:32px;height:32px;border-radius:8px;border:1px solid transparent;display:grid;place-items:center;cursor:pointer;transition:.18s;background:transparent;color:#64748b;font-size:12px}
         .btn-icon:hover{background:#eef2f8}
-        .btn-view{background:var(--primary-soft);color:var(--primary);border-color:#c9daff}
-        .btn-view:hover{background:var(--primary);color:#fff}
-        .btn-edit{background:var(--amber-soft);color:var(--amber);border-color:#f5dcb0}
-        .btn-edit:hover{background:var(--amber);color:#fff}
-        .btn-delete{background:var(--red-soft);color:var(--red);border-color:#f6c8cd}
-        .btn-delete:hover{background:var(--red);color:#fff}
-
-        /* Modales */
-        .ep-modal-overlay{position:fixed;inset:0;z-index:1050;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.58);backdrop-filter:blur(4px)}
-        .ep-modal{width:100%;max-width:1080px;max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:18px;box-shadow:0 25px 50px rgba(0,0,0,.22)}
-        .ep-modal.small{max-width:440px}
-        .ep-modal.medium{max-width:720px}
-        .ep-modal-header{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fbfcff,#fff);gap:12px}
-        .ep-modal-header h3{margin:0;font-size:20px;font-weight:800;display:flex;align-items:center;gap:10px}
-        .ep-modal-header p{margin:4px 0 0;font-size:18px;color:var(--muted)}
-        .ep-modal-icon{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--primary-soft);color:var(--primary);font-size:14px}
-        .ep-modal-icon.success{background:var(--green-soft);color:var(--green)}
-        .ep-modal-icon.danger{background:var(--red-soft);color:var(--red)}
-        .ep-modal-icon.amber{background:var(--amber-soft);color:var(--amber)}
-        .ep-modal-body{padding:22px}
-        .ep-modal-footer{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;padding:15px 22px;background:#f7f9fd;border-top:1px solid var(--line)}
+        .btn-view{background:var(--primary-soft);color:var(--primary);border-color:#c9daff}.btn-view:hover{background:var(--primary);color:#fff}
+        .btn-edit{background:var(--amber-soft);color:var(--amber);border-color:#f5dcb0}.btn-edit:hover{background:var(--amber);color:#fff}
+        .btn-delete{background:var(--red-soft);color:var(--red);border-color:#f6c8cd}.btn-delete:hover{background:var(--red);color:#fff}
+        .ep-modal-overlay{position:fixed;inset:0;z-index:1060;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;background:rgba(0,0,0,.50);backdrop-filter:none}
+        .ep-modal{display:flex;flex-direction:column;width:100%;max-width:800px;max-height:calc(100vh - 2rem);margin:auto;overflow:hidden;background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:.5rem;box-shadow:0 .5rem 1rem rgba(0,0,0,.15)}
+        .ep-modal.small{max-width:500px}.ep-modal.medium{max-width:700px}
+        .ep-modal-header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.25rem;color:#212529;background:#fff;border-bottom:1px solid #dee2e6}
+        .ep-modal-header h3{display:flex;align-items:center;gap:.65rem;margin:0;color:#212529;font-size:1.15rem;font-weight:600}
+        .ep-modal-header p{margin:.25rem 0 0 2.7rem;color:#6c757d;font-size:.875rem}
+        .ep-modal-icon{width:34px;height:34px;border-radius:.375rem;display:inline-grid;place-items:center;background:var(--primary-soft);color:var(--primary);font-size:14px}
+        .ep-modal-icon.success{background:var(--green-soft);color:var(--green)}.ep-modal-icon.amber{background:var(--amber-soft);color:var(--amber)}
+        .ep-modal-body{flex:1 1 auto;min-height:0;padding:1.25rem;overflow-y:auto;overscroll-behavior:contain;background:#fff}
+        .ep-modal-footer{flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:.5rem;padding:.75rem 1.25rem;background:#fff;border-top:1px solid #dee2e6}
         .ep-modal-footer.center{justify-content:center}
-        .ep-form-group{margin-bottom:15px}
-        .ep-form-group label{display:block;margin-bottom:6px;font-size:18px;font-weight:800;color:#4b5b75}
-        .ep-form-group input,.ep-form-group select,.ep-form-group textarea{width:100%;border:1px solid #d9e1ed;border-radius:9px;padding:10px 12px;font:inherit;font-size:14px;color:#2a3a55;background:#fbfcfe;outline:none}
-        .ep-form-group input:focus,.ep-form-group select:focus,.ep-form-group textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);background:#fff}
-        .ep-btn{padding:10px 20px;border-radius:10px;border:0;font:inherit;font-size:18px;font-weight:800;cursor:pointer;transition:.18s}
+        .ep-form-group{margin-bottom:.75rem}
+        .ep-form-group label{display:block;margin-bottom:.45rem;color:#212529;font-size:.9rem;font-weight:600}
+        .ep-form-group input,.ep-form-group select,.ep-form-group textarea{width:100%;min-height:38px;padding:.375rem .75rem;color:#212529;background:#fff;border:1px solid #ced4da;border-radius:.375rem;font:inherit;font-size:.95rem;outline:none}
+        .ep-form-group input:focus,.ep-form-group select:focus,.ep-form-group textarea:focus{border-color:#86b7fe;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}
+        .ep-btn{padding:.45rem .9rem;border-radius:.375rem;border:0;font:inherit;font-size:.9rem;font-weight:500;cursor:pointer;transition:.18s;box-shadow:none;transform:none}
         .ep-btn:hover:not(:disabled){filter:brightness(.96);transform:translateY(-1px)}
         .ep-btn:disabled{opacity:.6;cursor:not-allowed}
-        .ep-btn-cancel{background:#e6ebf3;color:#44546d}
-        .ep-btn-save{background:linear-gradient(135deg,#1f5eea,#2f7bf0);color:#fff}
-        .ep-btn-danger{background:var(--red);color:#fff}
-        .ep-btn-outline{background:#fff;color:#4b5b75;border:1px solid var(--line)}
-        .ep-alert{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;padding:13px 16px;border-radius:11px;font-size:13px}
-        .ep-alert.danger{border:1px solid #f6c8cd;background:var(--red-soft);color:#a3212e}
-        .ep-alert.success{border:1px solid #bfe8d9;background:var(--green-soft);color:#0b6a4e}
-        .ep-alert button{border:0;padding:7px 12px;border-radius:8px;background:#fff;font:inherit;font-size:20px;font-weight:800;cursor:pointer;color:inherit}
-
-        /* POS */
-        .pos-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:20px}
-        @media (max-width:900px){.pos-grid{grid-template-columns:1fr}}
-        .pos-products{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-height:420px;overflow-y:auto;padding:4px}
-        @media (max-width:720px){.pos-products{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media (max-width:420px){.pos-products{grid-template-columns:1fr}}
-        .pos-product{position:relative;min-width:0;padding:12px;border:1px solid #e3eaf4;border-radius:12px;background:#fff;cursor:pointer;text-align:start;transition:border .18s,box-shadow .18s,transform .18s}
-        .pos-product:hover:not(:disabled){border-color:#93c5fd;box-shadow:0 5px 15px rgba(31,94,234,.09);transform:translateY(-2px)}
-        .pos-product.in-cart{border-color:#60a5fa;background:#f0f7ff}
-        .pos-product:disabled{opacity:.55;cursor:not-allowed}
-        .pos-product-avatar{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--primary-soft);color:var(--primary);font-size:12px}
-        .pos-product-name{display:block;font-weight:800;font-size:18px;margin:8px 0 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .pos-product-cat{color:var(--muted);font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .pos-product-bottom{display:flex;justify-content:space-between;align-items:center;gap:5px;margin-top:10px;font-size:19px}
-        .pos-product-price{color:var(--primary);font-weight:800}
-        .pos-product-stock{border-radius:5px;padding:2px 6px;font-size:18px;font-weight:800;background:var(--green-soft);color:#0b6a4e}
-        .pos-product-stock.low{background:var(--red-soft);color:#a3212e}
-
-        .pos-cart{border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#fff}
-        .pos-cart-header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-weight:800;font-size:13px}
-        .pos-cart-list{list-style:none;padding:0;margin:0;max-height:280px;overflow-y:auto}
-        .pos-cart-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;border-bottom:1px solid #edf1f7}
-        .pos-cart-item:last-child{border-bottom:0}
-        .pos-cart-name{font-size:18px;font-weight:800;color:#2a3a55}
-        .pos-cart-detail{color:var(--muted);font-size:18px;margin-top:3px}
-        .pos-qty{display:flex;align-items:center;gap:4px}
-        .pos-qty button{width:26px;height:26px;border:1px solid #dbe4f0;background:#fff;border-radius:6px;color:var(--primary);font-weight:800;cursor:pointer}
-        .pos-qty button:hover{background:var(--primary-soft)}
-        .pos-qty input{width:44px;height:27px;padding:2px;text-align:center;border:1px solid #dbe4f0;border-radius:6px;font-size:20px}
-        .pos-cart-line{font-size:18px;font-weight:800;text-align:end;white-space:nowrap}
-        .pos-cart-remove{border:0;color:var(--red);background:transparent;padding:4px;cursor:pointer}
-        .pos-cart-footer{padding:14px;border-top:1px solid #e2e8f0}
-
-        .pos-totals{padding:12px;border-radius:10px;background:#f8fafc;margin:12px 0}
-        .pos-total-row{display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:18px}
-        .pos-grand-total{border-top:1px dashed #cbd5e1;margin-top:6px;padding-top:10px;font-size:20px;font-weight:900}
-        .pos-payments{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-        @media (max-width:420px){.pos-payments{grid-template-columns:repeat(2,1fr)}}
-        .pos-payment-btn{padding:8px 4px;border:1px solid #dbe4f0;border-radius:9px;background:#fff;font-size:18px;font-weight:700;cursor:pointer;transition:.15s}
-        .pos-payment-btn:hover{border-color:var(--primary)}
-        .pos-payment-btn.active{border-color:var(--primary);color:var(--primary);background:var(--primary-soft);box-shadow:inset 0 0 0 1px var(--primary)}
-        .pos-checkout{width:100%;padding:13px;margin-top:12px;border-radius:10px;font-weight:800}
-
-        .ep-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
-        @media (max-width:720px){.ep-detail-grid{grid-template-columns:1fr}}
-        .ep-detail-item{padding:12px;border:1px solid var(--line);border-radius:10px;background:#fbfcff;overflow-wrap:anywhere}
-        .ep-detail-item span{display:block;font-size:20px;color:var(--muted);margin-bottom:5px;font-weight:700}
-        .ep-detail-item strong{font-size:20px;color:#2a3a55}
-        .ep-section-title{display:flex;align-items:center;gap:9px;margin:18px 0 12px;font-size:18px;font-weight:800;color:#2a3a55}
+        .ep-btn-cancel,.ep-btn-outline{color:#fff;background:#6c757d;border:1px solid #6c757d}
+        .ep-btn-save{color:#fff;background:#0d6efd;border:1px solid #0d6efd}
+        .ep-btn-danger{color:#fff;background:#dc3545;border:1px solid #dc3545}
+        .ep-section-title{display:flex;align-items:center;gap:9px;margin:18px 0 12px;font-size:14px;font-weight:800;color:#2a3a55}
         .ep-section-num{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:var(--primary-soft);color:var(--primary);font-size:11px;font-weight:800}
-        .ep-items-table{width:100%;border-collapse:collapse;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-        .ep-items-table th{background:#f3f6fc;color:#5b6b85;text-align:start;padding:10px 12px;font-size:19px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;border-bottom:1px solid var(--line)}
-        .ep-items-table td{padding:10px 12px;font-size:20px;border-bottom:1px solid #f0f3f8}
+        .ep-items-table{width:100%;border-collapse:collapse;border:1px solid var(--line);border-radius:10px;overflow:hidden;display:table;min-width:560px}
+        .ep-items-table th{background:#f3f6fc;color:#5b6b85;text-align:start;padding:10px 12px;font-size:11px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;border-bottom:1px solid var(--line)}
+        .ep-items-table td{padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f3f8}
         .ep-items-table tr:last-child td{border-bottom:0}
-
-        .ep-delete-body{padding:28px 22px 10px;text-align:center}
-        .ep-delete-icon{display:inline-grid;place-items:center;width:58px;height:58px;margin-bottom:14px;border-radius:50%;background:var(--red-soft);color:var(--red);font-size:24px}
-        .ep-delete-body h4{margin:0 0 6px;font-size:22px;font-weight:800}
-        .ep-delete-body p{margin:0 0 10px;color:var(--muted);font-size:18px}
-        .ep-delete-name{background:#f7f9fd;border-radius:9px;padding:10px 14px;font-weight:800;margin:10px 0}
-
-        .ep-toast{position:fixed;z-index:1100;top:20px;inset-inline-end:20px;width:min(420px,calc(100% - 40px));display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;background:#fff;box-shadow:0 12px 30px rgba(20,40,70,.15);border-inline-start:4px solid var(--primary);font-size:18px}
+        .ep-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+        @media(max-width:720px){.ep-detail-grid{grid-template-columns:1fr}}
+        .ep-detail-item{padding:12px;border:1px solid var(--line);border-radius:10px;background:#fbfcff;overflow-wrap:anywhere}
+        .ep-detail-item span{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:700}
+        .ep-detail-item strong{font-size:13px;color:#2a3a55}
+        .ep-toast{position:fixed;z-index:1100;top:20px;inset-inline-end:20px;width:min(420px,calc(100% - 40px));display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;background:#fff;box-shadow:0 12px 30px rgba(20,40,70,.15);border-inline-start:4px solid var(--primary);font-size:12px}
         .ep-toast.success{border-inline-start-color:var(--green);color:#0b6a4e}
         .ep-toast.danger{border-inline-start-color:var(--red);color:#a3212e}
-
-        @media (max-width:1100px){.ep-filters{grid-template-columns:1fr 1fr}.ep-filters .ep-fg-search{grid-column:1/-1}}
-        @media (max-width:900px){.ep-stats{grid-template-columns:repeat(2,1fr)}}
-        @media (max-width:560px){
-          .expenses-page{padding:12px}
-          .ep-filters{grid-template-columns:1fr;padding:14px}
-          .ep-hero-actions{width:100%}.ep-btn-add{flex:1;justify-content:center}
-          .ep-stats{grid-template-columns:1fr}
-          .ep-modal-footer .ep-btn{flex:1}
-          .ep-modal-footer.center{flex-direction:column-reverse}
+        .ep-delete-body{padding:28px 22px 10px;text-align:center}
+        .ep-delete-icon{display:inline-grid;place-items:center;width:58px;height:58px;margin-bottom:14px;border-radius:50%;background:var(--red-soft);color:var(--red);font-size:24px}
+        .ep-delete-body h4{margin:0 0 6px;font-size:17px;font-weight:800}
+        .ep-delete-body p{margin:0 0 10px;color:var(--muted);font-size:13px}
+        .expenses-page { padding: 0; background: #f4f5f7; }
+        .expenses-page .ep-stats { padding: 22px 10px 0; gap: 24px; margin-bottom: 24px; }
+        .expenses-page .ep-card { min-height: 92px; padding: 16px 18px; border: 0; border-radius: 0; box-shadow: 0 2px 5px rgba(0,0,0,.16); color: #fff; }
+        .expenses-page .ep-card-info h3, .expenses-page .ep-card-info .value, .expenses-page .ep-card-info .sub { color: #fff; }
+        .expenses-page .ep-card-info h3 { font-size: 15px; margin-bottom: 4px; }
+        .expenses-page .ep-card-info .value { font-size: 30px; line-height: 1.15; }
+        .expenses-page .ep-card-info .sub { font-size: 11px; opacity: .9; }
+        .expenses-page .ep-icon { background: transparent; color: #fff; font-size: 30px; }
+        .expenses-page .tone-violet { background: #5954d6; --accent:#fff; --accent-soft:rgba(255,255,255,.12); }
+        .expenses-page .tone-green { background: #159b45; --accent:#fff; --accent-soft:rgba(255,255,255,.12); }
+        .expenses-page .tone-blue { background: #3295f0; --accent:#fff; --accent-soft:rgba(255,255,255,.12); }
+        .expenses-page .tone-amber { background: #f5aa0b; --accent:#fff; --accent-soft:rgba(255,255,255,.12); }
+        .expenses-page .ep-hero { margin: 0 0 16px; padding: 9px 16px; min-height: 55px; border-radius: 0; background: #5954d6; box-shadow: none; }
+        .expenses-page .ep-hero::after { display:none; }
+        .expenses-page .ep-eyebrow, .expenses-page .ep-title p { display:none; }
+        .expenses-page .ep-title h1 { margin:0; font-size:22px; color:#fff; }
+        .expenses-page .ep-title-icon { width:auto; height:auto; background:transparent; font-size:22px; }
+        .expenses-page .ep-hero-actions { gap:8px; }
+        .expenses-page .ep-btn-add { padding:9px 14px; border-radius:4px; background:#159b45; color:#fff; box-shadow:none; }
+        .expenses-page .ep-btn-add:hover { background:#12853c; transform:none; }
+        .expenses-page .ep-hero-refresh { min-height:36px; padding:7px 12px; border:0; border-radius:4px; background:#fff; color:#172033; }
+        .expenses-page .ep-panel { margin:0 10px 20px; border-radius:0; box-shadow:none; }
+        .expenses-page .ep-panel-head { padding:10px 14px; background:#5954d6; color:#fff; border:0; align-items:center; }
+        .expenses-page .ep-panel-head h5, .expenses-page .ep-panel-head p { color:#fff; }
+        .expenses-page .ep-panel-head h5 { font-size:18px; margin:0; }
+        .expenses-page .ep-panel-head p { display:none; }
+        .expenses-page .ep-panel-head h5 i { color:#fff !important; }
+        .expenses-page .ep-panel-head .ep-btn { border-radius:4px; }
+        .expenses-page .ep-filters { grid-template-columns:1.2fr 1fr 1fr 1fr 1fr 1fr auto; padding:14px 12px; background:#fff; }
+        .expenses-page .ep-fg label { font-size:12px; letter-spacing:0; text-transform:none; }
+        .expenses-page .ep-filter-input, .expenses-page .ep-reset { height:38px; font-size:13px; border-radius:4px; }
+        .expenses-page .ep-table { min-width:1150px; }
+        .expenses-page .ep-table th { padding:13px 10px; background:#222833; color:#fff; border:1px solid #424b58; font-size:13px; }
+        .expenses-page .ep-table th.sortable:hover { background:#2f3744; }
+        .expenses-page .ep-table td { padding:11px 10px; border:1px solid #d8dee8; font-size:13px; color:#172033; }
+        .expenses-page .ep-table tbody tr:nth-child(odd) td { background:#f0f1f2; }
+        .expenses-page .ep-table tbody tr:nth-child(even) td { background:#fff; }
+        .expenses-page .ep-table tbody tr:hover td { background:#e8efff; }
+        .expenses-page .ep-badge { font-size:11px; padding:4px 8px; }
+        .expenses-page .ep-customer-name, .expenses-page .ep-ref { font-size:13px; }
+        @media (max-width:900px) {
+          .expenses-page .ep-stats { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+          .expenses-page .ep-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+          .expenses-page .ep-fg-search { grid-column:1/-1; }
         }
-.expenses-page {
-  width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-  font-size: 14px;
-}
-
-.expenses-page input,
-.expenses-page select,
-.expenses-page textarea,
-.expenses-page button {
-  font-family: inherit;
-}
-
-/* Tailles de textes */
-.ep-eyebrow { font-size: 12px; }
-.ep-title p { font-size: 13px; }
-.ep-card-info h3 { font-size: 13px; }
-.ep-card-info .sub { font-size: 12px; }
-.ep-panel-head h5 { font-size: 16px; }
-.ep-panel-head p { font-size: 12px; }
-
-.ep-fg label {
-  font-size: 11px;
-  letter-spacing: 0;
-}
-
-.ep-filter-input {
-  height: 38px;
-  font-size: 13px;
-}
-
-.ep-reset {
-  height: 38px;
-  font-size: 12px;
-}
-
-.ep-table {
-  min-width: 1000px;
-}
-
-.ep-table th {
-  padding: 11px 12px;
-  font-size: 11px;
-}
-
-.ep-table td {
-  padding: 10px 12px;
-  font-size: 12px;
-}
-
-.ep-subtext { font-size: 11px; }
-.ep-badge { font-size: 11px; padding: 4px 8px; }
-.ep-customer-name { font-size: 12px; }
-.ep-ref { font-size: 12px; }
-
-.ep-modal-header h3 { font-size: 16px; }
-.ep-modal-header p { font-size: 12px; }
-.ep-form-group label { font-size: 12px; }
-.ep-btn { font-size: 13px; }
-.ep-alert button { font-size: 12px; }
-
-.pos-product-name { font-size: 13px; }
-.pos-product-cat { font-size: 11px; }
-.pos-product-bottom { font-size: 12px; }
-.pos-product-stock { font-size: 10px; }
-.pos-cart-name { font-size: 13px; }
-.pos-cart-detail { font-size: 11px; }
-.pos-cart-line { font-size: 12px; }
-.pos-qty input { font-size: 12px; }
-.pos-total-row { font-size: 13px; }
-.pos-grand-total { font-size: 15px; }
-.pos-payment-btn { font-size: 11px; }
-
-.ep-detail-item span { font-size: 11px; }
-.ep-detail-item strong { font-size: 13px; }
-.ep-items-table th { font-size: 11px; }
-.ep-items-table td { font-size: 12px; }
-
-/* Tableau : défilement horizontal sans casser la page */
-.ep-table-wrap {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-}
-
-.ep-table {
-  white-space: normal;
-}
-
-.ep-table th,
-.ep-table td {
-  overflow-wrap: anywhere;
-}
-
-.ep-actions {
-  flex-wrap: nowrap;
-}
-
-/* Fenêtres modales : hauteur limitée et contenu défilant */
-.ep-modal-overlay {
-  padding: 12px;
-  overflow-y: auto;
-  align-items: center;
-}
-
-.ep-modal {
-  display: flex;
-  flex-direction: column;
-  width: min(1080px, 100%);
-  max-height: calc(100dvh - 24px);
-  overflow: hidden;
-}
-
-.ep-modal-header,
-.ep-modal-footer {
-  flex: 0 0 auto;
-}
-
-.ep-modal-body {
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-.ep-modal form {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.ep-modal form .ep-modal-body {
-  flex: 1 1 auto;
-}
-
-.ep-modal form .ep-modal-footer {
-  flex-shrink: 0;
-}
-
-/* Point de vente */
-.pos-grid {
-  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr);
-  align-items: start;
-}
-
-.pos-grid > div {
-  min-width: 0;
-}
-
-.pos-products {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  max-height: min(420px, 48vh);
-  overscroll-behavior: contain;
-}
-
-.pos-cart {
-  min-width: 0;
-}
-
-.pos-cart-list {
-  max-height: 240px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.pos-cart-item {
-  flex-wrap: wrap;
-}
-
-.pos-cart-item > div:last-child {
-  max-width: 100%;
-}
-
-.pos-cart-footer {
-  min-width: 0;
-}
-
-.pos-payments {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
-.ep-items-table {
-  display: table;
-  min-width: 560px;
-}
-
-.ep-modal-body:has(.ep-items-table) {
-  overflow-x: auto;
-}
-
-/* Tablette */
-@media (max-width: 900px) {
-  .ep-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .pos-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .pos-products {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    max-height: 300px;
-  }
-
-  .ep-filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .ep-fg-search {
-    grid-column: 1 / -1;
-  }
-}
-
-/* Téléphone */
-@media (max-width: 600px) {
-  .expenses-page {
-    padding: 10px;
-  }
-
-  .ep-hero {
-    padding: 17px;
-    border-radius: 14px;
-    gap: 14px;
-  }
-
-  .ep-eyebrow { font-size: 10px; }
-
-  .ep-title h1 {
-    font-size: 21px;
-    gap: 8px;
-  }
-
-  .ep-title-icon {
-    width: 36px;
-    height: 36px;
-  }
-
-  .ep-title p {
-    font-size: 12px;
-    line-height: 1.6;
-  }
-
-  .ep-hero-actions {
-    width: 100%;
-  }
-
-  .ep-btn-add {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .ep-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 9px;
-  }
-
-  .ep-card {
-    padding: 12px;
-    border-radius: 12px;
-    gap: 7px;
-  }
-
-  .ep-card-info h3 {
-    font-size: 11px;
-    margin-bottom: 6px;
-  }
-
-  .ep-card-info .value {
-    font-size: 18px;
-  }
-
-  .ep-card-info .sub {
-    font-size: 10px;
-    line-height: 1.5;
-  }
-
-  .ep-icon {
-    width: 32px;
-    height: 32px;
-    flex-basis: 32px;
-    font-size: 14px;
-  }
-
-  .ep-panel {
-    border-radius: 12px;
-  }
-
-  .ep-panel-head {
-    padding: 13px;
-  }
-
-  .ep-panel-head h5 {
-    font-size: 14px;
-  }
-
-  .ep-panel-head p {
-    font-size: 11px;
-    line-height: 1.5;
-  }
-
-  .ep-panel-head > button {
-    width: 100%;
-  }
-
-  .ep-filters {
-    grid-template-columns: 1fr;
-    padding: 12px;
-    gap: 10px;
-  }
-
-  .ep-fg-search {
-    grid-column: auto;
-  }
-
-  .ep-filter-input {
-    height: 38px;
-    font-size: 13px;
-  }
-
-  .ep-reset {
-    width: 100%;
-  }
-
-  .ep-modal-overlay {
-    padding: 7px;
-    align-items: flex-start;
-  }
-
-  .ep-modal {
-    max-height: calc(100dvh - 14px);
-    border-radius: 12px;
-    margin: auto 0;
-  }
-
-  .ep-modal-header {
-    padding: 12px;
-  }
-
-  .ep-modal-header h3 {
-    font-size: 14px;
-  }
-
-  .ep-modal-header p {
-    font-size: 11px;
-  }
-
-  .ep-modal-body {
-    padding: 12px;
-  }
-
-  .ep-modal-footer {
-    padding: 10px 12px;
-    gap: 7px;
-  }
-
-  .ep-modal-footer .ep-btn {
-    padding: 10px;
-    font-size: 12px;
-  }
-
-  .pos-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
-  }
-
-  .pos-products {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    max-height: 250px;
-    gap: 7px;
-  }
-
-  .pos-product {
-    padding: 9px;
-  }
-
-  .pos-product-name {
-    font-size: 12px;
-  }
-
-  .pos-product-bottom {
-    flex-wrap: wrap;
-    font-size: 11px;
-  }
-
-  .pos-cart-item {
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .pos-cart-item > div:last-child {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .pos-qty input {
-    width: 38px;
-  }
-
-  .pos-payments {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .ep-detail-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .ep-grid2 {
-    grid-template-columns: 1fr !important;
-  }
-
-  .ep-modal-footer.center {
-    flex-direction: column-reverse;
-  }
-
-  .ep-modal-footer.center .ep-btn {
-    width: 100%;
-  }
-
-  .ep-toast {
-    top: 10px;
-    inset-inline: 10px;
-    width: auto;
-    font-size: 12px;
-  }
-
-  .ep-delete-body {
-    padding: 20px 14px 10px;
-  }
-
-  .ep-delete-body h4 {
-    font-size: 17px;
-  }
-}
-
-/* Très petits téléphones */
-@media (max-width: 360px) {
-  .expenses-page {
-    padding: 7px;
-  }
-
-  .ep-stats {
-    grid-template-columns: 1fr;
-  }
-
-  .pos-products {
-    grid-template-columns: 1fr;
-  }
-
-  .pos-payments {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .ep-modal-footer {
-    flex-wrap: wrap;
-  }
-  .ep-modal-footer .ep-btn {
-    flex: 1 1 100%;
-  }
-}
-
-/* RTL / LTR */
-.expenses-page[dir="rtl"] {
-  text-align: right;
-}
-
-.expenses-page[dir="ltr"] {
-  text-align: left;
-}
-
-.expenses-page input,
-.expenses-page textarea,
-.expenses-page select {
-  max-width: 100%;
-}
-
-.ep-amt {
-  direction: ltr;
-  unicode-bidi: isolate;
-}
-
+        @media (max-width:560px) {
+          .expenses-page .ep-stats { grid-template-columns:repeat(2,minmax(0,1fr)); padding:12px 8px 0; gap:8px; }
+          .expenses-page .ep-card { min-height:82px; padding:10px; }
+          .expenses-page .ep-card-info h3 { font-size:11px; }
+          .expenses-page .ep-card-info .value { font-size:21px; }
+          .expenses-page .ep-icon { font-size:20px; flex-basis:24px; }
+          .expenses-page .ep-hero { padding:10px; gap:10px; }
+          .expenses-page .ep-title h1 { font-size:17px; }
+          .expenses-page .ep-hero-actions { width:auto; }
+          .expenses-page .ep-btn-add, .expenses-page .ep-hero-refresh { padding:8px; font-size:11px; }
+          .expenses-page .ep-panel { margin-inline:8px; }
+          .expenses-page .ep-filters { grid-template-columns:1fr; }
+          .expenses-page .ep-fg-search { grid-column:auto; }
+          .expenses-page .ep-modal-overlay { padding: .4rem; align-items: center; }
+          .expenses-page .ep-modal { max-height: calc(100dvh - .8rem); border-radius: .5rem; }
+          .expenses-page .ep-modal-header { padding: .8rem 1rem; }
+          .expenses-page .ep-modal-body { padding: 1rem; }
+          .expenses-page .ep-modal-footer { padding: .7rem 1rem; flex-wrap: wrap; }
+          .expenses-page .ep-modal-footer .ep-btn { flex: 1 1 auto; }
+        }
+        .expenses-page[dir="rtl"] { text-align: right; }
+        .expenses-page[dir="ltr"] { text-align: left; }
+        .expenses-page input, .expenses-page textarea, .expenses-page select { max-width: 100%; }
+        .ep-amt { direction: ltr; unicode-bidi: isolate; }
       `}</style>
 
-      {/* Toast global */}
-      {error && (
-        <div className="ep-toast danger" role="alert">
-          <span>⚠️</span><div style={{ flex: 1 }}>{error}</div>
-          <button type="button" className="btn-icon" onClick={() => setError('')} aria-label={t.close}><i className="fas fa-times" /></button>
-        </div>
-      )}
-      {success && (
-        <div className="ep-toast success" role="status">
-          <span>✓</span><div style={{ flex: 1 }}>{success}</div>
-          <button type="button" className="btn-icon" onClick={() => setSuccess('')} aria-label={t.close}><i className="fas fa-times" /></button>
-        </div>
-      )}
+      {error && <div className="ep-toast danger" role="alert"><span>⚠</span><div style={{ flex: 1 }}>{error}</div><button type="button" className="btn-icon" onClick={() => setError('')}><i className="fas fa-times" /></button></div>}
+      {success && <div className="ep-toast success" role="status"><span>✓</span><div style={{ flex: 1 }}>{success}</div><button type="button" className="btn-icon" onClick={() => setSuccess('')}><i className="fas fa-times" /></button></div>}
 
-      {/* Hero */}
-      <header className="ep-hero">
-        <div className="ep-title">
-          <span className="ep-eyebrow"><i className="fas fa-chart-line" style={{ marginInlineEnd: 6 }} />{t.eyebrow}</span>
-          <h1>
-            <span className="ep-title-icon"><i className="fas fa-cash-register" /></span>
-            {t.title}
-          </h1>
-          <p>{t.subtitle}</p>
-        </div>
-        <div className="ep-hero-actions">
-          
-          <button type="button" className="ep-btn-add" onClick={() => { clearCart(); setShowModal(true); }}>
-            <i className="fas fa-plus" /> {t.add}
-          </button>
-        </div>
-      </header>
-
-      {/* Statistiques */}
       <section className="ep-stats">
         <div className="ep-card tone-violet">
           <div className="ep-card-info">
@@ -1434,28 +968,40 @@ const cur = t.currency;
         <div className="ep-card tone-blue">
           <div className="ep-card-info">
             <h3>{t.stat_month}</h3>
-            <div className="value">{stats.monthlySales}</div>
-            <div className="sub">{t.stat_month_sub(`${formatNumber(stats.monthlyRevenue)} ${cur}`)}</div>
+            <div className="value">{stats.monthlyS}</div>
+            <div className="sub">{t.stat_month_sub(`${formatNumber(stats.monthlyR)} ${cur}`)}</div>
           </div>
           <div className="ep-icon"><i className="fas fa-calendar-alt" /></div>
         </div>
         <div className="ep-card tone-amber">
           <div className="ep-card-info">
             <h3>{t.stat_day}</h3>
-            <div className="value">{stats.dailySales}</div>
-            <div className="sub">{t.stat_day_sub(`${formatNumber(stats.dailyRevenue)} ${cur}`)}</div>
+            <div className="value">{stats.dailyS}</div>
+            <div className="sub">{t.stat_day_sub(`${formatNumber(stats.dailyR)} ${cur}`)}</div>
           </div>
           <div className="ep-icon"><i className="fas fa-calendar-day" /></div>
         </div>
       </section>
 
-      {/* Historique */}
+      <header className="ep-hero">
+        <div className="ep-title">
+          <span className="ep-eyebrow"><i className="fas fa-chart-line" style={{ marginInlineEnd: 6 }} />{t.eyebrow}</span>
+          <h1><span className="ep-title-icon"><i className="fas fa-cash-register" /></span>{t.title}</h1>
+          <p>{t.subtitle}</p>
+        </div>
+        <div className="ep-hero-actions">
+          <button type="button" className="ep-btn ep-btn-outline ep-hero-refresh" onClick={() => { fetchSales(); fetchProducts(); fetchCustomers(); }} disabled={loadingSales}>
+            <i className={`fas fa-sync-alt ${loadingSales ? 'fa-spin' : ''}`} />{t.refresh}
+          </button>
+          <button type="button" className="ep-btn-add" onClick={() => setShowAddModal(true)}>
+            <i className="fas fa-plus" />{t.add}
+          </button>
+        </div>
+      </header>
+
       <div className="ep-panel">
         <div className="ep-panel-head">
-          <div>
-            <h5><i className="fas fa-list-alt" style={{ color: 'var(--primary)', marginInlineEnd: 8 }} />{t.history}</h5>
-            <p>{t.history_sub}</p>
-          </div>
+          <div><h5><i className="fas fa-list-alt" style={{ color: '#fff', marginInlineEnd: 8 }} />{t.history}</h5><p>{t.search_ph}</p></div>
           <button type="button" className="ep-btn ep-btn-outline" onClick={() => { fetchSales(); fetchProducts(); }} disabled={loadingSales}>
             <i className={`fas fa-sync-alt ${loadingSales ? 'fa-spin' : ''}`} style={{ marginInlineEnd: 6 }} />{t.refresh}
           </button>
@@ -1464,11 +1010,18 @@ const cur = t.currency;
         <div className="ep-filters">
           <div className="ep-fg ep-fg-search">
             <label>{t.th_invoice}</label>
-            <input type="search" className="ep-filter-input" placeholder={t.search_ph} value={searchSale} onChange={(e) => setSearchSale(e.target.value)} />
+            <input type="search" className="ep-filter-input" placeholder={t.search_ph} value={searchSale} onChange={e => setSearchSale(e.target.value)} />
+          </div>
+          <div className="ep-fg">
+            <label>{t.th_category}</label>
+            <select className="ep-filter-input" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+              <option value="all">{t.all_categories}</option>
+              {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+            </select>
           </div>
           <div className="ep-fg">
             <label>{t.th_status}</label>
-            <select className="ep-filter-input" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <select className="ep-filter-input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
               <option value="all">{t.all_status}</option>
               <option value="paid">{t.paid}</option>
               <option value="partial">{t.partial}</option>
@@ -1477,19 +1030,33 @@ const cur = t.currency;
             </select>
           </div>
           <div className="ep-fg">
-            <label>{t.start_date}</label>
-            <input type="date" className="ep-filter-input" value={startDateFilter} onChange={(e) => setStartDateFilter(e.target.value)} />
+            <label>{t.f_payment}</label>
+            <select className="ep-filter-input" value={filterPayment} onChange={e => setFilterPayment(e.target.value)}>
+              <option value="all">{t.all_payments}</option>
+              <option value="cash">{t.cash}</option>
+              <option value="bankily">{t.bankily}</option>
+              <option value="masrivi">{t.masrivi}</option>
+              <option value="sedad">{t.sedad}</option>
+              <option value="credit">{t.credit}</option>
+            </select>
           </div>
           <div className="ep-fg">
-            <label>{t.end_date}</label>
-            <input type="date" className="ep-filter-input" value={endDateFilter} onChange={(e) => setEndDateFilter(e.target.value)} />
+            <label>Début</label>
+            <input type="date" className="ep-filter-input" value={startDateFilter} onChange={e => setStartDateFilter(e.target.value)} />
           </div>
-          <div>
+          <div className="ep-fg">
+            <label>Fin</label>
+            <input type="date" className="ep-filter-input" value={endDateFilter} onChange={e => setEndDateFilter(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
             {hasFilters && (
               <button type="button" className="ep-reset" onClick={resetFilters}>
-                <i className="fas fa-rotate-left" /> {t.cancel}
+                <i className="fas fa-rotate-left" />
               </button>
             )}
+            <button type="button" className="ep-btn ep-btn-save" onClick={exportFilteredSales} style={{ height: 38, whiteSpace: 'nowrap' }}>
+              <i className="fas fa-file-excel" style={{ marginInlineEnd: 6 }} /> {t.export_all}
+            </button>
           </div>
         </div>
 
@@ -1498,77 +1065,69 @@ const cur = t.currency;
             <thead>
               <tr>
                 <th>{t.th_index}</th>
-                <th>{t.th_invoice}</th>
-                <th>{t.th_customer}</th>
-                <th>{t.th_products}</th>
+                <th className="sortable" onClick={() => handleSort('invoice')} title={t.sort_by}>
+                  {t.th_products} <i className={`fas ${sortIcon('invoice')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
+                </th>
+                <th className="sortable" onClick={() => handleSort('category')} title={t.sort_by}>
+                  {t.th_category} <i className={`fas ${sortIcon('category')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
+                </th>
+                <th className="sortable" onClick={() => handleSort('customer')} title={t.sort_by}>
+                  {t.th_customer} <i className={`fas ${sortIcon('customer')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
+                </th>
                 <th className="ep-col-center">{t.th_qty}</th>
                 <th className="ep-col-end">{t.th_unit}</th>
-                <th className="ep-col-end">{t.th_total}</th>
-                <th>{t.th_obs}</th>
-                <th>{t.th_status}</th>
-                <th>{t.th_date}</th>
+                <th className="ep-col-end sortable" onClick={() => handleSort('total')} title={t.sort_by}>
+                  {t.th_total} <i className={`fas ${sortIcon('total')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
+                </th>
+                {/* ✅ SUPPRIMÉ : colonne المتبقي / Reste à payer */}
+                <th className="sortable" onClick={() => handleSort('status')} title={t.sort_by}>
+                  {t.th_status} <i className={`fas ${sortIcon('status')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
+                </th>
+                <th className="sortable" onClick={() => handleSort('created_at')} title={t.sort_by}>
+                  {t.th_date} <i className={`fas ${sortIcon('created_at')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
+                </th>
                 <th className="ep-col-end">{t.th_actions}</th>
               </tr>
             </thead>
             <tbody>
               {loadingSales ? (
-                <tr><td colSpan="11" className="ep-state"><span className="ep-spinner" />{t.loading}</td></tr>
+                <tr><td colSpan="11" className="ep-state"><span className="ep-spinner" />{t.loading_sales}</td></tr>
               ) : filteredSales.length === 0 ? (
-                <tr>
-                  <td colSpan="11" className="ep-state">
-                    <div style={{ width: 56, height: 56, fontSize: 22, margin: '0 auto 12px', borderRadius: 16, display: 'grid', placeItems: 'center', background: 'var(--primary-soft)', color: 'var(--primary)' }}>
-                      <i className="fas fa-file-invoice" />
-                    </div>
-                    <div style={{ fontWeight: 800, color: '#2a3a55', fontSize: 15 }}>{t.none_title}</div>
-                    <div style={{ marginTop: 4, fontSize: 12 }}>{t.none_sub}</div>
-                    <button type="button" className="ep-btn ep-btn-save" style={{ marginTop: 14 }} onClick={() => { clearCart(); setShowModal(true); }}>
-                      <i className="fas fa-plus" style={{ marginInlineEnd: 6 }} />{t.none_add}
-                    </button>
-                  </td>
-                </tr>
+                <tr><td colSpan="11" className="ep-state">
+                  <div style={{ marginBottom: 8, fontSize: 22, color: 'var(--primary)' }}><i className="fas fa-file-invoice" /></div>
+                  <div style={{ fontWeight: 800, color: '#2a3a55', fontSize: 15 }}>{t.no_data}</div>
+                  <div style={{ marginTop: 4, fontSize: 12 }}>{t.no_data_sub}</div>
+                </td></tr>
               ) : (
-                filteredSales.map((sale, index) => {
-                  const status = getStatus(sale.status, sale.payment_method);
-                  const customerName = sale.customers?.name || sale.customer?.name || t.walk_in;
-                  const totalQty = getTotalQuantity(sale);
-                  const unitPrice = getAverageUnitPrice(sale);
-                  const productNames = getProductNames(sale);
+                sortedSales.map((sale, i) => {
+                  const st = getStatus(sale.status, sale.payment_method);
+                  const cn = sale.customers?.name || sale.customer?.name || t.walk_in;
+                  const qty = getTotalQuantity(sale);
+                  const avg = qty > 0 ? Number(sale.grand_total ?? sale.total ?? 0) / qty : 0;
+                  const names = getProductNames(sale);
+                  const cats = getSaleCategories(sale, productById);
                   return (
                     <tr key={sale.id}>
-                      <td style={{ color: '#8896ab' }}>{index + 1}</td>
-                      <td><span className="ep-ref">{sale.invoice_number || `VENTE-${sale.id}`}</span></td>
+                      <td style={{ color: '#000204' }}>{i + 1}</td>
+                      <td style={{ color: '#044dba' }} title={names}>{names}</td>
+                      <td title={cats}><span className="ep-badge badge-violet">{cats}</span></td>
                       <td>
                         <div className="ep-customer-cell">
                           <div className="ep-avatar"><i className="fas fa-user" /></div>
-                          <div className="ep-customer-name">{customerName}</div>
+                          <div className="ep-customer-name">{cn}</div>
                         </div>
                       </td>
-                      <td style={{ color: 'var(--muted)' }}>
-                        <span style={{ display: 'inline-block', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={productNames}>{productNames}</span>
-                      </td>
-                      <td className="ep-col-center"><span className="ep-badge badge-gray">{t.units(totalQty)}</span></td>
-                      <td className="ep-col-end ep-money">{formatNumber(unitPrice)} {cur}</td>
+                      <td className="ep-col-center"><span className="ep-badge badge-gray">{t.units(qty)}</span></td>
+                      <td className="ep-col-end ep-money">{formatNumber(avg)} {cur}</td>
                       <td className="ep-col-end ep-money ep-money-total">{formatNumber(sale.grand_total ?? sale.total)} {cur}</td>
-                      <td>
-                        {sale.notes ? (
-                          <span className="ep-badge badge-gray" style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block' }} title={sale.notes}>{sale.notes}</span>
-                        ) : (
-                          <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
-                        )}
-                      </td>
-                      <td><span className={`ep-badge badge-${status.tone}`}><i className={`fas ${status.icon}`} style={{ marginInlineEnd: 5 }} />{status.label}</span></td>
-                      <td style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{formatDate(sale.created_at, t.locale)}</td>
+                      {/* ✅ SUPPRIMÉ : cellule المتبقي */}
+                      <td><span className={`ep-badge badge-${st.tone}`}><i className={`fas ${st.icon}`} style={{ marginInlineEnd: 5 }} />{st.label}</span></td>
+                      <td style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{formatDate(sale.invoice_date || sale.created_at, t.locale)}</td>
                       <td className="ep-col-end">
                         <div className="ep-actions">
-                          <button type="button" className="btn-icon btn-view" title={t.view} onClick={() => setSelectedSale(sale)}>
-                            <i className="fas fa-eye" />
-                          </button>
-                          <button type="button" className="btn-icon btn-edit" title={t.edit} onClick={() => handleOpenEdit(sale)}>
-                            <i className="fas fa-edit" />
-                          </button>
-                          <button type="button" className="btn-icon btn-delete" title={t.delete} onClick={() => setSaleToDelete(sale)}>
-                            <i className="fas fa-trash-alt" />
-                          </button>
+                          <button type="button" className="btn-icon btn-view" title={t.view} onClick={() => setSelectedSale(sale)}><i className="fas fa-eye" /></button>
+                          <button type="button" className="btn-icon btn-edit" title={t.edit} onClick={() => handleOpenEdit(sale)}><i className="fas fa-edit" /></button>
+                          <button type="button" className="btn-icon btn-delete" title={t.delete} onClick={() => setSaleToDelete(sale)}><i className="fas fa-trash-alt" /></button>
                         </div>
                       </td>
                     </tr>
@@ -1580,379 +1139,122 @@ const cur = t.currency;
         </div>
       </div>
 
-      {/* Modal POS (nouvelle vente) */}
-      {showModal && (
-        <div className="ep-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && closeSaleModal()}>
-          <div className="ep-modal" role="dialog" aria-modal="true">
-            <div className="ep-modal-header">
-              <div>
-                <h3>
-                  <span className="ep-modal-icon"><i className="fas fa-cash-register" /></span>
-                  {t.pos_title}
-                </h3>
-                <p>{t.pos_sub}</p>
-              </div>
-              <button type="button" className="btn-icon" onClick={closeSaleModal} disabled={processing} aria-label={t.close}>
-                <i className="fas fa-times" />
-              </button>
-            </div>
-            <div className="ep-modal-body">
-              <div className="pos-grid">
-                {/* Catalogue */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <strong style={{ fontSize: 18 }}><i className="fas fa-boxes" style={{ color: 'var(--primary)', marginInlineEnd: 6 }} />{t.catalogue}</strong>
-                    <span className="ep-badge badge-gray">{t.product_count(products.length)}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 0, marginBottom: 12 }}>
-                    <input
-                      type="search"
-                      className="ep-filter-input"
-                      style={{ borderStartEndRadius: 0, borderEndEndRadius: 0, borderInlineEnd: 0 }}
-                      placeholder={t.product_search_ph}
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      onKeyDown={handleSearchKeyDown}
-                      autoFocus
-                    />
-                    <button type="button" className="ep-btn ep-btn-save" style={{ borderStartStartRadius: 0, borderEndStartRadius: 0, padding: '0 14px' }} onClick={() => setShowScanner(true)}>
-                      <i className="fas fa-barcode" />
-                    </button>
-                  </div>
-                  {loadingProducts ? (
-                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
-                      <span className="ep-spinner" />{t.loading_products}
-                    </div>
-                  ) : (
-                    <div className="pos-products">
-                      {products
-                        .filter((p) => {
-                          const q = search.toLowerCase().trim();
-                          return !q || String(p.name || '').toLowerCase().includes(q) || String(p.barcode || '').toLowerCase().includes(q) || String(p.reference || '').toLowerCase().includes(q);
-                        })
-                        .map((product) => {
-                          const stock = Number(product.quantity) || 0;
-                          const out = stock <= 0;
-                          const inCart = cart.find((i) => String(i.product_id) === String(product.id));
-                          return (
-                            <button type="button" key={product.id} className={`pos-product ${inCart ? 'in-cart' : ''}`} disabled={out} onClick={() => addToCart(product)}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span className="pos-product-avatar"><i className="fas fa-box" /></span>
-                                {inCart && <span className="ep-badge badge-blue">×{inCart.quantity}</span>}
-                                {out && <span className="ep-badge badge-rose">{t.out_of_stock}</span>}
-                              </div>
-                              <span className="pos-product-name" title={product.name}>{product.name}</span>
-                              <span className="pos-product-cat">{product.categories?.name || t.no_category}</span>
-                              <div className="pos-product-bottom">
-                                <span className="pos-product-price">{formatNumber(product.sale_price)} {cur}</span>
-                                <span className={`pos-product-stock ${out ? 'low' : ''}`}>{t.stock_label(stock)}</span>
-                              </div>
-                            </button>
-                          );
-                        })}
-                    </div>
-                  )}
-                </div>
+      <AddSaleModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        products={products}
+        customers={customers}
+        onSubmit={handleAddSubmit}
+        loading={processing}
+        t={t}
+        cur={cur}
+      />
 
-                {/* Panier */}
-                <div>
-                  <div className="pos-cart">
-                    <div className="pos-cart-header">
-                      <span><i className="fas fa-shopping-cart" style={{ color: 'var(--primary)', marginInlineEnd: 6 }} />{t.cart_title}</span>
-                      <span className="ep-badge badge-blue">{t.cart_count(totalItemsCart)}</span>
-                    </div>
-                    {cart.length === 0 ? (
-                      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)' }}>
-                        <div style={{ width: 56, height: 56, margin: '0 auto 12px', borderRadius: 16, display: 'grid', placeItems: 'center', background: 'var(--primary-soft)', color: 'var(--primary)', fontSize: 22 }}>
-                          <i className="fas fa-cart-plus" />
-                        </div>
-                        <div style={{ fontWeight: 800, color: '#2a3a55', fontSize: 14 }}>{t.cart_empty}</div>
-                        <div style={{ fontSize: 12, marginTop: 4 }}>{t.cart_empty_sub}</div>
-                      </div>
-                    ) : (
-                      <ul className="pos-cart-list">
-                        {cart.map((item) => (
-                          <li className="pos-cart-item" key={item.product_id}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div className="pos-cart-name">{item.name}</div>
-                              <div className="pos-cart-detail">{formatNumber(item.price)} {cur} / {t.units(1).split(' ')[1]}</div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <div className="pos-qty">
-                                <button type="button" onClick={() => updateQuantity(item.product_id, -1)} aria-label="-">−</button>
-                                <input
-                                  type="number" min="1" max={item.stock} value={item.quantity}
-                                  onChange={(e) => handleManualQuantityChange(item.product_id, e.target.value)}
-                                  onBlur={() => handleQuantityBlur(item.product_id)}
-                                />
-                                <button type="button" onClick={() => updateQuantity(item.product_id, 1)} aria-label="+">+</button>
-                              </div>
-                              <div className="pos-cart-line">{formatNumber(Number(item.price) * Number(item.quantity || 0))} {cur}</div>
-                              <button type="button" className="pos-cart-remove" onClick={() => removeFromCart(item.product_id)} title={t.delete}>
-                                <i className="fas fa-times" />
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-
-                    {cart.length > 0 && (
-                      <div className="pos-cart-footer">
-                        <div className="ep-form-group" style={{ marginBottom: 10 }}>
-                          <label style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span>{t.customer}</span>
-                            <small style={{ fontWeight: 400, color: 'var(--muted)' }}>{t.customer_required}</small>
-                          </label>
-                          <select className="ep-filter-input" style={{ height: 'auto', padding: '10px 12px' }} value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                            <option value="">{t.walk_in}</option>
-                            {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
-                        </div>
-
-                        <div className="ep-form-group" style={{ marginBottom: 10 }}>
-                          <label>{t.discount}</label>
-                          <input type="number" min="0" max={subtotal} className="ep-filter-input" style={{ height: 'auto', padding: '10px 12px' }} value={discount} placeholder="0" onChange={(e) => setDiscount(e.target.value)} />
-                        </div>
-
-                        <div className="pos-totals">
-                          <div className="pos-total-row">
-                            <span style={{ color: 'var(--muted)' }}>{t.subtotal}</span>
-                            <strong>{formatNumber(subtotal)} {cur}</strong>
-                          </div>
-                          <div className="pos-total-row">
-                            <span style={{ color: 'var(--muted)' }}>{t.discount}</span>
-                            <span style={{ color: 'var(--red)' }}>− {formatNumber(discountValue)} {cur}</span>
-                          </div>
-                          <div className="pos-total-row pos-grand-total">
-                            <span>{t.total_to_pay}</span>
-                            <span style={{ color: 'var(--primary)' }}>{formatNumber(total)} {cur}</span>
-                          </div>
-                        </div>
-
-                        <label style={{ fontSize: 12, fontWeight: 800, color: '#4b5b75', display: 'block', marginBottom: 6 }}>{t.payment_method}</label>
-                        <div className="pos-payments">
-                          <button type="button" className={`pos-payment-btn ${paymentMethod === 'cash' ? 'active' : ''}`} onClick={() => setPaymentMethod('cash')} title={t.cash}>
-                            <i className="fas fa-money-bill-wave" style={{ display: 'block', marginBottom: 4 }} /><span style={{ fontSize: 10 }}>{t.cash}</span>
-                          </button>
-                          <button type="button" className={`pos-payment-btn ${paymentMethod === 'bankily' ? 'active' : ''}`} onClick={() => setPaymentMethod('bankily')} title={t.bankily}>
-                            <i className="fas fa-mobile-alt" style={{ display: 'block', marginBottom: 4, color: '#e11d48' }} /><span style={{ fontSize: 10 }}>{t.bankily}</span>
-                          </button>
-                          <button type="button" className={`pos-payment-btn ${paymentMethod === 'masrivi' ? 'active' : ''}`} onClick={() => setPaymentMethod('masrivi')} title={t.masrivi}>
-                            <i className="fas fa-mobile-alt" style={{ display: 'block', marginBottom: 4, color: '#eab308' }} /><span style={{ fontSize: 10 }}>{t.masrivi}</span>
-                          </button>
-                          <button type="button" className={`pos-payment-btn ${paymentMethod === 'sedad' ? 'active' : ''}`} onClick={() => setPaymentMethod('sedad')} title={t.sedad}>
-                            <i className="fas fa-mobile-alt" style={{ display: 'block', marginBottom: 4, color: '#16a34a' }} /><span style={{ fontSize: 10 }}>{t.sedad}</span>
-                          </button>
-                          <button type="button" className={`pos-payment-btn ${paymentMethod === 'credit' ? 'active' : ''}`} onClick={() => setPaymentMethod('credit')} title={t.credit}>
-                            <i className="fas fa-hand-holding-usd" style={{ display: 'block', marginBottom: 4, color: '#f97316' }} /><span style={{ fontSize: 10 }}>{t.credit}</span>
-                          </button>
-                        </div>
-
-                        {paymentMethod === 'cash' && (
-                          <div style={{ marginTop: 12 }}>
-                            <label style={{ fontSize: 12, fontWeight: 800, color: '#4b5b75', display: 'block', marginBottom: 6 }}>{t.amount_received}</label>
-                            <input
-                              type="number" min="0" className="ep-filter-input" style={{ height: 'auto', padding: '10px 12px' }}
-                              value={amountReceived} placeholder={t.amount_placeholder}
-                              onChange={(e) => setAmountReceived(e.target.value)}
-                            />
-                            {received > 0 && received < total && (
-                              <div style={{ marginTop: 6, fontSize: 18, color: 'var(--red)' }}>
-                                <i className="fas fa-exclamation-circle" style={{ marginInlineEnd: 4 }} />{t.missing(`${formatNumber(total - received)} ${cur}`)}
-                              </div>
-                            )}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
-                              <span style={{ color: 'var(--muted)', fontSize: 12 }}>{t.change}</span>
-                              <strong style={{ color: change > 0 ? 'var(--green)' : 'var(--ink)' }}>{formatNumber(change)} {cur}</strong>
-                            </div>
-                          </div>
-                        )}
-
-                        {paymentMethod === 'credit' && (
-                          <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--amber-soft)', color: '#94590a', borderRadius: 9, fontSize: 12 }}>
-                            <i className="fas fa-info-circle" style={{ marginInlineEnd: 6 }} />{t.credit_info}
-                          </div>
-                        )}
-
-                        <div className="ep-form-group" style={{ marginTop: 12, marginBottom: 0 }}>
-                          <label>{t.notes}</label>
-                          <textarea rows="2" value={notes} placeholder={t.notes_ph} onChange={(e) => setNotes(e.target.value)} />
-                        </div>
-
-                        <button type="button" className="ep-btn ep-btn-save pos-checkout" onClick={handleCheckout} disabled={processing || cart.length === 0 || total <= 0}>
-                          {processing ? (
-                            <><i className="fas fa-spinner fa-spin" style={{ marginInlineEnd: 6 }} />{t.processing}</>
-                          ) : (
-                            <><i className="fas fa-check-circle" style={{ marginInlineEnd: 6 }} />{t.checkout(`${formatNumber(total)} ${cur}`)}</>
-                          )}
-                        </button>
-                        <button type="button" className="ep-btn ep-btn-outline" style={{ width: '100%', marginTop: 8 }} onClick={clearCart}>
-                          <i className="fas fa-trash-alt" style={{ marginInlineEnd: 6 }} />{t.clear_cart}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="ep-modal-footer">
-              <button type="button" className="ep-btn ep-btn-outline" onClick={closeSaleModal} disabled={processing}>{t.close}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal scanner */}
-      {showScanner && (
-        <div className="ep-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && setShowScanner(false)}>
-          <div className="ep-modal small" role="dialog" aria-modal="true">
-            <div className="ep-modal-header">
-              <h3><span className="ep-modal-icon"><i className="fas fa-barcode" /></span>{t.scanner_title}</h3>
-              <button type="button" className="btn-icon" onClick={() => setShowScanner(false)} aria-label={t.close}><i className="fas fa-times" /></button>
-            </div>
-            <form onSubmit={(e) => { e.preventDefault(); handleBarcodeSearch(scannerCode); }}>
-              <div className="ep-modal-body">
-                <div className="ep-form-group">
-                  <label>{t.scanner_label}</label>
-                  <input autoFocus value={scannerCode} onChange={(e) => setScannerCode(e.target.value)} placeholder={t.scanner_ph} />
-                  <small style={{ display: 'block', marginTop: 6, color: 'var(--muted)', fontSize: 18 }}>{t.scanner_hint}</small>
-                </div>
-              </div>
-              <div className="ep-modal-footer">
-                <button type="button" className="ep-btn ep-btn-cancel" onClick={() => setShowScanner(false)}>{t.cancel}</button>
-                <button type="submit" className="ep-btn ep-btn-save"><i className="fas fa-plus" style={{ marginInlineEnd: 6 }} />{t.add_to_cart}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* Modal détails vente */}
       {selectedSale && (
-        <div className="ep-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && setSelectedSale(null)}>
+        <div className="ep-modal-overlay" onMouseDown={e => e.target === e.currentTarget && setSelectedSale(null)}>
           <div className="ep-modal medium" role="dialog" aria-modal="true">
             <div className="ep-modal-header">
               <div>
                 <h3><span className="ep-modal-icon"><i className="fas fa-file-invoice" /></span>{t.details_title}</h3>
                 <p>{selectedSale.invoice_number || `VENTE-${selectedSale.id}`}</p>
               </div>
-              <button type="button" className="btn-icon" onClick={() => setSelectedSale(null)} aria-label={t.close}><i className="fas fa-times" /></button>
+              <button type="button" className="btn-icon" onClick={() => setSelectedSale(null)}><i className="fas fa-times" /></button>
             </div>
             <div className="ep-modal-body">
               <div className="ep-detail-grid">
-                <div className="ep-detail-item"><span>{t.invoice}</span><strong>{selectedSale.invoice_number || `VENTE-${selectedSale.id}`}</strong></div>
-                <div className="ep-detail-item"><span>{t.customer}</span><strong>{getCustomerName(selectedSale)}</strong></div>
-                <div className="ep-detail-item"><span>{t.date}</span><strong>{formatDate(selectedSale.created_at, t.locale)}</strong></div>
+                <div className="ep-detail-item"><span>{t.th_invoice}</span><strong>{selectedSale.invoice_number || `VENTE-${selectedSale.id}`}</strong></div>
+                <div className="ep-detail-item"><span>{t.f_customer}</span><strong>{getCustomerName(selectedSale)}</strong></div>
+                <div className="ep-detail-item"><span>{t.th_date}</span><strong>{formatDate(selectedSale.invoice_date || selectedSale.created_at, t.locale)}</strong></div>
               </div>
-              <div className="ep-section-title"><span className="ep-section-num">1</span> {t.sold_items}</div>
+              <div className="ep-section-title"><span className="ep-section-num">1</span> Articles vendus</div>
               <table className="ep-items-table">
                 <thead>
                   <tr>
-                    <th>{t.th_products}</th>
-                    <th className="ep-col-center">{t.edit_qty}</th>
-                    <th className="ep-col-end">{t.edit_unit}</th>
-                    <th className="ep-col-end">{t.edit_total}</th>
+                    <th>{t.f_product}</th>
+                    <th>{t.th_category}</th>
+                    <th className="ep-col-center">{t.f_qty}</th>
+                    <th className="ep-col-end">{t.f_price}</th>
+                    <th className="ep-col-end">{t.th_total}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {getSaleItems(selectedSale).length === 0 ? (
-                    <tr><td colSpan="4" style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>{t.no_items}</td></tr>
-                  ) : (
-                    getSaleItems(selectedSale).map((item, index) => {
-                      const qty = Number(item.quantity) || 0;
-                      const price = Number(item.price ?? item.unit_price) || 0;
-                      const lineTotal = Number(item.total ?? qty * price);
-                      const name = item.product_name || item.name || item.products?.name || item.product?.name || 'Produit';
-                      return (
-                        <tr key={item.id || index}>
-                          <td>{name}</td>
-                          <td className="ep-col-center">{qty}</td>
-                          <td className="ep-col-end">{formatNumber(price)} {cur}</td>
-                          <td className="ep-col-end" style={{ fontWeight: 800 }}>{formatNumber(lineTotal)} {cur}</td>
-                        </tr>
-                      );
-                    })
-                  )}
+                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>Aucun détail</td></tr>
+                  ) : getSaleItems(selectedSale).map((it, idx) => {
+                    const q = Number(it.quantity) || 0;
+                    const p = Number(it.price ?? it.unit_price) || 0;
+                    const lt = Number(it.total ?? q * p);
+                    return (
+                      <tr key={idx}>
+                        <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
+                        <td><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
+                        <td className="ep-col-center">{q}</td>
+                        <td className="ep-col-end">{formatNumber(p)} {cur}</td>
+                        <td className="ep-col-end" style={{ fontWeight: 800 }}>{formatNumber(lt)} {cur}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-              <div className="pos-totals" style={{ marginTop: 16 }}>
-                <div className="pos-total-row">
-                  <span style={{ color: 'var(--muted)' }}>{t.total_amount}</span>
-                  <strong>{formatNumber(selectedSale.grand_total ?? selectedSale.total)} {cur}</strong>
-                </div>
-                <div className="pos-total-row">
-                  <span style={{ color: 'var(--muted)' }}>{t.th_status}</span>
-                  <span className={`ep-badge badge-${getStatus(selectedSale.status, selectedSale.payment_method).tone}`}>
-                    {getStatus(selectedSale.status, selectedSale.payment_method).label}
-                  </span>
-                </div>
+              <div style={{ marginTop: 16, padding: 12, borderRadius: 10, background: '#f8fafc', display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
+                <span>Total</span>
+                <span>{formatNumber(selectedSale.grand_total ?? selectedSale.total)} {cur}</span>
               </div>
             </div>
             <div className="ep-modal-footer">
               <button type="button" className="ep-btn ep-btn-outline" onClick={() => setSelectedSale(null)}>{t.close}</button>
-              <button type="button" className="ep-btn ep-btn-outline" onClick={() => exportSale(selectedSale)}>
-                <i className="fas fa-download" style={{ marginInlineEnd: 6 }} />{t.export}
-              </button>
-              <button type="button" className="ep-btn ep-btn-save" onClick={() => printInvoice(selectedSale)}>
-                <i className="fas fa-print" style={{ marginInlineEnd: 6 }} />{t.print}
-              </button>
+              <button type="button" className="ep-btn ep-btn-outline" onClick={() => exportSale(selectedSale)}><i className="fas fa-download" style={{ marginInlineEnd: 6 }} />{t.export}</button>
+              <button type="button" className="ep-btn ep-btn-save" onClick={() => printInvoice(selectedSale)}><i className="fas fa-print" style={{ marginInlineEnd: 6 }} />{t.print}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal édition */}
       {saleToEdit && (
-        <div className="ep-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && !actionLoading && setSaleToEdit(null)}>
+        <div className="ep-modal-overlay" onMouseDown={e => e.target === e.currentTarget && !actionLoading && setSaleToEdit(null)}>
           <div className="ep-modal medium" role="dialog" aria-modal="true">
             <div className="ep-modal-header">
               <h3><span className="ep-modal-icon amber"><i className="fas fa-edit" /></span>{t.edit_title}</h3>
-              <button type="button" className="btn-icon" onClick={() => setSaleToEdit(null)} disabled={actionLoading} aria-label={t.close}><i className="fas fa-times" /></button>
+              <button type="button" className="btn-icon" onClick={() => setSaleToEdit(null)} disabled={actionLoading}><i className="fas fa-times" /></button>
             </div>
             <form onSubmit={handleEditSubmit}>
               <div className="ep-modal-body">
                 <div className="ep-detail-grid">
-                  <div className="ep-detail-item"><span>{t.invoice}</span><strong>{saleToEdit.invoice_number || `VENTE-${saleToEdit.id}`}</strong></div>
-                  <div className="ep-detail-item"><span>{t.customer}</span><strong>{getCustomerName(saleToEdit)}</strong></div>
-                  <div className="ep-detail-item"><span>{t.date}</span><strong>{formatDate(saleToEdit.created_at, t.locale)}</strong></div>
+                  <div className="ep-detail-item"><span>{t.th_invoice}</span><strong>{saleToEdit.invoice_number || `VENTE-${saleToEdit.id}`}</strong></div>
+                  <div className="ep-detail-item"><span>{t.f_customer}</span><strong>{getCustomerName(saleToEdit)}</strong></div>
+                  <div className="ep-detail-item"><span>{t.th_date}</span><strong>{formatDate(saleToEdit.invoice_date || saleToEdit.created_at, t.locale)}</strong></div>
                 </div>
-                <div className="ep-section-title"><span className="ep-section-num">1</span> {t.edit_articles}</div>
+                <div className="ep-section-title"><span className="ep-section-num">1</span> Articles</div>
                 <table className="ep-items-table">
                   <thead>
                     <tr>
-                      <th>{t.th_products}</th>
-                      <th className="ep-col-center" style={{ width: 90 }}>{t.edit_qty}</th>
-                      <th className="ep-col-end" style={{ width: 130 }}>{t.edit_unit}</th>
-                      <th className="ep-col-end">{t.edit_total}</th>
+                      <th>{t.f_product}</th>
+                      <th>{t.th_category}</th>
+                      <th className="ep-col-center" style={{ width: 90 }}>{t.f_qty}</th>
+                      <th className="ep-col-end" style={{ width: 130 }}>{t.f_price}</th>
+                      <th className="ep-col-end">{t.th_total}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {editItems.map((item, index) => (
-                      <tr key={index}>
-                        <td>{item.product_name || item.name || item.products?.name || 'Produit'}</td>
+                    {editItems.map((it, idx) => (
+                      <tr key={idx}>
+                        <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
+                        <td><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
                         <td className="ep-col-center">
-                          <input
-                            type="number" min="1" style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 6, padding: 5, textAlign: 'center' }}
-                            value={item.quantity}
-                            onChange={(e) => { const arr = [...editItems]; arr[index].quantity = parseInt(e.target.value, 10) || 1; setEditItems(arr); }}
-                          />
+                          <input type="number" min="1" style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 6, padding: 5, textAlign: 'center' }} value={it.quantity} onChange={e => { const a = [...editItems]; a[idx].quantity = parseInt(e.target.value, 10) || 1; setEditItems(a); }} />
                         </td>
                         <td className="ep-col-end">
-                          <input
-                            type="number" min="0" style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 6, padding: 5, textAlign: 'end' }}
-                            value={item.price}
-                            onChange={(e) => { const arr = [...editItems]; arr[index].price = parseFloat(e.target.value) || 0; setEditItems(arr); }}
-                          />
+                          <input type="number" min="0" style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 6, padding: 5, textAlign: 'end' }} value={it.price} onChange={e => { const a = [...editItems]; a[idx].price = parseFloat(e.target.value) || 0; setEditItems(a); }} />
                         </td>
-                        <td className="ep-col-end" style={{ fontWeight: 800 }}>{formatNumber(item.quantity * item.price)} {cur}</td>
+                        <td className="ep-col-end" style={{ fontWeight: 800 }}>{formatNumber(it.quantity * it.price)} {cur}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <div className="ep-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
                   <div className="ep-form-group" style={{ marginBottom: 0 }}>
-                    <label>{t.edit_status}</label>
-                    <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
+                    <label>Statut</label>
+                    <select value={editStatus} onChange={e => setEditStatus(e.target.value)}>
                       <option value="paid">{t.paid}</option>
                       <option value="partial">{t.partial}</option>
                       <option value="draft">{t.draft}</option>
@@ -1960,15 +1262,15 @@ const cur = t.currency;
                     </select>
                   </div>
                   <div className="ep-form-group" style={{ marginBottom: 0 }}>
-                    <label>{t.edit_notes}</label>
-                    <textarea rows="1" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder={t.edit_notes_ph} />
+                    <label>Observation</label>
+                    <textarea rows="1" value={editNotes} onChange={e => setEditNotes(e.target.value)} />
                   </div>
                 </div>
               </div>
               <div className="ep-modal-footer">
                 <button type="button" className="ep-btn ep-btn-cancel" onClick={() => setSaleToEdit(null)} disabled={actionLoading}>{t.cancel}</button>
                 <button type="submit" className="ep-btn ep-btn-save" disabled={actionLoading}>
-                  {actionLoading ? <><i className="fas fa-spinner fa-spin" style={{ marginInlineEnd: 6 }} />{t.saving}</> : <><i className="fas fa-save" style={{ marginInlineEnd: 6 }} />{t.save}</>}
+                  {actionLoading ? <><i className="fas fa-spinner fa-spin" style={{ marginInlineEnd: 6 }} />Enregistrement...</> : <><i className="fas fa-save" style={{ marginInlineEnd: 6 }} />{t.save}</>}
                 </button>
               </div>
             </form>
@@ -1976,17 +1278,13 @@ const cur = t.currency;
         </div>
       )}
 
-      {/* Modal suppression */}
       {saleToDelete && (
-        <div className="ep-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && !actionLoading && setSaleToDelete(null)}>
+        <div className="ep-modal-overlay" onMouseDown={e => e.target === e.currentTarget && !actionLoading && setSaleToDelete(null)}>
           <div className="ep-modal small" role="alertdialog" aria-modal="true">
             <div className="ep-delete-body">
               <span className="ep-delete-icon"><i className="fas fa-trash-alt" /></span>
               <h4>{t.delete_q}</h4>
-              <p>{t.delete_invoice(saleToDelete.invoice_number || saleToDelete.id)}</p>
-              <div style={{ padding: '10px 12px', background: 'var(--amber-soft)', color: '#94590a', borderRadius: 9, fontSize: 12, marginTop: 10 }}>
-                <i className="fas fa-info-circle" style={{ marginInlineEnd: 6 }} />{t.delete_warn}
-              </div>
+              <p>Facture {saleToDelete.invoice_number || saleToDelete.id}</p>
             </div>
             <div className="ep-modal-footer center">
               <button type="button" className="ep-btn ep-btn-cancel" onClick={() => setSaleToDelete(null)} disabled={actionLoading}>{t.cancel}</button>
@@ -1998,19 +1296,15 @@ const cur = t.currency;
         </div>
       )}
 
-      {/* Modal facture après encaissement */}
       {showInvoice && lastSale && (
-        <div className="ep-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && setShowInvoice(false)}>
+        <div className="ep-modal-overlay" onMouseDown={e => e.target === e.currentTarget && setShowInvoice(false)}>
           <div className="ep-modal medium" role="dialog" aria-modal="true">
             <div className="ep-modal-header">
               <div>
-                <h3>
-                  <span className="ep-modal-icon success"><i className="fas fa-check-circle" /></span>
-                  {t.success_invoice}
-                </h3>
-                <p>{t.invoice} : {getInvoiceNumber()}</p>
+                <h3><span className="ep-modal-icon success"><i className="fas fa-check-circle" /></span>{t.success_invoice}</h3>
+                <p>{t.th_invoice} : {lastSale.invoice_number || `VENTE-${lastSale.id}`}</p>
               </div>
-              <button type="button" className="btn-icon" onClick={() => setShowInvoice(false)} aria-label={t.close}><i className="fas fa-times" /></button>
+              <button type="button" className="btn-icon" onClick={() => setShowInvoice(false)}><i className="fas fa-times" /></button>
             </div>
             <div className="ep-modal-body">
               <div style={{ textAlign: 'center', paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid var(--line)' }}>
@@ -2020,67 +1314,50 @@ const cur = t.currency;
                 <h4 style={{ margin: '12px 0 0', fontWeight: 800 }}>{t.facture}</h4>
               </div>
               <div className="ep-detail-grid">
-                <div className="ep-detail-item"><span>{t.invoice.toUpperCase()}</span><strong>{getInvoiceNumber()}</strong></div>
-                <div className="ep-detail-item"><span>{t.date.toUpperCase()}</span><strong>{formatDate(lastSale.created_at, t.locale)}</strong></div>
-                <div className="ep-detail-item"><span>{t.customer.toUpperCase()}</span><strong>{getCustomerName(lastSale)}</strong></div>
+                <div className="ep-detail-item"><span>N°</span><strong>{lastSale.invoice_number || `VENTE-${lastSale.id}`}</strong></div>
+                <div className="ep-detail-item"><span>Date</span><strong>{formatDate(lastSale.invoice_date || lastSale.created_at, t.locale)}</strong></div>
+                <div className="ep-detail-item"><span>Client</span><strong>{getCustomerName(lastSale)}</strong></div>
               </div>
               <table className="ep-items-table">
                 <thead>
                   <tr>
-                    <th>{t.th_products}</th>
-                    <th className="ep-col-center">{t.edit_qty}</th>
-                    <th className="ep-col-end">{t.edit_unit}</th>
-                    <th className="ep-col-end">{t.edit_total}</th>
+                    <th>{t.f_product}</th>
+                    <th>{t.th_category}</th>
+                    <th className="ep-col-center">{t.f_qty}</th>
+                    <th className="ep-col-end">{t.f_price}</th>
+                    <th className="ep-col-end">{t.th_total}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {getSaleItems(lastSale).map((item, index) => {
-                    const qty = Number(item.quantity) || 0;
-                    const price = Number(item.price ?? item.unit_price) || 0;
-                    const lineTotal = Number(item.total ?? qty * price);
+                  {getSaleItems(lastSale).map((it, idx) => {
+                    const q = Number(it.quantity) || 0;
+                    const p = Number(it.price ?? it.unit_price) || 0;
+                    const lt = Number(it.total ?? q * p);
                     return (
-                      <tr key={item.id || index}>
-                        <td>{item.product_name || item.name || item.products?.name || 'Produit'}</td>
-                        <td className="ep-col-center">{qty}</td>
-                        <td className="ep-col-end">{formatNumber(price)} {cur}</td>
-                        <td className="ep-col-end" style={{ fontWeight: 800 }}>{formatNumber(lineTotal)} {cur}</td>
+                      <tr key={idx}>
+                        <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
+                        <td><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
+                        <td className="ep-col-center">{q}</td>
+                        <td className="ep-col-end">{formatNumber(p)} {cur}</td>
+                        <td className="ep-col-end" style={{ fontWeight: 800 }}>{formatNumber(lt)} {cur}</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-              <div className="pos-totals" style={{ marginTop: 16 }}>
-                <div className="pos-total-row"><span style={{ color: 'var(--muted)' }}>{t.subtotal}</span><strong>{formatNumber(lastSale.subtotal)} {cur}</strong></div>
-                <div className="pos-total-row"><span style={{ color: 'var(--muted)' }}>{t.discount}</span><strong style={{ color: 'var(--red)' }}>− {formatNumber(lastSale.discount)} {cur}</strong></div>
-                <div className="pos-total-row pos-grand-total">
-                  <span>{t.total_to_pay}</span>
-                  <span style={{ color: 'var(--primary)' }}>{formatNumber(lastSale.grand_total ?? lastSale.total)} {cur}</span>
-                </div>
-                <div className="pos-total-row"><span style={{ color: 'var(--muted)' }}>{t.payment_method}</span><strong>{({ cash: t.cash, bankily: t.bankily, masrivi: t.masrivi, sedad: t.sedad, credit: t.credit, card: t.card })[lastSale.payment_method] || t.cash}</strong></div>
-                {lastSale.payment_method === 'cash' && (
-                  <>
-                    <div className="pos-total-row"><span style={{ color: 'var(--muted)' }}>{t.amount_received}</span><strong>{formatNumber(lastSale.amount_received)} {cur}</strong></div>
-                    <div className="pos-total-row"><span style={{ color: 'var(--muted)' }}>{t.change}</span><strong>{formatNumber(lastSale.change_amount)} {cur}</strong></div>
-                  </>
-                )}
-                {lastSale.notes && (
-                  <div style={{ marginTop: 12, padding: '8px 12px', background: '#f8fafc', borderInlineStart: '3px solid var(--primary)', borderRadius: 8, fontSize: 12 }}>
-                    <small style={{ color: 'var(--muted)', display: 'block', marginBottom: 2 }}>{t.edit_notes} :</small>
-                    <em>{lastSale.notes}</em>
-                  </div>
-                )}
+              <div style={{ marginTop: 16, padding: 12, borderRadius: 10, background: '#f8fafc', display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
+                <span>TOTAL À PAYER</span>
+                <span style={{ color: 'var(--primary)' }}>{formatNumber(lastSale.grand_total ?? lastSale.total)} {cur}</span>
               </div>
-              <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 18, marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+              <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
                 {t.thanks}<br />{t.thanks_sub}
               </div>
             </div>
             <div className="ep-modal-footer">
-              <button type="button" className="ep-btn ep-btn-outline" onClick={() => printInvoice(lastSale)}>
-                <i className="fas fa-print" style={{ marginInlineEnd: 6 }} />{t.print_invoice}
-              </button>
+              <button type="button" className="ep-btn ep-btn-outline" onClick={() => printInvoice(lastSale)}><i className="fas fa-print" style={{ marginInlineEnd: 6 }} />{t.print}</button>
               <button type="button" className="ep-btn ep-btn-outline" onClick={() => setShowInvoice(false)}>{t.close}</button>
-              <button type="button" className="ep-btn ep-btn-save" onClick={handleNewSale}>
-                <i className="fas fa-plus" style={{ marginInlineEnd: 6 }} />{t.new_sale}
+              <button type="button" className="ep-btn ep-btn-save" onClick={() => { setShowInvoice(false); setLastSale(null); setShowAddModal(true); }}>
+                <i className="fas fa-plus" style={{ marginInlineEnd: 6 }} />{t.add}
               </button>
             </div>
           </div>

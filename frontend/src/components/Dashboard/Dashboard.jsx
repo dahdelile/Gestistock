@@ -190,7 +190,7 @@ const DashboardPage = () => {
 
   // NB : la route des ventes du menu est /ventes.
   const quickActions = [
-    { key: 'sales', label: t.q_sales, icon: 'fa-cash-register', to: '/ventes', tone: 'green' },
+    { key: 'sales', label: t.q_sales, icon: 'fa-cash-register', to: '/sales', tone: 'green' },
     { key: 'purchases', label: t.q_purchases, icon: 'fa-cart-shopping', to: '/purchases', tone: 'violet' },
     { key: 'products', label: t.q_products, icon: 'fa-boxes-stacked', to: '/products', tone: 'blue' },
     { key: 'expenses', label: t.q_expenses, icon: 'fa-file-invoice-dollar', to: '/expenses', tone: 'amber' },

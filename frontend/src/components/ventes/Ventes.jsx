@@ -1,5 +1,5 @@
 // src/pages/VentesPage.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { productsApi, customersApi, salesApi } from '../../api';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -66,6 +66,8 @@ const I18N = {
     export_all: 'Exporter', sort_by: 'Trier',
     no_data: 'Aucune vente trouvée.', no_data_sub: 'Modifiez votre recherche ou créez une nouvelle vente.',
     loading_sales: 'Chargement des ventes...',
+    role_admin: 'Admin', role_user: 'Lecture',
+    err_permission: 'Action réservée aux administrateurs.',
   },
   ar: {
     dir: 'rtl', locale: 'ar-u-nu-latn', currency: 'أوقية',
@@ -105,6 +107,8 @@ const I18N = {
     export_all: 'تصدير', sort_by: 'ترتيب',
     no_data: 'لا توجد مبيعات.', no_data_sub: 'عدّل البحث أو أنشئ بيعًا جديدًا.',
     loading_sales: 'جارٍ تحميل المبيعات...',
+    role_admin: 'مدير', role_user: 'قراءة',
+    err_permission: 'الإجراء مخصص للمديرين فقط.',
   },
 };
 
@@ -141,7 +145,7 @@ const getSaleCategories = (sale, productById) => {
 };
 
 /* ============================================================
-   MODALE D'AJOUT DE VENTE (entièrement responsive)
+   MODALE D'AJOUT DE VENTE
    ============================================================ */
 const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading, t, cur }) => {
   const buildInitialForm = () => ({
@@ -261,7 +265,6 @@ const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading,
                 <i className="fas fa-exclamation-circle" style={{ marginInlineEnd: 6 }} />{localError}
               </div>
             )}
-
             <div className="ep-form-group">
               <label>{t.f_customer}</label>
               <select name="customer_id" value={form.customer_id} onChange={handleChange}>
@@ -269,8 +272,6 @@ const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading,
                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
-
-            {/* ✅ Classe responsive au lieu de style inline */}
             <div className="ep-grid-3">
               <div className="ep-form-group">
                 <label>{t.f_date}</label>
@@ -296,12 +297,9 @@ const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading,
                 </select>
               </div>
             </div>
-
             <div className="ep-section-title">
               <span className="ep-section-num">1</span> Articles de la vente
             </div>
-
-            {/* ✅ Barre responsive : passe en colonne sur mobile */}
             <div className="ep-item-bar">
               <div className="ep-form-group ep-w-cat">
                 <label>{t.f_category}</label>
@@ -339,12 +337,11 @@ const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading,
                 <i className="fas fa-plus" style={{ marginInlineEnd: 6 }} />{t.f_add_item}
               </button>
             </div>
-
             <table className="ep-items-table">
               <thead>
                 <tr>
                   <th>{t.f_product}</th>
-                  <th className="col-sm-hide">{t.th_category}</th>
+                  <th>{t.th_category}</th>
                   <th className="ep-col-center" style={{ width: 70 }}>{t.f_qty}</th>
                   <th className="ep-col-end" style={{ width: 100 }}>{t.f_price}</th>
                   <th className="ep-col-end" style={{ width: 100 }}>{t.th_total}</th>
@@ -357,7 +354,7 @@ const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading,
                 ) : items.map((item, idx) => (
                   <tr key={idx}>
                     <td>{item.name}</td>
-                    <td className="col-sm-hide"><span className="ep-badge badge-blue">{item.category || getItemCategory(item, productById)}</span></td>
+                    <td><span className="ep-badge badge-blue">{item.category || getItemCategory(item, productById)}</span></td>
                     <td className="ep-col-center">{item.quantity}</td>
                     <td className="ep-col-end">{formatNumber(item.price)}</td>
                     <td className="ep-col-end" style={{ fontWeight: 700 }}>{formatNumber(item.price * item.quantity)}</td>
@@ -375,7 +372,6 @@ const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading,
                 </tr>
               </tfoot>
             </table>
-
             <div className="ep-form-group" style={{ marginTop: 16 }}>
               <label>{t.f_notes}</label>
               <textarea rows="2" name="notes" value={form.notes} onChange={handleChange} placeholder="Notes optionnelles..." />
@@ -400,6 +396,29 @@ const VentesPage = () => {
   const { lang } = useLanguage();
   const t = I18N[lang];
   const cur = t.currency;
+
+  /* ---------- Gestion des rôles (comme ChauffeurManager) ---------- */
+  const [userRole, setUserRole] = useState(null);
+  const [userLoading, setUserLoading] = useState(true);
+  const isAdmin = () => userRole === 'admin' || userRole === 'administrateur';
+  const canEdit = () => isAdmin();
+
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        setUserRole(userData.role || userData.roles?.[0] || 'user');
+      } else {
+        setUserRole('user');
+      }
+    } catch (e) {
+      console.error('Erreur parsing user:', e);
+      setUserRole('user');
+    } finally {
+      setUserLoading(false);
+    }
+  }, []);
 
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
@@ -580,6 +599,7 @@ const VentesPage = () => {
   }, [sales]);
 
   const handleAddSubmit = async (payload) => {
+    if (!canEdit()) { showError(t.err_permission); return; }
     setProcessing(true);
     try {
       const cleanPayload = {
@@ -628,6 +648,7 @@ const VentesPage = () => {
   };
 
   const handleOpenEdit = (sale) => {
+    if (!canEdit()) { showError(t.err_permission); return; }
     setSaleToEdit(sale);
     setEditStatus(sale.status || 'paid');
     setEditNotes(sale.notes || '');
@@ -723,13 +744,14 @@ const VentesPage = () => {
 
   const exportFilteredSales = () => {
     const rows = [
-      [t.th_invoice, t.th_customer, t.th_products, t.th_category, t.th_qty, t.th_total, t.th_status, t.th_date],
+      [t.th_invoice, t.th_customer, t.th_products, t.th_category, t.th_qty, t.th_unit, t.th_total, t.th_status, t.th_date],
       ...filteredSales.map(s => [
         s.invoice_number || `VENTE-${s.id}`,
         getCustomerName(s),
         getProductNames(s),
         getSaleCategories(s, productById),
         getTotalQuantity(s),
+        getTotalQuantity(s) > 0 ? Number(s.grand_total ?? s.total ?? 0) / getTotalQuantity(s) : 0,
         Number(s.grand_total ?? s.total ?? 0),
         getStatus(s.status, s.payment_method).label,
         formatDate(s.invoice_date || s.created_at, t.locale),
@@ -754,6 +776,16 @@ const VentesPage = () => {
     setEndDateFilter('');
   };
 
+  if (userLoading) {
+    return (
+      <div className="expenses-page" dir={t.dir} lang={lang} style={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center', color: 'var(--muted)' }}>
+          <span className="ep-spinner" /> Vérification des permissions...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="expenses-page" dir={t.dir} lang={lang}>
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
@@ -772,21 +804,24 @@ const VentesPage = () => {
         .expenses-page button:focus-visible,.expenses-page input:focus-visible,.expenses-page select:focus-visible,.expenses-page textarea:focus-visible{outline:3px solid rgba(31,94,234,.35);outline-offset:2px}
         .ep-amt{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
 
-        /* ===== BASE ===== */
+        /* ===== HERO (identique Affectation) ===== */
         .ep-hero{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:9px 16px;min-height:55px;margin:0 0 16px;background:#5954d6;color:#fff}
         .ep-title h1{margin:0;font-size:22px;font-weight:800;display:flex;align-items:center;gap:12px;line-height:1.25;color:#fff}
         .ep-title-icon{font-size:22px}
         .ep-title p{display:none}
         .ep-eyebrow{display:none}
+        .ep-role-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:800;background:#159b45;color:#fff}
+        .ep-role-badge.readonly{background:#6c757d}
         .ep-hero-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
         .ep-btn-add{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border:0;border-radius:4px;background:#159b45;color:#fff;font:inherit;font-weight:800;font-size:13px;cursor:pointer;transition:.18s}
         .ep-btn-add:hover{background:#12853c}
         .ep-hero-refresh{min-height:36px;padding:7px 12px;border:0;border-radius:4px;background:#fff;color:#172033;cursor:pointer;font:inherit;font-weight:700;font-size:13px}
 
-        .ep-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;padding:22px 10px 0;margin-bottom:24px}
+        /* ===== CARTES STATS : TOUJOURS 4 EN LIGNE HORIZONTALE (comme Affectation) ===== */
+        .ep-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;padding:22px 10px 0;margin-bottom:24px}
         .ep-card{position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;min-height:92px;padding:16px 18px;border-radius:0;box-shadow:0 2px 5px rgba(0,0,0,.16);color:#fff}
         .ep-card-info{position:relative;z-index:1;min-width:0}
-        .ep-card-info h3{margin:0 0 4px;font-size:15px;font-weight:800;color:#fff}
+        .ep-card-info h3{margin:0 0 4px;font-size:15px;font-weight:800;color:#fff;line-height:1.25}
         .ep-card-info .value{font-size:30px;font-weight:800;line-height:1.15;color:#fff;overflow-wrap:anywhere}
         .ep-card-info .sub{margin-top:5px;font-size:11px;opacity:.9;color:#fff}
         .ep-icon{position:relative;z-index:1;flex:0 0 auto;display:grid;place-items:center;font-size:30px;color:#fff}
@@ -807,12 +842,13 @@ const VentesPage = () => {
         .ep-reset:hover{background:#f1f5fb}
         .ep-fg-actions{display:flex;gap:8px}
 
+        /* ===== TABLEAU : toutes les colonnes, scroll horizontal (comme Affectation) ===== */
         .ep-table-wrap{overflow-x:auto;width:100%;max-width:100%;-webkit-overflow-scrolling:touch}
-        .ep-table{width:100%;min-width:980px;border-collapse:collapse;white-space:normal}
+        .ep-table{width:100%;min-width:1080px;border-collapse:collapse;white-space:normal}
         .ep-table th{padding:13px 10px;background:#222833;color:#fff;border:1px solid #424b58;font-size:13px;font-weight:700;text-align:start;white-space:nowrap;user-select:none}
         .ep-table th.sortable{cursor:pointer}
         .ep-table th.sortable:hover{background:#2f3744}
-        .ep-table td{padding:11px 10px;border:1px solid #d8dee8;font-size:13px;color:#172033;vertical-align:middle;overflow-wrap:anywhere;max-width:200px}
+        .ep-table td{padding:11px 10px;border:1px solid #d8dee8;font-size:13px;color:#172033;vertical-align:middle;overflow-wrap:anywhere}
         .ep-table tbody tr:nth-child(odd) td{background:#f0f1f2}
         .ep-table tbody tr:nth-child(even) td{background:#fff}
         .ep-table tbody tr:hover td{background:#e8efff}
@@ -881,7 +917,6 @@ const VentesPage = () => {
         .ep-delete-body h4{margin:0 0 6px;font-size:17px;font-weight:800}
         .ep-delete-body p{margin:0 0 10px;color:var(--muted);font-size:13px}
 
-        /* ===== GRILLES RESPONSIVES DES MODALES (remplacent les styles inline) ===== */
         .ep-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
         .ep-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
         .ep-item-bar{display:flex;gap:8px;margin-bottom:12px;align-items:end;flex-wrap:wrap}
@@ -889,40 +924,45 @@ const VentesPage = () => {
         .ep-w-cat{width:150px}.ep-w-prod{flex:2;min-width:180px}.ep-w-qty{width:90px}.ep-w-price{width:130px}
 
         /* ============================================================
-           MOBILE — identique à la page Affectation (intranet-atm)
+           MOBILE — COMPORTEMENT IDENTIQUE À LA PAGE AFFECTATION
         ============================================================ */
         @media (max-width:992px){
-          .expenses-page .ep-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:14px 10px 0;margin-bottom:16px}
+          .expenses-page .ep-stats{gap:12px;padding:14px 8px 0;margin-bottom:16px}
           .expenses-page .ep-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
           .expenses-page .ep-fg-search{grid-column:1/-1}
           .ep-fg-actions{grid-column:1/-1}
         }
 
-        /* ✅ CARTE STATS : TOUJOURS 2 COLONNES sur téléphone (comme l'affectation) */
+        /* ✅ Cartes stats : 4 EN LIGNE HORIZONTALE SUR TÉLÉPHONE (comme la capture) */
         @media (max-width:768px){
-          .expenses-page .ep-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px 8px 0;margin-bottom:14px}
-          .expenses-page .ep-card{min-height:74px;padding:12px}
-          .expenses-page .ep-card-info h3{font-size:12px}
-          .expenses-page .ep-card-info .value{font-size:22px}
-          .expenses-page .ep-card-info .sub{font-size:10px}
-          .expenses-page .ep-icon{font-size:22px;flex-basis:26px}
+          .expenses-page .ep-stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:12px 6px 0;margin-bottom:14px}
+          .expenses-page .ep-card{min-height:74px;padding:9px 7px;gap:6px}
+          .expenses-page .ep-card-info h3{font-size:10px;margin-bottom:2px;line-height:1.2}
+          .expenses-page .ep-card-info .value{font-size:20px}
+          .expenses-page .ep-card-info .sub{font-size:8px;margin-top:3px}
+          .expenses-page .ep-icon{font-size:18px;flex-basis:20px}
           .expenses-page .ep-hero{padding:9px 10px;gap:8px;min-height:48px}
-          .expenses-page .ep-title h1{font-size:17px}
-          .expenses-page .ep-btn-add,.expenses-page .ep-hero-refresh{padding:8px 10px;font-size:12px}
-          .expenses-page .ep-panel{margin-inline:8px}
+          .expenses-page .ep-title h1{font-size:16px;gap:8px}
+          .expenses-page .ep-role-badge{font-size:9px;padding:3px 7px}
+          .expenses-page .ep-btn-add,.expenses-page .ep-hero-refresh{padding:7px 9px;font-size:11px}
+          .expenses-page .ep-panel{margin-inline:6px}
           .expenses-page .ep-panel-head h5{font-size:15px}
           .expenses-page .ep-filters{grid-template-columns:1fr 1fr;gap:8px;padding:10px}
           .expenses-page .ep-fg-search{grid-column:1/-1}
           .ep-fg-actions{grid-column:1/-1}
-          .ep-fg-actions .ep-btn,.ep-fg-actions .ep-reset{flex:1;justify-content:center}
+          .ep-fg-actions .ep-btn,.ep-fg-actions .ep-reset{flex:1;justify-content:center;text-align:center}
           .expenses-page .ep-filter-input,.expenses-page .ep-reset{height:36px;font-size:12px}
-          .expenses-page .ep-table{min-width:680px}
+
+          /* ✅ Tableau : TOUTES les colonnes visibles, scroll horizontal (comme Affectation) */
+          .expenses-page .ep-table{min-width:1080px}
           .expenses-page .ep-table th{padding:8px 6px;font-size:11px}
-          .expenses-page .ep-table td{padding:7px 6px;font-size:11px;max-width:150px}
-          .ep-customer-name{max-width:110px}
-          /* ✅ Colonnes secondaires masquées sur téléphone */
-          .ep-table .col-sm-hide{display:none}
-          /* ✅ Modales plein écran */
+          .expenses-page .ep-table td{padding:7px 6px;font-size:11px}
+          .ep-customer-name{max-width:120px}
+          .ep-ref{font-size:11px}
+          .expenses-page .ep-badge{font-size:10px;padding:2px 6px}
+          .btn-icon{width:26px;height:26px;font-size:11px}
+
+          /* Modales plein écran */
           .ep-modal-overlay{padding:.4rem;align-items:stretch}
           .ep-modal,.ep-modal.medium,.ep-modal.small{max-width:100%;max-height:calc(100dvh - .8rem);border-radius:.5rem;margin:auto}
           .ep-modal-header{padding:.8rem 1rem}
@@ -934,7 +974,6 @@ const VentesPage = () => {
           .ep-items-table{min-width:420px}
           .ep-detail-grid{grid-template-columns:1fr 1fr}
           .ep-detail-grid .ep-detail-item:last-child{grid-column:1/-1}
-          /* ✅ Barre d'ajout article en colonne */
           .ep-item-bar{flex-direction:column;align-items:stretch}
           .ep-item-bar .ep-form-group{width:100%!important;min-width:0!important;flex:none!important}
           .ep-item-bar .ep-btn{width:100%}
@@ -945,12 +984,12 @@ const VentesPage = () => {
         }
         @media (max-width:440px){
           .ep-grid-2,.ep-grid-3{grid-template-columns:1fr}
-          .expenses-page .ep-stats{gap:8px;padding:10px 6px 0}
-          .expenses-page .ep-card{min-height:66px;padding:9px 10px}
-          .expenses-page .ep-card-info h3{font-size:11px}
-          .expenses-page .ep-card-info .value{font-size:19px}
-          .expenses-page .ep-card-info .sub{font-size:9px}
-          .expenses-page .ep-icon{font-size:18px;flex-basis:22px}
+          .expenses-page .ep-stats{gap:4px;padding:10px 4px 0}
+          .expenses-page .ep-card{min-height:68px;padding:8px 5px}
+          .expenses-page .ep-card-info h3{font-size:9px}
+          .expenses-page .ep-card-info .value{font-size:17px}
+          .expenses-page .ep-card-info .sub{font-size:7px}
+          .expenses-page .ep-icon{font-size:15px;flex-basis:18px}
           .ep-detail-grid{grid-template-columns:1fr}
           .ep-detail-grid .ep-detail-item:last-child{grid-column:auto}
           .ep-toast{top:10px;inset-inline:10px;width:auto}
@@ -965,7 +1004,7 @@ const VentesPage = () => {
       {error && <div className="ep-toast danger" role="alert"><span>⚠</span><div style={{ flex: 1 }}>{error}</div><button type="button" className="btn-icon" onClick={() => setError('')}><i className="fas fa-times" /></button></div>}
       {success && <div className="ep-toast success" role="status"><span>✓</span><div style={{ flex: 1 }}>{success}</div><button type="button" className="btn-icon" onClick={() => setSuccess('')}><i className="fas fa-times" /></button></div>}
 
-      {/* Cartes stats : 2×2 sur mobile comme la page Affectation */}
+      {/* Cartes stats : 4 en ligne horizontale sur téléphone, comme Affectation */}
       <section className="ep-stats">
         <div className="ep-card tone-violet">
           <div className="ep-card-info">
@@ -1003,15 +1042,24 @@ const VentesPage = () => {
 
       <header className="ep-hero">
         <div className="ep-title">
-          <h1><span className="ep-title-icon"><i className="fas fa-cash-register" /></span>{t.title}</h1>
+          <h1>
+            <span className="ep-title-icon"><i className="fas fa-cash-register" /></span>
+            {t.title}
+            <span className={`ep-role-badge ${canEdit() ? '' : 'readonly'}`}>
+              <i className={`fas ${canEdit() ? 'fa-user-shield' : 'fa-user'}`} />
+              {canEdit() ? t.role_admin : t.role_user}
+            </span>
+          </h1>
         </div>
         <div className="ep-hero-actions">
           <button type="button" className="ep-hero-refresh" onClick={() => { fetchSales(); fetchProducts(); fetchCustomers(); }} disabled={loadingSales}>
             <i className={`fas fa-sync-alt ${loadingSales ? 'fa-spin' : ''}`} /> {t.refresh}
           </button>
-          <button type="button" className="ep-btn-add" onClick={() => setShowAddModal(true)}>
-            <i className="fas fa-plus" /> {t.add}
-          </button>
+          {canEdit() && (
+            <button type="button" className="ep-btn-add" onClick={() => setShowAddModal(true)}>
+              <i className="fas fa-plus" /> {t.add}
+            </button>
+          )}
         </div>
       </header>
 
@@ -1084,14 +1132,14 @@ const VentesPage = () => {
                 <th className="sortable" onClick={() => handleSort('products')} title={t.sort_by}>
                   {t.th_products} <i className={`fas ${sortIcon('products')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
                 </th>
-                <th className="sortable col-sm-hide" onClick={() => handleSort('category')} title={t.sort_by}>
+                <th className="sortable" onClick={() => handleSort('category')} title={t.sort_by}>
                   {t.th_category} <i className={`fas ${sortIcon('category')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
                 </th>
                 <th className="sortable" onClick={() => handleSort('customer')} title={t.sort_by}>
                   {t.th_customer} <i className={`fas ${sortIcon('customer')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
                 </th>
                 <th className="ep-col-center">{t.th_qty}</th>
-                <th className="ep-col-end col-sm-hide">{t.th_unit}</th>
+                <th className="ep-col-end">{t.th_unit}</th>
                 <th className="ep-col-end sortable" onClick={() => handleSort('total')} title={t.sort_by}>
                   {t.th_total} <i className={`fas ${sortIcon('total')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
                 </th>
@@ -1125,7 +1173,7 @@ const VentesPage = () => {
                     <tr key={sale.id}>
                       <td style={{ color: '#000204' }}>{i + 1}</td>
                       <td style={{ color: '#044dba' }} title={names}>{names}</td>
-                      <td className="col-sm-hide" title={cats}><span className="ep-badge badge-violet">{cats}</span></td>
+                      <td title={cats}><span className="ep-badge badge-violet">{cats}</span></td>
                       <td>
                         <div className="ep-customer-cell">
                           <div className="ep-avatar"><i className="fas fa-user" /></div>
@@ -1133,15 +1181,19 @@ const VentesPage = () => {
                         </div>
                       </td>
                       <td className="ep-col-center"><span className="ep-badge badge-gray">{t.units(qty)}</span></td>
-                      <td className="ep-col-end ep-money col-sm-hide">{formatNumber(avg)} {cur}</td>
+                      <td className="ep-col-end ep-money">{formatNumber(avg)} {cur}</td>
                       <td className="ep-col-end ep-money ep-money-total">{formatNumber(sale.grand_total ?? sale.total)} {cur}</td>
                       <td><span className={`ep-badge badge-${st.tone}`}><i className={`fas ${st.icon}`} style={{ marginInlineEnd: 5 }} />{st.label}</span></td>
                       <td style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{formatDate(sale.invoice_date || sale.created_at, t.locale)}</td>
                       <td className="ep-col-end">
                         <div className="ep-actions">
                           <button type="button" className="btn-icon btn-view" title={t.view} onClick={() => setSelectedSale(sale)}><i className="fas fa-eye" /></button>
-                          <button type="button" className="btn-icon btn-edit" title={t.edit} onClick={() => handleOpenEdit(sale)}><i className="fas fa-edit" /></button>
-                          <button type="button" className="btn-icon btn-delete" title={t.delete} onClick={() => setSaleToDelete(sale)}><i className="fas fa-trash-alt" /></button>
+                          {canEdit() && (
+                            <>
+                              <button type="button" className="btn-icon btn-edit" title={t.edit} onClick={() => handleOpenEdit(sale)}><i className="fas fa-edit" /></button>
+                              <button type="button" className="btn-icon btn-delete" title={t.delete} onClick={() => setSaleToDelete(sale)}><i className="fas fa-trash-alt" /></button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1185,7 +1237,7 @@ const VentesPage = () => {
                 <thead>
                   <tr>
                     <th>{t.f_product}</th>
-                    <th className="col-sm-hide">{t.th_category}</th>
+                    <th>{t.th_category}</th>
                     <th className="ep-col-center">{t.f_qty}</th>
                     <th className="ep-col-end">{t.f_price}</th>
                     <th className="ep-col-end">{t.th_total}</th>
@@ -1201,7 +1253,7 @@ const VentesPage = () => {
                     return (
                       <tr key={idx}>
                         <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
-                        <td className="col-sm-hide"><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
+                        <td><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
                         <td className="ep-col-center">{q}</td>
                         <td className="ep-col-end">{formatNumber(p)} {cur}</td>
                         <td className="ep-col-end" style={{ fontWeight: 800 }}>{formatNumber(lt)} {cur}</td>
@@ -1243,7 +1295,7 @@ const VentesPage = () => {
                   <thead>
                     <tr>
                       <th>{t.f_product}</th>
-                      <th className="col-sm-hide">{t.th_category}</th>
+                      <th>{t.th_category}</th>
                       <th className="ep-col-center" style={{ width: 80 }}>{t.f_qty}</th>
                       <th className="ep-col-end" style={{ width: 110 }}>{t.f_price}</th>
                       <th className="ep-col-end">{t.th_total}</th>
@@ -1253,7 +1305,7 @@ const VentesPage = () => {
                     {editItems.map((it, idx) => (
                       <tr key={idx}>
                         <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
-                        <td className="col-sm-hide"><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
+                        <td><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
                         <td className="ep-col-center">
                           <input type="number" min="1" style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 6, padding: 5, textAlign: 'center' }} value={it.quantity} onChange={e => { const a = [...editItems]; a[idx].quantity = parseInt(e.target.value, 10) || 1; setEditItems(a); }} />
                         </td>
@@ -1336,7 +1388,7 @@ const VentesPage = () => {
                 <thead>
                   <tr>
                     <th>{t.f_product}</th>
-                    <th className="col-sm-hide">{t.th_category}</th>
+                    <th>{t.th_category}</th>
                     <th className="ep-col-center">{t.f_qty}</th>
                     <th className="ep-col-end">{t.f_price}</th>
                     <th className="ep-col-end">{t.th_total}</th>
@@ -1350,7 +1402,7 @@ const VentesPage = () => {
                     return (
                       <tr key={idx}>
                         <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
-                        <td className="col-sm-hide"><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
+                        <td><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
                         <td className="ep-col-center">{q}</td>
                         <td className="ep-col-end">{formatNumber(p)} {cur}</td>
                         <td className="ep-col-end" style={{ fontWeight: 800 }}>{formatNumber(lt)} {cur}</td>
@@ -1370,9 +1422,11 @@ const VentesPage = () => {
             <div className="ep-modal-footer">
               <button type="button" className="ep-btn ep-btn-outline" onClick={() => printInvoice(lastSale)}><i className="fas fa-print" style={{ marginInlineEnd: 6 }} />{t.print}</button>
               <button type="button" className="ep-btn ep-btn-outline" onClick={() => setShowInvoice(false)}>{t.close}</button>
-              <button type="button" className="ep-btn ep-btn-save" onClick={() => { setShowInvoice(false); setLastSale(null); setShowAddModal(true); }}>
-                <i className="fas fa-plus" style={{ marginInlineEnd: 6 }} />{t.add}
-              </button>
+              {canEdit() && (
+                <button type="button" className="ep-btn ep-btn-save" onClick={() => { setShowInvoice(false); setLastSale(null); setShowAddModal(true); }}>
+                  <i className="fas fa-plus" style={{ marginInlineEnd: 6 }} />{t.add}
+                </button>
+              )}
             </div>
           </div>
         </div>

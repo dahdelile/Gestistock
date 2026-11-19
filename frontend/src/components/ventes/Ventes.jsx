@@ -300,4 +300,5 @@ const Ventes = () => {
         </div>
     );
 };
+
 export default Ventes;

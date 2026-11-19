@@ -8,13 +8,13 @@ import {
   FaInfoCircle, FaSyncAlt, FaPlus, FaEdit, FaTrash, FaSearch,
   FaLock, FaUserShield, FaUser, FaTimes, FaPrint, FaDownload,
   FaMoneyBillWave, FaShoppingCart, FaCalendarAlt, FaExchangeAlt,
-  FaCashRegister, FaFilter, FaFileExcel, FaBan, FaEye
+  FaCashRegister, FaFilter, FaFileExcel, FaEye
 } from 'react-icons/fa';
 import { productsApi, customersApi, salesApi } from '../../api';
 import { useLanguage } from '../../context/LanguageContext';
+import './Ventes.css';
 
 const STORE = { name: 'GESTION STOCK', address: 'Nouakchott, Mauritanie', phone: '+222 XX XX XX XX' };
-const AUTH_API_URL = 'https://intranet-attm.com/api';
 
 /* ============================================================
    HELPERS
@@ -56,7 +56,7 @@ const getSaleCategories = (sale, productById) => {
 };
 
 /* ============================================================
-   TRADUCTIONS
+   TRADUCTIONS - inchangées
    ============================================================ */
 const I18N = {
   fr: {
@@ -81,7 +81,7 @@ const I18N = {
     err_qty_invalid: 'Quantité invalide.', err_price_invalid: 'Saisissez un prix unitaire valide.',
     err_customer_credit: 'Sélectionnez un client pour le crédit.', no_items: 'Aucun article ajouté.',
     save: 'Enregistrer', cancel: 'Annuler', close: 'Fermer', saving: 'Enregistrement...',
-    err_save: 'Erreur lors de l\'enregistrement.', ok_sale: 'Vente enregistrée avec succès.',
+    err_save: "Erreur lors de l'enregistrement.", ok_sale: 'Vente enregistrée avec succès.',
     edit_title: 'Modifier la vente', ok_edit: 'Vente modifiée.', err_edit: 'Erreur modification.',
     delete_q: 'Supprimer cette vente ?', delete_confirm: 'Oui, supprimer', deleting: 'Suppression...',
     ok_delete: 'Vente supprimée.', err_delete: 'Erreur suppression.',
@@ -144,42 +144,22 @@ const VentesPage = () => {
   const isChefEnt = () => userRole === 'chef_ent' || userRole === 'chef_entreprise';
   const isDM = () => userRole === 'DM' || userRole === 'dm';
   const canEdit = () => isAdmin() || isDM() || isChefEnt();
-
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      try {
-        setUserLoading(true);
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          try {
-            const userData = JSON.parse(storedUser);
-            setUserRole(userData.role || userData.roles?.[0] || 'user');
-            setUserLoading(false);
-            return;
-          } catch (e) { console.error("Erreur parsing user:", e); }
-        }
-        const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-        if (token) {
-          const response = await fetch(`${AUTH_API_URL}/user`, {
-            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-          });
-          if (response.ok) {
-            const userData = await response.json();
-            const role = userData.role || userData.roles?.[0] || 'user';
-            setUserRole(role);
-            localStorage.setItem('user', JSON.stringify({ id: userData.id, email: userData.email, role }));
-          } else { setUserRole('user'); }
-        } else { setUserRole('user'); }
-      } catch (err) {
-        console.error("Erreur récupération rôle:", err);
-        setUserRole('user');
-      } finally { setUserLoading(false); }
-    };
-    fetchUserRole();
-  }, []);
-
   const canAdd = useCallback(() => canEdit(), [userRole]);
   const canDelete = useCallback(() => canEdit(), [userRole]);
+
+  // ✅ FIX 1 : charger le rôle comme dans ChauffeurManager, sinon userLoading reste true à vie
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        const u = JSON.parse(stored);
+        setUserRole(u.role || u.roles?.[0] || 'user');
+      } else {
+        setUserRole('user');
+      }
+    } catch { setUserRole('user'); }
+    finally { setUserLoading(false); }
+  }, []);
 
   /* ---------- ÉTATS ---------- */
   const [sales, setSales] = useState([]);
@@ -333,7 +313,6 @@ const VentesPage = () => {
   };
 
   const handleChange = (e) => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
-
   const handleSelectProduct = (e) => { setNewItem(p => ({ ...p, product_id: e.target.value, price: '' })); setLocalError(''); };
 
   const addItem = () => {
@@ -511,7 +490,7 @@ const VentesPage = () => {
   }
 
   return (
-    <div className="container-fluid py-4">
+    <div className="container-fluid py-4 ventes-page">
       <ToastContainer position="top-end" className="p-3">
         {toasts.map(toast => (
           <Toast key={toast.id} onClose={() => setToasts(prev => prev.filter(tt => tt.id !== toast.id))}
@@ -521,49 +500,49 @@ const VentesPage = () => {
         ))}
       </ToastContainer>
 
-      {/* ====== STATISTIQUES : xs={3} = 4 cartes sur UNE LIGNE même sur téléphone ====== */}
-      <Row className="mb-4">
+      {/* ====== STATS : MÊME QUE ChauffeurManager - xs={3} = 4 sur 1 ligne téléphone ====== */}
+      <Row className="mb-4 ventes-stats-row g-2">
         <Col xs={3} md={3}>
-          <Card className="bg-primary text-white shadow-sm">
+          <Card className="bg-primary text-white shadow-sm h-100">
             <Card.Body className="d-flex justify-content-between align-items-center">
               <div>
                 <h6 className="mb-0">{t.stat_revenue}</h6>
                 <h2 className="mb-0">{formatNumber(stats.revenue)}</h2>
               </div>
-              <FaMoneyBillWave size={40} />
+              <FaMoneyBillWave size={40} className="stat-icon" />
             </Card.Body>
           </Card>
         </Col>
         <Col xs={3} md={3}>
-          <Card className="bg-success text-white shadow-sm">
+          <Card className="bg-success text-white shadow-sm h-100">
             <Card.Body className="d-flex justify-content-between align-items-center">
               <div>
                 <h6 className="mb-0">{t.stat_count}</h6>
                 <h2 className="mb-0">{stats.count}</h2>
               </div>
-              <FaShoppingCart size={40} />
+              <FaShoppingCart size={40} className="stat-icon" />
             </Card.Body>
           </Card>
         </Col>
         <Col xs={3} md={3}>
-          <Card className="bg-info text-white shadow-sm">
+          <Card className="bg-info text-white shadow-sm h-100">
             <Card.Body className="d-flex justify-content-between align-items-center">
               <div>
                 <h6 className="mb-0">{t.stat_month}</h6>
                 <h2 className="mb-0">{stats.monthlyS}</h2>
               </div>
-              <FaCalendarAlt size={40} />
+              <FaCalendarAlt size={40} className="stat-icon" />
             </Card.Body>
           </Card>
         </Col>
         <Col xs={3} md={3}>
-          <Card className="bg-warning text-white shadow-sm">
+          <Card className="bg-warning text-white shadow-sm h-100">
             <Card.Body className="d-flex justify-content-between align-items-center">
               <div>
                 <h6 className="mb-0">{t.stat_day}</h6>
                 <h2 className="mb-0">{stats.dailyS}</h2>
               </div>
-              <FaExchangeAlt size={40} />
+              <FaExchangeAlt size={40} className="stat-icon" />
             </Card.Body>
           </Card>
         </Col>
@@ -578,10 +557,12 @@ const VentesPage = () => {
               {t.title}
               <Badge bg={canEdit() ? 'success' : 'secondary'} className="ms-2" style={{ fontSize: '0.6em' }}>
                 {canEdit() ? <FaUserShield className="me-1" /> : <FaUser className="me-1" />}
-                {isAdmin() ? t.role_admin : isDM() ? 'DM' : isChefEnt() ? 'Chef' : t.role_user}
               </Badge>
             </h3>
             <div className="d-flex align-items-center gap-2">
+              <Button variant="outline-success" onClick={exportAll}>
+                <FaFileExcel className="me-2" />{t.export_all}
+              </Button>
               <Button variant="light" onClick={() => { fetchSales(); fetchProducts(); fetchCustomers(); }} disabled={loading}>
                 <FaSyncAlt className={loading ? "spin" : ""} />
                 <span className="ms-2">{t.refresh}</span>
@@ -604,27 +585,15 @@ const VentesPage = () => {
             </Alert>
           )}
 
-          {/* Filtres */}
+          {/* Filtres - MÊME Row que ChauffeurManager */}
           <Row className="mb-3">
-            <Col md={4}>
+            <Col md={2}>
               <Form.Group>
                 <Form.Label className="fw-bold"><FaSearch className="me-2" />{t.th_invoice}</Form.Label>
                 <InputGroup>
                   <Form.Control type="text" placeholder={t.search_ph} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                   {searchTerm && <Button variant="outline-secondary" onClick={() => setSearchTerm('')}>×</Button>}
                 </InputGroup>
-              </Form.Group>
-            </Col>
-            <Col md={2}>
-              <Form.Group>
-                <Form.Label className="fw-bold"><FaFilter className="me-2" />{t.th_status}</Form.Label>
-                <Form.Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                  <option value="all">{t.all_status}</option>
-                  <option value="paid">{t.paid}</option>
-                  <option value="partial">{t.partial}</option>
-                  <option value="draft">{t.draft}</option>
-                  <option value="cancelled">{t.cancelled}</option>
-                </Form.Select>
               </Form.Group>
             </Col>
             <Col md={2}>
@@ -661,21 +630,18 @@ const VentesPage = () => {
                 <Form.Control type="date" value={endDateFilter} onChange={(e) => setEndDateFilter(e.target.value)} />
               </Form.Group>
             </Col>
-            <Col md={4} className="d-flex align-items-end gap-2">
+            <Col md={2} className="d-flex align-items-end gap-2">
               {hasFilters && (
-                <Button variant="outline-secondary" onClick={resetFilters}>
+                <Button variant="outline-secondary" onClick={resetFilters} className="w-100">
                   <FaTimes className="me-2" />{t.reset}
                 </Button>
               )}
-              <Button variant="outline-success" onClick={exportAll}>
-                <FaFileExcel className="me-2" />{t.export_all}
-              </Button>
             </Col>
           </Row>
 
           <p className="text-muted mb-2">{t.footer_count(filteredSales.length)}</p>
 
-          {/* Tableau */}
+          {/* Tableau - MÊME que ChauffeurManager */}
           {loading ? (
             <div className="text-center py-5">
               <Spinner animation="border" variant="primary" />
@@ -686,10 +652,8 @@ const VentesPage = () => {
               <Table striped bordered hover>
                 <thead className="table-dark">
                   <tr>
-                    <th>#</th>
                     <th>{t.th_products}</th>
                     <th>{t.th_category}</th>
-                    <th>{t.th_customer}</th>
                     <th className="text-center">{t.th_qty}</th>
                     <th className="text-end">{t.th_unit}</th>
                     <th className="text-end">{t.th_total}</th>
@@ -700,19 +664,16 @@ const VentesPage = () => {
                 </thead>
                 <tbody>
                   {filteredSales.length > 0 ? (
-                    filteredSales.map((sale, i) => {
+                    filteredSales.map((sale) => {
                       const st = getStatus(sale.status, sale.payment_method);
-                      const cn = sale.customers?.name || sale.customer?.name || t.walk_in;
                       const qty = getTotalQuantity(sale);
                       const avg = qty > 0 ? Number(sale.grand_total ?? sale.total ?? 0) / qty : 0;
                       const names = getProductNames(sale);
                       const cats = getSaleCategories(sale, productById);
                       return (
                         <tr key={sale.id}>
-                          <td className="fw-bold">{i + 1}</td>
                           <td title={names}>{names}</td>
                           <td><Badge bg="primary">{cats}</Badge></td>
-                          <td>{cn}</td>
                           <td className="text-center"><Badge bg="secondary">{t.units(qty)}</Badge></td>
                           <td className="text-end">{formatNumber(avg)} {cur}</td>
                           <td className="text-end fw-bold text-success">{formatNumber(sale.grand_total ?? sale.total)} {cur}</td>
@@ -745,7 +706,7 @@ const VentesPage = () => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan="10" className="text-center py-4">
+                      <td colSpan="8" className="text-center py-4">
                         <FaInfoCircle className="me-2" />
                         {t.no_data}
                       </td>
@@ -758,7 +719,7 @@ const VentesPage = () => {
         </Card.Body>
       </Card>
 
-      {/* ====== MODAL AJOUT (structure Row/Col comme modal chauffeur) ====== */}
+      {/* ====== MODAL AJOUT ====== */}
       <Modal show={showAddModal} onHide={() => !isUpdating && setShowAddModal(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title><FaCashRegister className="me-2" />{t.form_title}</Modal.Title>
@@ -769,17 +730,14 @@ const VentesPage = () => {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>{t.f_customer}</Form.Label>
-                  <Form.Select name="customer_id" value={form.customer_id} onChange={handleChange} disabled={isUpdating}>
-                    <option value="">{t.walk_in}</option>
-                    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </Form.Select>
+                  <Form.Label>{t.f_date}</Form.Label>
+                  <Form.Control type="datetime-local" name="date" value={form.date} onChange={handleChange} disabled={isUpdating} />
                 </Form.Group>
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>{t.f_date}</Form.Label>
-                  <Form.Control type="datetime-local" name="date" value={form.date} onChange={handleChange} disabled={isUpdating} />
+                  <Form.Label>{t.f_notes}</Form.Label>
+                  <Form.Control as="textarea" rows={1} name="notes" value={form.notes} onChange={handleChange} disabled={isUpdating} />
                 </Form.Group>
               </Col>
             </Row>
@@ -890,11 +848,6 @@ const VentesPage = () => {
                 )}
               </Table>
             </div>
-
-            <Form.Group className="mb-3">
-              <Form.Label>{t.f_notes}</Form.Label>
-              <Form.Control as="textarea" rows={2} name="notes" value={form.notes} onChange={handleChange} disabled={isUpdating} />
-            </Form.Group>
           </Form>
         </Modal.Body>
         <Modal.Footer>
@@ -1114,18 +1067,6 @@ const VentesPage = () => {
           )}
         </Modal.Footer>
       </Modal>
-
-      {/* Style minimal pour cartes stats sur mobile (titres compacts) */}
-      <style>{`
-        @media (max-width: 576px) {
-          .container-fluid .card.bg-primary h6, .container-fluid .card.bg-success h6,
-          .container-fluid .card.bg-info h6, .container-fluid .card.bg-warning h6 { font-size: 0.65rem; }
-          .container-fluid .card.bg-primary h2, .container-fluid .card.bg-success h2,
-          .container-fluid .card.bg-info h2, .container-fluid .card.bg-warning h2 { font-size: 1.1rem; }
-          .container-fluid .card.bg-primary svg, .container-fluid .card.bg-success svg,
-          .container-fluid .card.bg-info svg, .container-fluid .card.bg-warning svg { width: 22px; height: 22px; }
-        }
-      `}</style>
     </div>
   );
 };

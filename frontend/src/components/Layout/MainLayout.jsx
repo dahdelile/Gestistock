@@ -295,6 +295,7 @@ const MainLayout = ({ children }) => {
             </main>
         </div>
     );
+    
 };
 
 export default MainLayout;

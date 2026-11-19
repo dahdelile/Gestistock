@@ -762,175 +762,121 @@ const VentesPage = () => {
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+        
+        /* Reset de base */
         .expenses-page {
-          --ink:#14213d;--muted:#66748b;--line:#e3e9f2;--bg:#f2f5fb;--card:#fff;
-          --primary:#1f5eea;--primary-soft:#e8efff;--green:#0f9d74;--green-soft:#def7ee;
-          --violet:#6a4de0;--violet-soft:#ece8fd;--amber:#e08a0b;--amber-soft:#fff0d6;
-          --red:#d63c4a;--red-soft:#fde8ea;--rose:#c2417c;--rose-soft:#fbe6f0;
-          min-height:100vh;padding:clamp(14px,2.2vw,28px);background:radial-gradient(1000px 340px at 100% -80px,rgba(31,94,234,.08),transparent 70%),var(--bg);
-          color:var(--ink);font-family:Inter,'Segoe UI',system-ui,Tahoma,Arial,sans-serif;width:100%;min-width:0;overflow-x:hidden;font-size:14px;
+          --ink:#14213d; --muted:#66748b; --line:#e3e9f2; --bg:#f4f5f7; --card:#fff;
+          --primary:#1f5eea; --primary-soft:#e8efff;
+          --green:#0f9d74; --green-soft:#def7ee;
+          --violet:#6a4de0; --violet-soft:#ece8fd;
+          --amber:#e08a0b; --amber-soft:#fff0d6;
+          --red:#d63c4a; --red-soft:#fde8ea;
+          --rose:#c2417c; --rose-soft:#fbe6f0;
+          
+          min-height:100vh; width:100%; min-width:0; overflow-x:hidden; font-size:14px;
+          background: var(--bg); color:var(--ink);
+          font-family:Inter,'Segoe UI',system-ui,Tahoma,Arial,sans-serif;
         }
-        .expenses-page[lang="ar"]{font-family:Cairo,'Noto Sans Arabic',Tahoma,'Segoe UI',Arial,sans-serif}
-        .expenses-page *{box-sizing:border-box}
-        .expenses-page button:focus-visible,.expenses-page input:focus-visible,.expenses-page select:focus-visible,.expenses-page textarea:focus-visible{outline:3px solid rgba(31,94,234,.35);outline-offset:2px}
-        .ep-amt{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
-        .ep-hero{position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px;padding:clamp(20px,3vw,30px);margin-bottom:20px;border-radius:20px;color:#fff;background:linear-gradient(125deg,#0f2f66 0%,#1b55c9 58%,#2aa3d9 100%);box-shadow:0 14px 32px rgba(21,74,170,.2)}
-        .ep-hero::after{content:"";position:absolute;z-index:-1;width:250px;height:250px;inset-inline-end:-70px;top:-115px;border:32px solid rgba(255,255,255,.09);border-radius:50%}
-        .ep-eyebrow{font-size:12px;font-weight:800;letter-spacing:1.8px;opacity:.78}
-        .ep-title h1{margin:6px 0 4px;font-size:clamp(22px,2.8vw,30px);font-weight:800;display:flex;align-items:center;gap:12px;line-height:1.25}
-        .ep-title-icon{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.16);font-size:18px}
-        .ep-title p{margin:0;color:rgba(255,255,255,.82);font-size:13px}
-        .ep-hero-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
-        .ep-btn-add{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border:0;border-radius:11px;background:#fff;color:#174078;font:inherit;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.14);transition:.18s}
-        .ep-btn-add:hover{transform:translateY(-2px)}
-        .ep-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:20px}
-        .ep-card{position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:20px;background:var(--card);border:1px solid var(--line);border-inline-start:4px solid var(--accent);border-radius:16px;box-shadow:0 4px 14px rgba(20,33,61,.04);transition:transform .2s,box-shadow .2s}
-        .ep-card:hover{transform:translateY(-2px);box-shadow:0 12px 24px rgba(20,33,61,.08)}
-        .ep-card::after{content:"";position:absolute;inset-inline-end:-30px;bottom:-42px;width:105px;height:105px;border-radius:50%;background:var(--accent-soft);opacity:.7}
-        .ep-card-info{position:relative;z-index:1;min-width:0}
-        .ep-card-info h3{margin:0 0 9px;font-size:13px;color:var(--muted);font-weight:800}
-        .ep-card-info .value{font-size:clamp(20px,2vw,26px);font-weight:800;letter-spacing:-.3px;color:var(--ink);overflow-wrap:anywhere}
-        .ep-card-info .sub{margin-top:5px;font-size:12px;color:var(--accent);font-weight:700}
-        .ep-icon{position:relative;z-index:1;flex:0 0 44px;width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font-size:21px;background:var(--accent-soft);color:var(--accent)}
-        .tone-blue{--accent:var(--primary);--accent-soft:var(--primary-soft)}.tone-amber{--accent:var(--amber);--accent-soft:var(--amber-soft)}
-        .tone-violet{--accent:var(--violet);--accent-soft:var(--violet-soft)}.tone-green{--accent:var(--green);--accent-soft:var(--green-soft)}
-        .tone-rose{--accent:var(--rose);--accent-soft:var(--rose-soft)}
-        .ep-panel{background:var(--card);border-radius:16px;border:1px solid var(--line);overflow:hidden;box-shadow:0 4px 14px rgba(20,33,61,.035);margin-bottom:20px}
-        .ep-panel-head{padding:16px 20px;border-bottom:1px solid var(--line);background:#fbfcff;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px}
-        .ep-panel-head h5{margin:0 0 4px;font-size:16px;font-weight:800}
-        .ep-panel-head p{margin:0;font-size:12px;color:var(--muted)}
+        .expenses-page[lang="ar"] { font-family:'Cairo','Noto Sans Arabic',Tahoma,'Segoe UI',Arial,sans-serif; }
+        .expenses-page * { box-sizing: border-box; }
         
-        /* ✅ FILTRES FIXES POUR MOBILE (horizontal scroll) */
-        .ep-filters{display:flex;flex-wrap:nowrap;gap:8px;padding:12px;background:#fbfcff;border-bottom:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch;align-items:flex-end;}
-        .ep-fg{display:flex;flex-direction:column;gap:5px;min-width:120px;flex:0 0 auto;}
-        .ep-fg-search{min-width:200px;}
-        .ep-fg label{font-size:11px;font-weight:800;color:#4b5b75;text-transform:none;letter-spacing:0;white-space:nowrap;}
-        .ep-filter-input{width:100%;height:38px;border:1px solid #d9e1ed;border-radius:9px;padding:0 12px;font:inherit;font-size:13px;color:#2a3a55;background:#fff;outline:none}
-        .ep-filter-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
-        .ep-reset{height:38px;padding:0 13px;border:1px solid var(--line);border-radius:9px;background:#fff;color:#4b5b75;font:inherit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;flex:0 0 auto;}
-        .ep-reset:hover{background:#f1f5fb}
+        /* Header Violet (Style Affectation) */
+        .expenses-page .ep-hero { margin: 0 0 16px; padding: 9px 16px; min-height: 55px; border-radius: 0; background: #5954d6; box-shadow: none; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; color:#fff; }
+        .expenses-page .ep-title h1 { margin:0; font-size:22px; color:#fff; display:flex; align-items:center; gap:8px; }
+        .expenses-page .ep-title p { display:none; }
+        .expenses-page .ep-title-icon { background:transparent; font-size:22px; color:#fff; }
+        .expenses-page .ep-eyebrow { display:none; }
+        .expenses-page .ep-hero-actions { display:flex; align-items:center; gap:8px; }
+        .expenses-page .ep-btn-add { padding:9px 14px; border-radius:4px; background:#159b45; color:#fff; box-shadow:none; display:flex; align-items:center; gap:6px; font-weight:600; border:0; cursor:pointer; }
+        .expenses-page .ep-btn-add:hover { background:#12853c; }
+        .expenses-page .ep-hero-refresh { min-height:36px; padding:7px 12px; border:0; border-radius:4px; background:#fff; color:#172033; display:flex; align-items:center; gap:6px; font-weight:600; cursor:pointer; }
 
-        .ep-table-wrap{overflow-x:auto;width:100%;max-width:100%;-webkit-overflow-scrolling:touch}
-        .ep-table{width:100%;min-width:1180px;border-collapse:collapse;white-space:normal}
-        .ep-table th{background:#f3f6fc;color:#5b6b85;text-align:start;padding:11px 12px;font-size:11px;font-weight:800;letter-spacing:.4px;border-bottom:1px solid var(--line);white-space:nowrap;overflow-wrap:anywhere;user-select:none}
-        .ep-table th.sortable{cursor:pointer}
-        .ep-table th.sortable:hover{background:#e8eef9}
-        .ep-table td{padding:10px 12px;border-bottom:1px solid #f0f3f8;font-size:12px;color:#44546d;vertical-align:middle;overflow-wrap:anywhere}
-        .ep-table tbody tr:nth-child(even) td{background:#fafbfe}
-        .ep-table tbody tr:hover td{background:#eff4ff}
-        .ep-table tr:last-child td{border-bottom:0}
-        .ep-col-end{text-align:end!important}.ep-col-center{text-align:center!important}
-        .ep-state{padding:40px 18px!important;text-align:center;color:#8896ab!important}
-        .ep-spinner{display:inline-block;width:22px;height:22px;margin-inline-end:10px;vertical-align:middle;border:3px solid #dbeafe;border-top-color:var(--primary);border-radius:50%;animation:ep-spin .75s linear infinite}
-        @keyframes ep-spin{to{transform:rotate(360deg)}}
-        .ep-customer-cell{display:flex;align-items:center;gap:10px;min-width:150px}
-        .ep-avatar{flex:0 0 34px;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--primary-soft);color:var(--primary);font-size:13px}
-        .ep-customer-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;color:#2a3a55;font-size:12px}
-        .ep-ref{color:var(--primary);font-weight:800;font-size:12px}
-        .ep-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap}
-        .badge-blue{background:var(--primary-soft);color:#164aba}.badge-violet{background:var(--violet-soft);color:#4a32b0}
-        .badge-green{background:var(--green-soft);color:#0b6a4e}.badge-amber{background:var(--amber-soft);color:#94590a}
-        .badge-rose{background:var(--rose-soft);color:#9c2a62}.badge-gray{background:#eef2f8;color:#4b5b75}
-        .ep-money{font-weight:800;color:var(--ink);white-space:nowrap}
-        .ep-money-total{color:#0b6a4e}
-        .ep-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:nowrap}
-        .btn-icon{width:32px;height:32px;border-radius:8px;border:1px solid transparent;display:grid;place-items:center;cursor:pointer;transition:.18s;background:transparent;color:#64748b;font-size:12px}
-        .btn-icon:hover{background:#eef2f8}
-        .btn-view{background:var(--primary-soft);color:var(--primary);border-color:#c9daff}.btn-view:hover{background:var(--primary);color:#fff}
-        .btn-edit{background:var(--amber-soft);color:var(--amber);border-color:#f5dcb0}.btn-edit:hover{background:var(--amber);color:#fff}
-        .btn-delete{background:var(--red-soft);color:var(--red);border-color:#f6c8cd}.btn-delete:hover{background:var(--red);color:#fff}
-        .ep-modal-overlay{position:fixed;inset:0;z-index:1060;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;background:rgba(0,0,0,.50);backdrop-filter:none}
-        .ep-modal{display:flex;flex-direction:column;width:100%;max-width:800px;max-height:calc(100vh - 2rem);margin:auto;overflow:hidden;background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:.5rem;box-shadow:0 .5rem 1rem rgba(0,0,0,.15)}
-        .ep-modal.small{max-width:500px}.ep-modal.medium{max-width:700px}
-        .ep-modal-header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.25rem;color:#212529;background:#fff;border-bottom:1px solid #dee2e6}
-        .ep-modal-header h3{display:flex;align-items:center;gap:.65rem;margin:0;color:#212529;font-size:1.15rem;font-weight:600}
-        .ep-modal-header p{margin:.25rem 0 0 2.7rem;color:#6c757d;font-size:.875rem}
-        .ep-modal-icon{width:34px;height:34px;border-radius:.375rem;display:inline-grid;place-items:center;background:var(--primary-soft);color:var(--primary);font-size:14px}
-        .ep-modal-icon.success{background:var(--green-soft);color:var(--green)}.ep-modal-icon.amber{background:var(--amber-soft);color:var(--amber)}
-        .ep-modal-body{flex:1 1 auto;min-height:0;padding:1.25rem;overflow-y:auto;overscroll-behavior:contain;background:#fff}
-        .ep-modal-footer{flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:.5rem;padding:.75rem 1.25rem;background:#fff;border-top:1px solid #dee2e6}
-        .ep-modal-footer.center{justify-content:center}
-        .ep-form-group{margin-bottom:.75rem}
-        .ep-form-group label{display:block;margin-bottom:.45rem;color:#212529;font-size:.9rem;font-weight:600}
-        .ep-form-group input,.ep-form-group select,.ep-form-group textarea{width:100%;min-height:38px;padding:.375rem .75rem;color:#212529;background:#fff;border:1px solid #ced4da;border-radius:.375rem;font:inherit;font-size:.95rem;outline:none}
-        .ep-form-group input:focus,.ep-form-group select:focus,.ep-form-group textarea:focus{border-color:#86b7fe;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}
-        .ep-btn{padding:.45rem .9rem;border-radius:.375rem;border:0;font:inherit;font-size:.9rem;font-weight:500;cursor:pointer;transition:.18s;box-shadow:none;transform:none}
-        .ep-btn:hover:not(:disabled){filter:brightness(.96);transform:translateY(-1px)}
-        .ep-btn:disabled{opacity:.6;cursor:not-allowed}
-        .ep-btn-cancel,.ep-btn-outline{color:#fff;background:#6c757d;border:1px solid #6c757d}
-        .ep-btn-save{color:#fff;background:#0d6efd;border:1px solid #0d6efd}
-        .ep-btn-danger{color:#fff;background:#dc3545;border:1px solid #dc3545}
-        .ep-section-title{display:flex;align-items:center;gap:9px;margin:18px 0 12px;font-size:14px;font-weight:800;color:#2a3a55}
-        .ep-section-num{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:var(--primary-soft);color:var(--primary);font-size:11px;font-weight:800}
-        .ep-items-table{width:100%;border-collapse:collapse;border:1px solid var(--line);border-radius:10px;overflow:hidden;display:table;min-width:560px}
-        .ep-items-table th{background:#f3f6fc;color:#5b6b85;text-align:start;padding:10px 12px;font-size:11px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;border-bottom:1px solid var(--line)}
-        .ep-items-table td{padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f3f8}
-        .ep-items-table tr:last-child td{border-bottom:0}
-        .ep-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
-        @media(max-width:720px){.ep-detail-grid{grid-template-columns:1fr}}
-        .ep-detail-item{padding:12px;border:1px solid var(--line);border-radius:10px;background:#fbfcff;overflow-wrap:anywhere}
-        .ep-detail-item span{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:700}
-        .ep-detail-item strong{font-size:13px;color:#2a3a55}
-        .ep-toast{position:fixed;z-index:1100;top:20px;inset-inline-end:20px;width:min(420px,calc(100% - 40px));display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;background:#fff;box-shadow:0 12px 30px rgba(20,40,70,.15);border-inline-start:4px solid var(--primary);font-size:12px}
-        .ep-toast.success{border-inline-start-color:var(--green);color:#0b6a4e}
-        .ep-toast.danger{border-inline-start-color:var(--red);color:#a3212e}
-        .ep-delete-body{padding:28px 22px 10px;text-align:center}
-        .ep-delete-icon{display:inline-grid;place-items:center;width:58px;height:58px;margin-bottom:14px;border-radius:50%;background:var(--red-soft);color:var(--red);font-size:24px}
-        .ep-delete-body h4{margin:0 0 6px;font-size:17px;font-weight:800}
-        .ep-delete-body p{margin:0 0 10px;color:var(--muted);font-size:13px}
-        /* ===== STYLE REFERENCE : compact ===== */
-        .expenses-page { padding: 0; background: #f4f5f7; }
-        .expenses-page .ep-stats { padding: 22px 10px 0; gap: 24px; margin-bottom: 24px; }
-        .expenses-page .ep-card { min-height: 92px; padding: 16px 18px; border: 0; border-radius: 0; box-shadow: 0 2px 5px rgba(0,0,0,.16); color: #fff; }
-        .expenses-page .ep-card-info h3, .expenses-page .ep-card-info .value, .expenses-page .ep-card-info .sub { color: #fff; }
-        .expenses-page .ep-card-info h3 { font-size: 15px; margin-bottom: 4px; }
-        .expenses-page .ep-card-info .value { font-size: 30px; line-height: 1.15; }
-        .expenses-page .ep-card-info .sub { font-size: 11px; opacity: .9; }
-        .expenses-page .ep-icon { background: transparent; color: #fff; font-size: 30px; }
-        .expenses-page .tone-violet { background: #5954d6; --accent:#fff; --accent-soft:rgba(255,255,255,.12); }
-        .expenses-page .tone-green { background: #159b45; --accent:#fff; --accent-soft:rgba(255,255,255,.12); }
-        .expenses-page .tone-blue { background: #3295f0; --accent:#fff; --accent-soft:rgba(255,255,255,.12); }
-        .expenses-page .tone-amber { background: #f5aa0b; --accent:#fff; --accent-soft:rgba(255,255,255,.12); }
-        .expenses-page .ep-hero { margin: 0 0 16px; padding: 9px 16px; min-height: 55px; border-radius: 0; background: #5954d6; box-shadow: none; }
-        .expenses-page .ep-hero::after { display:none; }
-        .expenses-page .ep-eyebrow, .expenses-page .ep-title p { display:none; }
-        .expenses-page .ep-title h1 { margin:0; font-size:22px; color:#fff; }
-        .expenses-page .ep-title-icon { width:auto; height:auto; background:transparent; font-size:22px; }
-        .expenses-page .ep-hero-actions { gap:8px; }
-        .expenses-page .ep-btn-add { padding:9px 14px; border-radius:4px; background:#159b45; color:#fff; box-shadow:none; }
-        .expenses-page .ep-btn-add:hover { background:#12853c; transform:none; }
-        .expenses-page .ep-hero-refresh { min-height:36px; padding:7px 12px; border:0; border-radius:4px; background:#fff; color:#172033; }
-        .expenses-page .ep-panel { margin:0 10px 20px; border-radius:0; box-shadow:none; }
-        .expenses-page .ep-panel-head { padding:10px 14px; background:#5954d6; color:#fff; border:0; align-items:center; }
-        .expenses-page .ep-panel-head h5, .expenses-page .ep-panel-head p { color:#fff; }
-        .expenses-page .ep-panel-head h5 { font-size:18px; margin:0; }
+        /* Cartes de Statistiques */
+        .expenses-page .ep-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:24px; padding:22px 10px 0; margin-bottom:24px; }
+        .expenses-page .ep-card { min-height:92px; padding:16px 18px; border:0; border-radius:0; box-shadow:0 2px 5px rgba(0,0,0,.16); color:#fff; display:flex; justify-content:space-between; align-items:flex-start; position:relative; overflow:hidden; }
+        .expenses-page .ep-card-info h3 { font-size:15px; margin:0 0 4px; color:#fff; }
+        .expenses-page .ep-card-info .value { font-size:30px; line-height:1.15; color:#fff; font-weight:800; }
+        .expenses-page .ep-card-info .sub { font-size:11px; opacity:.9; color:#fff; margin-top:4px; }
+        .expenses-page .ep-icon { background:transparent; color:#fff; font-size:30px; }
+        
+        .expenses-page .tone-violet { background: #5954d6; }
+        .expenses-page .tone-green { background: #159b45; }
+        .expenses-page .tone-blue { background: #3295f0; }
+        .expenses-page .tone-amber { background: #f5aa0b; }
+
+        /* Panel Historique */
+        .expenses-page .ep-panel { margin:0 10px 20px; border-radius:0; box-shadow:none; background:var(--card); border:1px solid var(--line); overflow:hidden; }
+        .expenses-page .ep-panel-head { padding:10px 14px; background:#5954d6; color:#fff; border:0; display:flex; justify-content:space-between; align-items:center; }
+        .expenses-page .ep-panel-head h5 { font-size:18px; margin:0; color:#fff; display:flex; align-items:center; gap:8px; }
         .expenses-page .ep-panel-head p { display:none; }
-        .expenses-page .ep-panel-head h5 i { color:#fff !important; }
         .expenses-page .ep-panel-head .ep-btn { border-radius:4px; }
+
+        /* ✅ BARRE DE FILTRES MOBILE (Défilement horizontal) */
+        .expenses-page .ep-filters { display:flex; flex-wrap:nowrap; gap:10px; padding:14px 12px; background:#fff; overflow-x:auto; -webkit-overflow-scrolling:touch; border-bottom:1px solid var(--line); align-items:flex-end; }
+        .expenses-page .ep-fg { display:flex; flex-direction:column; gap:5px; flex:0 0 auto; min-width:130px; }
+        .expenses-page .ep-fg-search { min-width:200px; }
+        .expenses-page .ep-fg label { font-size:12px; font-weight:700; color:#4b5b75; white-space:nowrap; margin:0; }
+        .expenses-page .ep-filter-input, .expenses-page .ep-reset { height:38px; font-size:13px; border-radius:4px; border:1px solid #d9e1ed; padding:0 10px; outline:none; background:#fff; color:#2a3a55; }
+        .expenses-page .ep-filter-input:focus { border-color:var(--primary); }
+        .expenses-page .ep-reset { display:flex; align-items:center; justify-content:center; cursor:pointer; }
+        .expenses-page .ep-btn-export { height:38px; display:flex; align-items:center; gap:6px; white-space:nowrap; background:#0d6efd; color:#fff; border:0; padding:0 14px; border-radius:4px; font-weight:600; cursor:pointer; }
         
-        /* ✅ Adapter le flex pour les filtres */
-        .expenses-page .ep-filters { display:flex; gap:10px; padding:14px 12px; background:#fff; overflow-x:auto; }
-        .expenses-page .ep-fg label { font-size:12px; letter-spacing:0; text-transform:none; }
-        .expenses-page .ep-filter-input, .expenses-page .ep-reset { height:38px; font-size:13px; border-radius:4px; }
-        
-        .expenses-page .ep-table { min-width:760px; }
-        .expenses-page .ep-table th { padding:9px 8px; background:#222833; color:#fff; border:1px solid #424b58; font-size:12px; white-space:nowrap; }
+        /* ✅ TABLEAU MOBILE (Compact & Défilant) */
+        .expenses-page .ep-table-wrap { width:100%; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        .expenses-page .ep-table { width:100%; min-width:760px; border-collapse:collapse; white-space:normal; }
+        .expenses-page .ep-table th { padding:9px 8px; background:#222833; color:#fff; border:1px solid #424b58; font-size:12px; white-space:nowrap; text-align:start; user-select:none; }
+        .expenses-page .ep-table th.sortable { cursor:pointer; }
         .expenses-page .ep-table th.sortable:hover { background:#2f3744; }
-        .expenses-page .ep-table td { padding:8px 8px; border:1px solid #d8dee8; font-size:12px; color:#172033; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
+        .expenses-page .ep-table td { padding:8px 8px; border:1px solid #d8dee8; font-size:12px; color:#172033; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; vertical-align:middle; }
         .expenses-page .ep-table tbody tr:nth-child(odd) td { background:#f0f1f2; }
         .expenses-page .ep-table tbody tr:nth-child(even) td { background:#fff; }
         .expenses-page .ep-table tbody tr:hover td { background:#e8efff; }
-        .expenses-page .ep-badge { font-size:11px; padding:3px 7px; }
-        .expenses-page .ep-customer-name, .expenses-page .ep-ref { font-size:12px; }
         
+        /* Badges et divers */
+        .expenses-page .ep-badge { display:inline-block; padding:3px 7px; border-radius:999px; font-size:11px; font-weight:800; white-space:nowrap; }
+        .badge-blue { background:var(--primary-soft); color:#164aba; }
+        .badge-violet { background:var(--violet-soft); color:#4a32b0; }
+        .badge-green { background:var(--green-soft); color:#0b6a4e; }
+        .badge-amber { background:var(--amber-soft); color:#94590a; }
+        .badge-rose { background:var(--rose-soft); color:#9c2a62; }
+        .badge-gray { background:#eef2f8; color:#4b5b75; }
+        .expenses-page .ep-customer-cell { display:flex; align-items:center; gap:6px; }
+        .expenses-page .ep-avatar { flex:0 0 24px; width:24px; height:24px; border-radius:6px; display:grid; place-items:center; background:var(--primary-soft); color:var(--primary); font-size:11px; }
+        .expenses-page .ep-customer-name { font-size:12px; font-weight:700; color:#2a3a55; }
+        .expenses-page .ep-money { font-weight:800; color:var(--ink); white-space:nowrap; }
+        .expenses-page .ep-money-total { color:#0b6a4e; }
+        .expenses-page .ep-actions { display:flex; gap:4px; justify-content:flex-end; }
+        .expenses-page .btn-icon { width:28px; height:28px; border-radius:6px; border:1px solid transparent; display:grid; place-items:center; cursor:pointer; background:transparent; color:#64748b; font-size:12px; }
+        .expenses-page .btn-view { background:#e8efff; color:#1f5eea; }
+        .expenses-page .btn-edit { background:#fff0d6; color:#e08a0b; }
+        .expenses-page .btn-delete { background:#fde8ea; color:#d63c4a; }
+
+        /* Modales (Reste inchangé) */
+        .ep-modal-overlay{position:fixed;inset:0;z-index:1060;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;background:rgba(0,0,0,.50);}
+        .ep-modal{display:flex;flex-direction:column;width:100%;max-width:800px;max-height:calc(100vh - 2rem);margin:auto;overflow:hidden;background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:.5rem;box-shadow:0 .5rem 1rem rgba(0,0,0,.15);}
+        .ep-modal.medium{max-width:700px;}
+        .ep-modal-header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.25rem;color:#212529;background:#fff;border-bottom:1px solid #dee2e6;}
+        .ep-modal-header h3{display:flex;align-items:center;gap:.65rem;margin:0;color:#212529;font-size:1.15rem;font-weight:600;}
+        .ep-modal-icon{width:34px;height:34px;border-radius:.375rem;display:inline-grid;place-items:center;background:var(--primary-soft);color:var(--primary);font-size:14px;}
+        .ep-modal-body{flex:1 1 auto;min-height:0;padding:1.25rem;overflow-y:auto;overscroll-behavior:contain;background:#fff;}
+        .ep-modal-footer{flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:.5rem;padding:.75rem 1.25rem;background:#fff;border-top:1px solid #dee2e6;}
+        .ep-form-group{margin-bottom:.75rem;}
+        .ep-form-group label{display:block;margin-bottom:.45rem;color:#212529;font-size:.9rem;font-weight:600;}
+        .ep-form-group input,.ep-form-group select,.ep-form-group textarea{width:100%;min-height:38px;padding:.375rem .75rem;color:#212529;background:#fff;border:1px solid #ced4da;border-radius:.375rem;font:inherit;font-size:.95rem;outline:none;}
+        .ep-btn{padding:.45rem .9rem;border-radius:.375rem;border:0;font:inherit;font-size:.9rem;font-weight:500;cursor:pointer;box-shadow:none;}
+        .ep-btn-save{color:#fff;background:#0d6efd;border:1px solid #0d6efd;}
+        .ep-btn-cancel,.ep-btn-outline{color:#fff;background:#6c757d;border:1px solid #6c757d;}
+        .ep-btn-danger{color:#fff;background:#dc3545;border:1px solid #dc3545;}
+        .ep-items-table{width:100%;border-collapse:collapse;border:1px solid var(--line);border-radius:10px;overflow:hidden;display:table;min-width:560px;}
+        .ep-items-table th{background:#f3f6fc;color:#5b6b85;text-align:start;padding:10px 12px;font-size:11px;font-weight:800;text-transform:uppercase;border-bottom:1px solid var(--line);}
+        .ep-items-table td{padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f3f8;}
+
+        /* ✅ Media Queries (Adaptation Téléphone) */
         @media (max-width:900px) {
           .expenses-page .ep-stats { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-          .expenses-page .ep-filters { padding:10px; }
-          .expenses-page .ep-fg { min-width:110px; }
-          .expenses-page .ep-fg-search { min-width:180px; }
         }
         @media (max-width:560px) {
-          .expenses-page .ep-stats { grid-template-columns:repeat(2,minmax(0,1fr)); padding:12px 8px 0; gap:8px; }
+          .expenses-page .ep-stats { padding:12px 8px 0; gap:8px; }
           .expenses-page .ep-card { min-height:68px; padding:10px 11px; }
           .expenses-page .ep-card-info h3 { font-size:11px; }
           .expenses-page .ep-card-info .value { font-size:18px; }
@@ -938,44 +884,25 @@ const VentesPage = () => {
           .expenses-page .ep-icon { font-size:20px; flex-basis:24px; }
           .expenses-page .ep-hero { padding:9px 10px; gap:10px; min-height:48px; }
           .expenses-page .ep-title h1 { font-size:17px; }
-          .expenses-page .ep-hero-actions { width:auto; }
           .expenses-page .ep-btn-add, .expenses-page .ep-hero-refresh { padding:8px 10px; font-size:12px; }
           .expenses-page .ep-panel { margin-inline:8px; }
           
-          /* ✅ Les filtres restent sur une seule ligne défilante */
-          .expenses-page .ep-filters { padding:8px 6px; gap:7px; }
-          .expenses-page .ep-fg { min-width:100px; }
+          /* Les filtres sont plus étroits sur téléphone */
+          .expenses-page .ep-filters { padding:10px 8px; gap:8px; }
+          .expenses-page .ep-fg { min-width:110px; }
           .expenses-page .ep-fg-search { min-width:160px; }
-          .expenses-page .ep-filter-input, .expenses-page .ep-reset { height:34px; font-size:12px; }
+          .expenses-page .ep-filter-input, .expenses-page .ep-reset, .expenses-page .ep-btn-export { height:34px; font-size:12px; }
           
           .expenses-page .ep-table { min-width:720px; }
           .expenses-page .ep-table th { padding:8px 6px; font-size:11px; }
           .expenses-page .ep-table td { padding:7px 6px; font-size:11px; max-width:140px; }
-          .expenses-page .ep-modal-overlay { padding: .4rem; align-items: center; }
-          .expenses-page .ep-modal { max-height: calc(100dvh - .8rem); border-radius: .5rem; }
-          .expenses-page .ep-modal-header { padding: .8rem 1rem; }
-          .expenses-page .ep-modal-body { padding: 1rem; }
-          .expenses-page .ep-modal-footer { padding: .7rem 1rem; flex-wrap: wrap; }
-          .expenses-page .ep-modal-footer .ep-btn { flex: 1 1 auto; }
         }
-        @media (max-width:420px) {
-          .expenses-page .ep-stats { gap:6px; padding:8px 6px 0; }
-          .expenses-page .ep-card { min-height:64px; padding:8px 9px; }
-          .expenses-page .ep-card-info h3 { font-size:10px; }
-          .expenses-page .ep-card-info .value { font-size:16px; }
-          .expenses-page .ep-panel { margin-inline:6px; }
-          .expenses-page .ep-filters { padding:8px; gap:6px; }
-          .expenses-page .ep-detail-grid { grid-template-columns:1fr; }
-        }
-        .expenses-page[dir="rtl"] { text-align: right; }
-        .expenses-page[dir="ltr"] { text-align: left; }
-        .expenses-page input, .expenses-page textarea, .expenses-page select { max-width: 100%; }
-        .ep-amt { direction: ltr; unicode-bidi: isolate; }
       `}</style>
 
-      {error && <div className="ep-toast danger" role="alert"><span>⚠</span><div style={{ flex: 1 }}>{error}</div><button type="button" className="btn-icon" onClick={() => setError('')}><i className="fas fa-times" /></button></div>}
-      {success && <div className="ep-toast success" role="status"><span>✓</span><div style={{ flex: 1 }}>{success}</div><button type="button" className="btn-icon" onClick={() => setSuccess('')}><i className="fas fa-times" /></button></div>}
+      {error && <div className="ep-toast danger" style={{ position:'fixed', top:20, right:20, zIndex:9999, background:'#fff', padding:'10px 16px', borderLeft:'4px solid #d63c4a', boxShadow:'0 4px 12px rgba(0,0,0,.15)', borderRadius:8 }}>{error}</div>}
+      {success && <div className="ep-toast success" style={{ position:'fixed', top:20, right:20, zIndex:9999, background:'#fff', padding:'10px 16px', borderLeft:'4px solid #0f9d74', boxShadow:'0 4px 12px rgba(0,0,0,.15)', borderRadius:8 }}>{success}</div>}
 
+      {/* Cartes de stats */}
       <section className="ep-stats">
         <div className="ep-card tone-violet">
           <div className="ep-card-info">
@@ -1011,14 +938,13 @@ const VentesPage = () => {
         </div>
       </section>
 
+      {/* Header violet */}
       <header className="ep-hero">
         <div className="ep-title">
-          <span className="ep-eyebrow"><i className="fas fa-chart-line" style={{ marginInlineEnd: 6 }} />{t.eyebrow}</span>
           <h1><span className="ep-title-icon"><i className="fas fa-cash-register" /></span>{t.title}</h1>
-          <p>{t.subtitle}</p>
         </div>
         <div className="ep-hero-actions">
-          <button type="button" className="ep-btn ep-btn-outline ep-hero-refresh" onClick={() => { fetchSales(); fetchProducts(); fetchCustomers(); }} disabled={loadingSales}>
+          <button type="button" className="ep-hero-refresh" onClick={() => { fetchSales(); fetchProducts(); fetchCustomers(); }} disabled={loadingSales}>
             <i className={`fas fa-sync-alt ${loadingSales ? 'fa-spin' : ''}`} />{t.refresh}
           </button>
           <button type="button" className="ep-btn-add" onClick={() => setShowAddModal(true)}>
@@ -1027,15 +953,16 @@ const VentesPage = () => {
         </div>
       </header>
 
+      {/* Panel principal */}
       <div className="ep-panel">
         <div className="ep-panel-head">
-          <div><h5><i className="fas fa-list-alt" style={{ color: '#fff', marginInlineEnd: 8 }} />{t.history}</h5><p>{t.search_ph}</p></div>
+          <h5><i className="fas fa-list-alt" />{t.history}</h5>
           <button type="button" className="ep-btn ep-btn-outline" onClick={() => { fetchSales(); fetchProducts(); }} disabled={loadingSales}>
             <i className={`fas fa-sync-alt ${loadingSales ? 'fa-spin' : ''}`} style={{ marginInlineEnd: 6 }} />{t.refresh}
           </button>
         </div>
 
-        {/* BARRE DE FILTRES ET EXPORT EN HAUT */}
+        {/* ✅ BARRE DE FILTRES DÉFILANTE SUR MOBILE */}
         <div className="ep-filters">
           <div className="ep-fg ep-fg-search">
             <label>{t.th_invoice}</label>
@@ -1083,12 +1010,13 @@ const VentesPage = () => {
                 <i className="fas fa-rotate-left" />
               </button>
             )}
-            <button type="button" className="ep-btn ep-btn-save" onClick={exportFilteredSales} style={{ height: 38, whiteSpace: 'nowrap' }}>
-              <i className="fas fa-file-excel" style={{ marginInlineEnd: 6 }} /> {t.export_all}
+            <button type="button" className="ep-btn-export" onClick={exportFilteredSales}>
+              <i className="fas fa-file-excel" /> {t.export_all}
             </button>
           </div>
         </div>
 
+        {/* ✅ TABLEAU COMPACT ET DÉFILANT */}
         <div className="ep-table-wrap">
           <table className="ep-table">
             <thead>
@@ -1119,13 +1047,9 @@ const VentesPage = () => {
             </thead>
             <tbody>
               {loadingSales ? (
-                <tr><td colSpan="10" className="ep-state"><span className="ep-spinner" />{t.loading_sales}</td></tr>
+                <tr><td colSpan="10" className="ep-state" style={{ textAlign:'center', padding:20 }}>Chargement...</td></tr>
               ) : filteredSales.length === 0 ? (
-                <tr><td colSpan="10" className="ep-state">
-                  <div style={{ marginBottom: 8, fontSize: 22, color: 'var(--primary)' }}><i className="fas fa-file-invoice" /></div>
-                  <div style={{ fontWeight: 800, color: '#2a3a55', fontSize: 15 }}>{t.no_data}</div>
-                  <div style={{ marginTop: 4, fontSize: 12 }}>{t.no_data_sub}</div>
-                </td></tr>
+                <tr><td colSpan="10" className="ep-state" style={{ textAlign:'center', padding:20 }}>{t.no_data}</td></tr>
               ) : (
                 sortedSales.map((sale, i) => {
                   const st = getStatus(sale.status, sale.payment_method);
@@ -1177,6 +1101,7 @@ const VentesPage = () => {
         cur={cur}
       />
 
+      {/* Modal Détails */}
       {selectedSale && (
         <div className="ep-modal-overlay" onMouseDown={e => e.target === e.currentTarget && setSelectedSale(null)}>
           <div className="ep-modal medium" role="dialog" aria-modal="true">
@@ -1188,12 +1113,12 @@ const VentesPage = () => {
               <button type="button" className="btn-icon" onClick={() => setSelectedSale(null)}><i className="fas fa-times" /></button>
             </div>
             <div className="ep-modal-body">
-              <div className="ep-detail-grid">
-                <div className="ep-detail-item"><span>{t.th_invoice}</span><strong>{selectedSale.invoice_number || `VENTE-${selectedSale.id}`}</strong></div>
-                <div className="ep-detail-item"><span>{t.f_customer}</span><strong>{getCustomerName(selectedSale)}</strong></div>
-                <div className="ep-detail-item"><span>{t.th_date}</span><strong>{formatDate(selectedSale.invoice_date || selectedSale.created_at, t.locale)}</strong></div>
+              <div className="ep-detail-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:16 }}>
+                <div className="ep-detail-item" style={{ padding:12, border:'1px solid var(--line)', borderRadius:10, background:'#fbfcff' }}><span style={{ fontSize:11, color:'var(--muted)', fontWeight:700 }}>{t.th_invoice}</span><br/><strong>{selectedSale.invoice_number || `VENTE-${selectedSale.id}`}</strong></div>
+                <div className="ep-detail-item" style={{ padding:12, border:'1px solid var(--line)', borderRadius:10, background:'#fbfcff' }}><span style={{ fontSize:11, color:'var(--muted)', fontWeight:700 }}>{t.f_customer}</span><br/><strong>{getCustomerName(selectedSale)}</strong></div>
+                <div className="ep-detail-item" style={{ padding:12, border:'1px solid var(--line)', borderRadius:10, background:'#fbfcff' }}><span style={{ fontSize:11, color:'var(--muted)', fontWeight:700 }}>{t.th_date}</span><br/><strong>{formatDate(selectedSale.invoice_date || selectedSale.created_at, t.locale)}</strong></div>
               </div>
-              <div className="ep-section-title"><span className="ep-section-num">1</span> Articles vendus</div>
+              <div className="ep-section-title" style={{ display:'flex', alignItems:'center', gap:9, margin:'18px 0 12px', fontWeight:800 }}><span className="ep-section-num" style={{ display:'grid', placeItems:'center', width:24, height:24, borderRadius:7, background:'var(--primary-soft)', color:'var(--primary)', fontSize:11 }}>1</span> Articles vendus</div>
               <table className="ep-items-table">
                 <thead>
                   <tr>
@@ -1237,6 +1162,7 @@ const VentesPage = () => {
         </div>
       )}
 
+      {/* Modal Édition */}
       {saleToEdit && (
         <div className="ep-modal-overlay" onMouseDown={e => e.target === e.currentTarget && !actionLoading && setSaleToEdit(null)}>
           <div className="ep-modal medium" role="dialog" aria-modal="true">
@@ -1246,12 +1172,6 @@ const VentesPage = () => {
             </div>
             <form onSubmit={handleEditSubmit}>
               <div className="ep-modal-body">
-                <div className="ep-detail-grid">
-                  <div className="ep-detail-item"><span>{t.th_invoice}</span><strong>{saleToEdit.invoice_number || `VENTE-${saleToEdit.id}`}</strong></div>
-                  <div className="ep-detail-item"><span>{t.f_customer}</span><strong>{getCustomerName(saleToEdit)}</strong></div>
-                  <div className="ep-detail-item"><span>{t.th_date}</span><strong>{formatDate(saleToEdit.invoice_date || saleToEdit.created_at, t.locale)}</strong></div>
-                </div>
-                <div className="ep-section-title"><span className="ep-section-num">1</span> Articles</div>
                 <table className="ep-items-table">
                   <thead>
                     <tr>
@@ -1305,15 +1225,16 @@ const VentesPage = () => {
         </div>
       )}
 
+      {/* Modal Suppression */}
       {saleToDelete && (
         <div className="ep-modal-overlay" onMouseDown={e => e.target === e.currentTarget && !actionLoading && setSaleToDelete(null)}>
-          <div className="ep-modal small" role="alertdialog" aria-modal="true">
-            <div className="ep-delete-body">
-              <span className="ep-delete-icon"><i className="fas fa-trash-alt" /></span>
-              <h4>{t.delete_q}</h4>
-              <p>Facture {saleToDelete.invoice_number || saleToDelete.id}</p>
+          <div className="ep-modal medium" role="alertdialog" aria-modal="true">
+            <div className="ep-modal-body" style={{ textAlign:'center', padding:'28px 22px 10px' }}>
+              <span style={{ display:'inline-grid', placeItems:'center', width:58, height:58, marginBottom:14, borderRadius:'50%', background:'var(--red-soft)', color:'var(--red)', fontSize:24 }}><i className="fas fa-trash-alt" /></span>
+              <h4 style={{ margin:'0 0 6px', fontSize:17, fontWeight:800 }}>{t.delete_q}</h4>
+              <p style={{ margin:'0 0 10px', color:'var(--muted)', fontSize:13 }}>Facture {saleToDelete.invoice_number || saleToDelete.id}</p>
             </div>
-            <div className="ep-modal-footer center">
+            <div className="ep-modal-footer" style={{ justifyContent:'center' }}>
               <button type="button" className="ep-btn ep-btn-cancel" onClick={() => setSaleToDelete(null)} disabled={actionLoading}>{t.cancel}</button>
               <button type="button" className="ep-btn ep-btn-danger" onClick={handleDeleteConfirm} disabled={actionLoading}>
                 {actionLoading ? <><i className="fas fa-spinner fa-spin" style={{ marginInlineEnd: 6 }} />{t.deleting}</> : <><i className="fas fa-trash-alt" style={{ marginInlineEnd: 6 }} />{t.delete_confirm}</>}
@@ -1323,6 +1244,7 @@ const VentesPage = () => {
         </div>
       )}
 
+      {/* Modal Facture (Succès) */}
       {showInvoice && lastSale && (
         <div className="ep-modal-overlay" onMouseDown={e => e.target === e.currentTarget && setShowInvoice(false)}>
           <div className="ep-modal medium" role="dialog" aria-modal="true">
@@ -1339,11 +1261,6 @@ const VentesPage = () => {
                 <h3 style={{ margin: '0 0 4px', fontWeight: 800 }}>{STORE.name}</h3>
                 <div style={{ color: 'var(--muted)', fontSize: 12 }}>{STORE.address}<br />{STORE.phone}</div>
                 <h4 style={{ margin: '12px 0 0', fontWeight: 800 }}>{t.facture}</h4>
-              </div>
-              <div className="ep-detail-grid">
-                <div className="ep-detail-item"><span>N°</span><strong>{lastSale.invoice_number || `VENTE-${lastSale.id}`}</strong></div>
-                <div className="ep-detail-item"><span>Date</span><strong>{formatDate(lastSale.invoice_date || lastSale.created_at, t.locale)}</strong></div>
-                <div className="ep-detail-item"><span>Client</span><strong>{getCustomerName(lastSale)}</strong></div>
               </div>
               <table className="ep-items-table">
                 <thead>

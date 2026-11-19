@@ -519,3 +519,73 @@ body {
         flex-direction: row-reverse;
     }
 }
+/* ============================================
+   VENTES - COMME AFFECTATION - DOIT RESTER A LA FIN
+   Sinon MainLayout écrase Ventes
+============================================ */
+.ventes-chauffeur-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  padding: 0 !important;
+}
+.ventes-chauffeur-wrap .vc-stats {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+}
+.ventes-chauffeur-wrap .vc-stat {
+  padding: 10px 6px !important;
+  min-width: 0 !important;
+}
+.ventes-chauffeur-wrap .vc-stat span { font-size: 10px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ventes-chauffeur-wrap .vc-stat strong { font-size: 16px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ventes-chauffeur-wrap .vc-stat svg { font-size: 18px !important; }
+.ventes-chauffeur-wrap .vc-table-wrap,
+.ventes-chauffeur-wrap .table-responsive {
+  overflow-x: visible !important;
+  overflow-y: visible !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.ventes-chauffeur-wrap .vc-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+.ventes-chauffeur-wrap .vc-table thead th,
+.ventes-chauffeur-wrap .vc-table tbody td {
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  font-size: 11px !important;
+  padding: 8px 4px !important;
+}
+.ventes-chauffeur-wrap .vc-table th:nth-child(1), .ventes-chauffeur-wrap .vc-table td:nth-child(1) { width: 9%; }
+.ventes-chauffeur-wrap .vc-table th:nth-child(2), .ventes-chauffeur-wrap .vc-table td:nth-child(2) { width: 18%; }
+.ventes-chauffeur-wrap .vc-table th:nth-child(3), .ventes-chauffeur-wrap .vc-table td:nth-child(3) { width: 16%; }
+.ventes-chauffeur-wrap .vc-table th:nth-child(4), .ventes-chauffeur-wrap .vc-table td:nth-child(4) { width: 18%; }
+.ventes-chauffeur-wrap .vc-table th:nth-child(5), .ventes-chauffeur-wrap .vc-table td:nth-child(5) { width: 13%; }
+.ventes-chauffeur-wrap .vc-table th:nth-child(6), .ventes-chauffeur-wrap .vc-table td:nth-child(6) { width: 14%; }
+.ventes-chauffeur-wrap .vc-table th:nth-child(7), .ventes-chauffeur-wrap .vc-table td:nth-child(7) { width: 12%; }
+
+@media (max-width: 768px) {
+  /* SUR TELEPHONE : 4 CARTES SUR UNE SEULE LIGNE, COMME AFFECTATION */
+  .ventes-chauffeur-wrap .vc-stats {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 4px !important;
+  }
+  .ventes-chauffeur-wrap .vc-stat { padding: 8px 4px !important; }
+  .ventes-chauffeur-wrap .vc-stat span { font-size: 8px !important; }
+  .ventes-chauffeur-wrap .vc-stat strong { font-size: 12px !important; }
+  .ventes-chauffeur-wrap .vc-stat svg { font-size: 15px !important; }
+  .ventes-chauffeur-wrap .vc-table thead th,
+  .ventes-chauffeur-wrap .vc-table tbody td { font-size: 10px !important; padding: 6px 2px !important; }
+  /* Ne pas appliquer la règle 1 carte par ligne à Ventes */
+  .ventes-chauffeur-wrap .ep-stats,
+  .ventes-chauffeur-wrap .dash-stats { grid-template-columns: repeat(4, 1fr) !important; }
+}
+@media (max-width: 380px) {
+  .ventes-chauffeur-wrap .vc-stat strong { font-size: 11px !important; }
+  .ventes-chauffeur-wrap .vc-stat span { font-size: 7px !important; }
+}

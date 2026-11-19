@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { productsApi, customersApi, salesApi } from '../../api';
 import { useLanguage } from '../../context/LanguageContext';
-import './Ventes.css';
+
 const STORE = {
   name: 'GESTION STOCK',
   address: 'Nouakchott, Mauritanie',
@@ -63,7 +63,7 @@ const I18N = {
     err_load: 'Impossible de charger les ventes.', err_edit: 'Erreur modification.', err_delete: 'Erreur suppression.',
     ok_edit: 'Vente modifiée.', ok_delete: 'Vente supprimée.', close: 'Fermer',
     footer_total: 'Total affiché', footer_count: (n) => `${n} vente(s)`,
-    export_all: 'Exporter en Excel', sort_by: 'Trier',
+    export_all: 'Exporter', sort_by: 'Trier',
     no_data: 'Aucune vente trouvée.', no_data_sub: 'Modifiez votre recherche ou créez une nouvelle vente.',
     loading_sales: 'Chargement des ventes...',
   },
@@ -102,7 +102,7 @@ const I18N = {
     err_load: 'تعذّر التحميل.', err_edit: 'خطأ في التعديل.', err_delete: 'خطأ في الحذف.',
     ok_edit: 'تم التعديل.', ok_delete: 'تم الحذف.', close: 'إغلاق',
     footer_total: 'إجمالي المعروض', footer_count: (n) => `${n} عملية بيع`,
-    export_all: 'تصدير إلى Excel', sort_by: 'ترتيب',
+    export_all: 'تصدير', sort_by: 'ترتيب',
     no_data: 'لا توجد مبيعات.', no_data_sub: 'عدّل البحث أو أنشئ بيعًا جديدًا.',
     loading_sales: 'جارٍ تحميل المبيعات...',
   },
@@ -124,17 +124,10 @@ const getItemCategory = (item, productById) => {
   if (!item) return '—';
   const fromMap = item.product_id != null ? productById?.[String(item.product_id)] : null;
   return (
-    fromMap?.categories?.name ||
-    fromMap?.category?.name ||
-    fromMap?.category_name ||
-    item?.categories?.name ||
-    item?.category?.name ||
-    item?.products?.categories?.name ||
-    item?.products?.category?.name ||
-    item?.products?.category_name ||
-    item?.category_name ||
-    item?.category ||
-    '—'
+    fromMap?.categories?.name || fromMap?.category?.name || fromMap?.category_name ||
+    item?.categories?.name || item?.category?.name ||
+    item?.products?.categories?.name || item?.products?.category?.name ||
+    item?.products?.category_name || item?.category_name || item?.category || '—'
   );
 };
 const getSaleCategories = (sale, productById) => {
@@ -148,7 +141,7 @@ const getSaleCategories = (sale, productById) => {
 };
 
 /* ============================================================
-   MODALE D'AJOUT DE VENTE
+   MODALE D'AJOUT DE VENTE (entièrement responsive)
    ============================================================ */
 const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading, t, cur }) => {
   const buildInitialForm = () => ({
@@ -212,9 +205,7 @@ const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading,
       name: prod?.name || 'Produit',
       category: prod?.categories?.name || prod?.category?.name || prod?.category_name || '—',
       purchase_price: Number(prod?.purchase_price ?? 0),
-      quantity: qty,
-      price,
-      stock,
+      quantity: qty, price, stock,
     }]);
     setNewItem({ product_id: '', quantity: 1, price: '' });
     setLocalError('');
@@ -270,16 +261,17 @@ const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading,
                 <i className="fas fa-exclamation-circle" style={{ marginInlineEnd: 6 }} />{localError}
               </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginBottom: 12 }}>
-              <div className="ep-form-group" style={{ marginBottom: 0 }}>
-                <label>{t.f_customer}</label>
-                <select name="customer_id" value={form.customer_id} onChange={handleChange}>
-                  <option value="">{t.walk_in}</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
+
+            <div className="ep-form-group">
+              <label>{t.f_customer}</label>
+              <select name="customer_id" value={form.customer_id} onChange={handleChange}>
+                <option value="">{t.walk_in}</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+
+            {/* ✅ Classe responsive au lieu de style inline */}
+            <div className="ep-grid-3">
               <div className="ep-form-group">
                 <label>{t.f_date}</label>
                 <input type="datetime-local" name="date" value={form.date} onChange={handleChange} />
@@ -304,18 +296,21 @@ const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading,
                 </select>
               </div>
             </div>
-            <div className="ep-section-title" style={{ marginTop: 16 }}>
+
+            <div className="ep-section-title">
               <span className="ep-section-num">1</span> Articles de la vente
             </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'end', flexWrap: 'wrap' }}>
-              <div className="ep-form-group" style={{ width: 150, marginBottom: 0 }}>
+
+            {/* ✅ Barre responsive : passe en colonne sur mobile */}
+            <div className="ep-item-bar">
+              <div className="ep-form-group ep-w-cat">
                 <label>{t.f_category}</label>
                 <select value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setNewItem(p => ({ ...p, product_id: '' })); }}>
                   <option value="">Toutes</option>
                   {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
-              <div className="ep-form-group" style={{ flex: 2, marginBottom: 0, minWidth: 180 }}>
+              <div className="ep-form-group ep-w-prod">
                 <label>{t.f_product}</label>
                 <select value={newItem.product_id} onChange={handleSelectProduct}>
                   <option value="">-- Sélectionner --</option>
@@ -332,27 +327,28 @@ const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading,
                   </small>
                 )}
               </div>
-              <div className="ep-form-group" style={{ width: 90, marginBottom: 0 }}>
+              <div className="ep-form-group ep-w-qty">
                 <label>{t.f_qty}</label>
                 <input type="number" min="1" max={selectedProduct ? (selectedProduct.quantity ?? selectedProduct.stock ?? 0) : ''} value={newItem.quantity} onChange={e => setNewItem(p => ({ ...p, quantity: e.target.value }))} />
               </div>
-              <div className="ep-form-group" style={{ width: 130, marginBottom: 0 }}>
+              <div className="ep-form-group ep-w-price">
                 <label>{t.f_price}</label>
                 <input type="number" min="0" step="0.01" value={newItem.price} onChange={e => setNewItem(p => ({ ...p, price: e.target.value }))} placeholder={t.sale_price_ph} />
               </div>
-              <button type="button" className="ep-btn ep-btn-save" style={{ height: 38, padding: '0 12px' }} onClick={addItem}>
-                <i className="fas fa-plus" />
+              <button type="button" className="ep-btn ep-btn-save" onClick={addItem}>
+                <i className="fas fa-plus" style={{ marginInlineEnd: 6 }} />{t.f_add_item}
               </button>
             </div>
-            <table className="ep-items-table" style={{ border: '1px solid var(--line)', borderRadius: 8 }}>
+
+            <table className="ep-items-table">
               <thead>
                 <tr>
                   <th>{t.f_product}</th>
-                  <th>{t.th_category}</th>
-                  <th className="ep-col-center" style={{ width: 80 }}>{t.f_qty}</th>
-                  <th className="ep-col-end" style={{ width: 110 }}>{t.f_price}</th>
-                  <th className="ep-col-end" style={{ width: 110 }}>{t.th_total}</th>
-                  <th style={{ width: 50 }}></th>
+                  <th className="col-sm-hide">{t.th_category}</th>
+                  <th className="ep-col-center" style={{ width: 70 }}>{t.f_qty}</th>
+                  <th className="ep-col-end" style={{ width: 100 }}>{t.f_price}</th>
+                  <th className="ep-col-end" style={{ width: 100 }}>{t.th_total}</th>
+                  <th style={{ width: 44 }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -361,7 +357,7 @@ const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading,
                 ) : items.map((item, idx) => (
                   <tr key={idx}>
                     <td>{item.name}</td>
-                    <td><span className="ep-badge badge-blue">{item.category || getItemCategory(item, productById)}</span></td>
+                    <td className="col-sm-hide"><span className="ep-badge badge-blue">{item.category || getItemCategory(item, productById)}</span></td>
                     <td className="ep-col-center">{item.quantity}</td>
                     <td className="ep-col-end">{formatNumber(item.price)}</td>
                     <td className="ep-col-end" style={{ fontWeight: 700 }}>{formatNumber(item.price * item.quantity)}</td>
@@ -374,11 +370,12 @@ const AddSaleModal = ({ isOpen, onClose, products, customers, onSubmit, loading,
               <tfoot>
                 <tr style={{ background: '#f8fafc' }}>
                   <td colSpan="4" style={{ textAlign: 'right', fontWeight: 700 }}>TOTAL :</td>
-                  <td className="ep-col-end" style={{ fontWeight: 800, fontSize: 16 }}>{formatNumber(subtotal)} {cur}</td>
+                  <td className="ep-col-end" style={{ fontWeight: 800, fontSize: 15 }}>{formatNumber(subtotal)} {cur}</td>
                   <td></td>
                 </tr>
               </tfoot>
             </table>
+
             <div className="ep-form-group" style={{ marginTop: 16 }}>
               <label>{t.f_notes}</label>
               <textarea rows="2" name="notes" value={form.notes} onChange={handleChange} placeholder="Notes optionnelles..." />
@@ -537,6 +534,7 @@ const VentesPage = () => {
       const getVal = (s) => {
         switch (sortKey) {
           case 'invoice': return String(s.invoice_number || '');
+          case 'products': return getProductNames(s);
           case 'customer': return String(s.customers?.name || s.customer?.name || '');
           case 'category': return getSaleCategories(s, productById);
           case 'total': return Number(s.grand_total ?? s.total ?? 0);
@@ -725,7 +723,7 @@ const VentesPage = () => {
 
   const exportFilteredSales = () => {
     const rows = [
-      [t.th_invoice, t.th_customer, t.th_products, t.th_category, t.th_qty, t.th_total, t.th_status, t.f_payment, t.th_date],
+      [t.th_invoice, t.th_customer, t.th_products, t.th_category, t.th_qty, t.th_total, t.th_status, t.th_date],
       ...filteredSales.map(s => [
         s.invoice_number || `VENTE-${s.id}`,
         getCustomerName(s),
@@ -733,7 +731,6 @@ const VentesPage = () => {
         getSaleCategories(s, productById),
         getTotalQuantity(s),
         Number(s.grand_total ?? s.total ?? 0),
-        getStatus(s.status, s.payment_method).label,
         getStatus(s.status, s.payment_method).label,
         formatDate(s.invoice_date || s.created_at, t.locale),
       ]),
@@ -760,10 +757,215 @@ const VentesPage = () => {
   return (
     <div className="expenses-page" dir={t.dir} lang={lang}>
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-     
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+        .expenses-page {
+          --ink:#14213d;--muted:#66748b;--line:#e3e9f2;--bg:#f2f5fb;--card:#fff;
+          --primary:#1f5eea;--primary-soft:#e8efff;--green:#0f9d74;--green-soft:#def7ee;
+          --violet:#6a4de0;--violet-soft:#ece8fd;--amber:#e08a0b;--amber-soft:#fff0d6;
+          --red:#d63c4a;--red-soft:#fde8ea;--rose:#c2417c;--rose-soft:#fbe6f0;
+          min-height:100vh;background:var(--bg);
+          color:var(--ink);font-family:Inter,'Segoe UI',system-ui,Tahoma,Arial,sans-serif;width:100%;min-width:0;overflow-x:hidden;font-size:14px;
+        }
+        .expenses-page[lang="ar"]{font-family:Cairo,'Noto Sans Arabic',Tahoma,'Segoe UI',Arial,sans-serif}
+        .expenses-page *{box-sizing:border-box}
+        .expenses-page button:focus-visible,.expenses-page input:focus-visible,.expenses-page select:focus-visible,.expenses-page textarea:focus-visible{outline:3px solid rgba(31,94,234,.35);outline-offset:2px}
+        .ep-amt{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+
+        /* ===== BASE ===== */
+        .ep-hero{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:9px 16px;min-height:55px;margin:0 0 16px;background:#5954d6;color:#fff}
+        .ep-title h1{margin:0;font-size:22px;font-weight:800;display:flex;align-items:center;gap:12px;line-height:1.25;color:#fff}
+        .ep-title-icon{font-size:22px}
+        .ep-title p{display:none}
+        .ep-eyebrow{display:none}
+        .ep-hero-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+        .ep-btn-add{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border:0;border-radius:4px;background:#159b45;color:#fff;font:inherit;font-weight:800;font-size:13px;cursor:pointer;transition:.18s}
+        .ep-btn-add:hover{background:#12853c}
+        .ep-hero-refresh{min-height:36px;padding:7px 12px;border:0;border-radius:4px;background:#fff;color:#172033;cursor:pointer;font:inherit;font-weight:700;font-size:13px}
+
+        .ep-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;padding:22px 10px 0;margin-bottom:24px}
+        .ep-card{position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;min-height:92px;padding:16px 18px;border-radius:0;box-shadow:0 2px 5px rgba(0,0,0,.16);color:#fff}
+        .ep-card-info{position:relative;z-index:1;min-width:0}
+        .ep-card-info h3{margin:0 0 4px;font-size:15px;font-weight:800;color:#fff}
+        .ep-card-info .value{font-size:30px;font-weight:800;line-height:1.15;color:#fff;overflow-wrap:anywhere}
+        .ep-card-info .sub{margin-top:5px;font-size:11px;opacity:.9;color:#fff}
+        .ep-icon{position:relative;z-index:1;flex:0 0 auto;display:grid;place-items:center;font-size:30px;color:#fff}
+        .tone-violet{background:#5954d6}.tone-green{background:#159b45}.tone-blue{background:#3295f0}.tone-amber{background:#f5aa0b}
+
+        .ep-panel{background:#fff;border:1px solid var(--line);margin:0 10px 20px}
+        .ep-panel-head{padding:10px 14px;background:#5954d6;color:#fff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+        .ep-panel-head h5{margin:0;font-size:18px;font-weight:800;color:#fff}
+        .ep-panel-head h5 i{color:#fff !important;margin-inline-end:8px}
+        .ep-panel-head p{display:none}
+
+        .ep-filters{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;padding:14px 12px;background:#fff;border-bottom:1px solid var(--line)}
+        .ep-fg{display:flex;flex-direction:column;gap:5px;min-width:0}
+        .ep-fg label{font-size:12px;font-weight:700;color:#4b5b75}
+        .ep-filter-input{width:100%;height:38px;border:1px solid #ced4da;border-radius:4px;padding:0 10px;font:inherit;font-size:13px;color:#212529;background:#fff;outline:none}
+        .ep-filter-input:focus{border-color:#86b7fe;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}
+        .ep-reset{height:38px;padding:0 12px;border:1px solid #ced4da;border-radius:4px;background:#fff;color:#4b5b75;font:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+        .ep-reset:hover{background:#f1f5fb}
+        .ep-fg-actions{display:flex;gap:8px}
+
+        .ep-table-wrap{overflow-x:auto;width:100%;max-width:100%;-webkit-overflow-scrolling:touch}
+        .ep-table{width:100%;min-width:980px;border-collapse:collapse;white-space:normal}
+        .ep-table th{padding:13px 10px;background:#222833;color:#fff;border:1px solid #424b58;font-size:13px;font-weight:700;text-align:start;white-space:nowrap;user-select:none}
+        .ep-table th.sortable{cursor:pointer}
+        .ep-table th.sortable:hover{background:#2f3744}
+        .ep-table td{padding:11px 10px;border:1px solid #d8dee8;font-size:13px;color:#172033;vertical-align:middle;overflow-wrap:anywhere;max-width:200px}
+        .ep-table tbody tr:nth-child(odd) td{background:#f0f1f2}
+        .ep-table tbody tr:nth-child(even) td{background:#fff}
+        .ep-table tbody tr:hover td{background:#e8efff}
+        .ep-col-end{text-align:end!important}.ep-col-center{text-align:center!important}
+        .ep-state{padding:40px 18px!important;text-align:center;color:#8896ab!important}
+        .ep-spinner{display:inline-block;width:22px;height:22px;margin-inline-end:10px;vertical-align:middle;border:3px solid #dbeafe;border-top-color:var(--primary);border-radius:50%;animation:ep-spin .75s linear infinite}
+        @keyframes ep-spin{to{transform:rotate(360deg)}}
+
+        .ep-customer-cell{display:flex;align-items:center;gap:8px;min-width:0}
+        .ep-avatar{flex:0 0 30px;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--primary-soft);color:var(--primary);font-size:12px}
+        .ep-customer-name{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;color:#2a3a55;font-size:12px}
+        .ep-ref{color:var(--primary);font-weight:800;font-size:12px}
+        .ep-badge{display:inline-block;padding:3px 7px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap}
+        .badge-blue{background:var(--primary-soft);color:#164aba}.badge-violet{background:var(--violet-soft);color:#4a32b0}
+        .badge-green{background:var(--green-soft);color:#0b6a4e}.badge-amber{background:var(--amber-soft);color:#94590a}
+        .badge-rose{background:var(--rose-soft);color:#9c2a62}.badge-gray{background:#eef2f8;color:#4b5b75}
+        .ep-money{font-weight:800;color:var(--ink);white-space:nowrap}
+        .ep-money-total{color:#0b6a4e}
+        .ep-actions{display:flex;gap:5px;justify-content:flex-end;flex-wrap:nowrap}
+        .btn-icon{width:30px;height:30px;border-radius:6px;border:1px solid transparent;display:grid;place-items:center;cursor:pointer;transition:.18s;background:transparent;color:#64748b;font-size:12px}
+        .btn-icon:hover{background:#eef2f8}
+        .btn-view{background:var(--primary-soft);color:var(--primary);border-color:#c9daff}.btn-view:hover{background:var(--primary);color:#fff}
+        .btn-edit{background:var(--amber-soft);color:var(--amber);border-color:#f5dcb0}.btn-edit:hover{background:var(--amber);color:#fff}
+        .btn-delete{background:var(--red-soft);color:var(--red);border-color:#f6c8cd}.btn-delete:hover{background:var(--red);color:#fff}
+
+        /* ===== MODALES ===== */
+        .ep-modal-overlay{position:fixed;inset:0;z-index:1060;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;background:rgba(0,0,0,.50)}
+        .ep-modal{display:flex;flex-direction:column;width:100%;max-width:800px;max-height:calc(100dvh - 2rem);margin:auto;overflow:hidden;background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:.5rem;box-shadow:0 .5rem 1rem rgba(0,0,0,.15)}
+        .ep-modal.small{max-width:500px}.ep-modal.medium{max-width:700px}
+        .ep-modal-header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.25rem;color:#212529;background:#fff;border-bottom:1px solid #dee2e6}
+        .ep-modal-header h3{display:flex;align-items:center;gap:.65rem;margin:0;color:#212529;font-size:1.15rem;font-weight:600}
+        .ep-modal-header p{margin:.25rem 0 0 2.7rem;color:#6c757d;font-size:.875rem}
+        .ep-modal-icon{width:34px;height:34px;border-radius:.375rem;display:inline-grid;place-items:center;background:var(--primary-soft);color:var(--primary);font-size:14px}
+        .ep-modal-icon.success{background:var(--green-soft);color:var(--green)}.ep-modal-icon.amber{background:var(--amber-soft);color:var(--amber)}
+        .ep-modal-body{flex:1 1 auto;min-height:0;padding:1.25rem;overflow-y:auto;overscroll-behavior:contain;background:#fff}
+        .ep-modal form{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+        .ep-modal form .ep-modal-body{flex:1 1 auto}
+        .ep-modal-footer{flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:.5rem;padding:.75rem 1.25rem;background:#fff;border-top:1px solid #dee2e6}
+        .ep-modal-footer.center{justify-content:center}
+        .ep-form-group{margin-bottom:.75rem}
+        .ep-form-group label{display:block;margin-bottom:.45rem;color:#212529;font-size:.9rem;font-weight:600}
+        .ep-form-group input,.ep-form-group select,.ep-form-group textarea{width:100%;min-height:38px;padding:.375rem .75rem;color:#212529;background:#fff;border:1px solid #ced4da;border-radius:.375rem;font:inherit;font-size:.95rem;outline:none}
+        .ep-form-group input:focus,.ep-form-group select:focus,.ep-form-group textarea:focus{border-color:#86b7fe;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}
+        .ep-btn{padding:.45rem .9rem;border-radius:.375rem;border:0;font:inherit;font-size:.9rem;font-weight:500;cursor:pointer;transition:.18s}
+        .ep-btn:disabled{opacity:.6;cursor:not-allowed}
+        .ep-btn-cancel,.ep-btn-outline{color:#fff;background:#6c757d;border:1px solid #6c757d}
+        .ep-btn-save{color:#fff;background:#0d6efd;border:1px solid #0d6efd}
+        .ep-btn-danger{color:#fff;background:#dc3545;border:1px solid #dc3545}
+
+        .ep-section-title{display:flex;align-items:center;gap:9px;margin:18px 0 12px;font-size:14px;font-weight:800;color:#2a3a55}
+        .ep-section-num{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:var(--primary-soft);color:var(--primary);font-size:11px;font-weight:800}
+        .ep-items-table{width:100%;border-collapse:collapse;border:1px solid var(--line);border-radius:10px;overflow:hidden;display:table;min-width:520px}
+        .ep-items-table th{background:#f3f6fc;color:#5b6b85;text-align:start;padding:10px 12px;font-size:11px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;border-bottom:1px solid var(--line)}
+        .ep-items-table td{padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f3f8}
+        .ep-items-table tr:last-child td{border-bottom:0}
+        .ep-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+        .ep-detail-item{padding:12px;border:1px solid var(--line);border-radius:10px;background:#fbfcff;overflow-wrap:anywhere}
+        .ep-detail-item span{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:700}
+        .ep-detail-item strong{font-size:13px;color:#2a3a55}
+
+        .ep-toast{position:fixed;z-index:1100;top:20px;inset-inline-end:20px;width:min(420px,calc(100% - 40px));display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;background:#fff;box-shadow:0 12px 30px rgba(20,40,70,.15);border-inline-start:4px solid var(--primary);font-size:12px}
+        .ep-toast.success{border-inline-start-color:var(--green);color:#0b6a4e}
+        .ep-toast.danger{border-inline-start-color:var(--red);color:#a3212e}
+        .ep-delete-body{padding:28px 22px 10px;text-align:center}
+        .ep-delete-icon{display:inline-grid;place-items:center;width:58px;height:58px;margin-bottom:14px;border-radius:50%;background:var(--red-soft);color:var(--red);font-size:24px}
+        .ep-delete-body h4{margin:0 0 6px;font-size:17px;font-weight:800}
+        .ep-delete-body p{margin:0 0 10px;color:var(--muted);font-size:13px}
+
+        /* ===== GRILLES RESPONSIVES DES MODALES (remplacent les styles inline) ===== */
+        .ep-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .ep-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+        .ep-item-bar{display:flex;gap:8px;margin-bottom:12px;align-items:end;flex-wrap:wrap}
+        .ep-item-bar .ep-form-group{margin-bottom:0}
+        .ep-w-cat{width:150px}.ep-w-prod{flex:2;min-width:180px}.ep-w-qty{width:90px}.ep-w-price{width:130px}
+
+        /* ============================================================
+           MOBILE — identique à la page Affectation (intranet-atm)
+        ============================================================ */
+        @media (max-width:992px){
+          .expenses-page .ep-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:14px 10px 0;margin-bottom:16px}
+          .expenses-page .ep-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+          .expenses-page .ep-fg-search{grid-column:1/-1}
+          .ep-fg-actions{grid-column:1/-1}
+        }
+
+        /* ✅ CARTE STATS : TOUJOURS 2 COLONNES sur téléphone (comme l'affectation) */
+        @media (max-width:768px){
+          .expenses-page .ep-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px 8px 0;margin-bottom:14px}
+          .expenses-page .ep-card{min-height:74px;padding:12px}
+          .expenses-page .ep-card-info h3{font-size:12px}
+          .expenses-page .ep-card-info .value{font-size:22px}
+          .expenses-page .ep-card-info .sub{font-size:10px}
+          .expenses-page .ep-icon{font-size:22px;flex-basis:26px}
+          .expenses-page .ep-hero{padding:9px 10px;gap:8px;min-height:48px}
+          .expenses-page .ep-title h1{font-size:17px}
+          .expenses-page .ep-btn-add,.expenses-page .ep-hero-refresh{padding:8px 10px;font-size:12px}
+          .expenses-page .ep-panel{margin-inline:8px}
+          .expenses-page .ep-panel-head h5{font-size:15px}
+          .expenses-page .ep-filters{grid-template-columns:1fr 1fr;gap:8px;padding:10px}
+          .expenses-page .ep-fg-search{grid-column:1/-1}
+          .ep-fg-actions{grid-column:1/-1}
+          .ep-fg-actions .ep-btn,.ep-fg-actions .ep-reset{flex:1;justify-content:center}
+          .expenses-page .ep-filter-input,.expenses-page .ep-reset{height:36px;font-size:12px}
+          .expenses-page .ep-table{min-width:680px}
+          .expenses-page .ep-table th{padding:8px 6px;font-size:11px}
+          .expenses-page .ep-table td{padding:7px 6px;font-size:11px;max-width:150px}
+          .ep-customer-name{max-width:110px}
+          /* ✅ Colonnes secondaires masquées sur téléphone */
+          .ep-table .col-sm-hide{display:none}
+          /* ✅ Modales plein écran */
+          .ep-modal-overlay{padding:.4rem;align-items:stretch}
+          .ep-modal,.ep-modal.medium,.ep-modal.small{max-width:100%;max-height:calc(100dvh - .8rem);border-radius:.5rem;margin:auto}
+          .ep-modal-header{padding:.8rem 1rem}
+          .ep-modal-header h3{font-size:1rem}
+          .ep-modal-header p{margin-inline-start:0;font-size:.8rem}
+          .ep-modal-body{padding:1rem}
+          .ep-modal-footer{padding:.7rem 1rem;flex-wrap:wrap}
+          .ep-modal-footer .ep-btn{flex:1 1 auto;text-align:center}
+          .ep-items-table{min-width:420px}
+          .ep-detail-grid{grid-template-columns:1fr 1fr}
+          .ep-detail-grid .ep-detail-item:last-child{grid-column:1/-1}
+          /* ✅ Barre d'ajout article en colonne */
+          .ep-item-bar{flex-direction:column;align-items:stretch}
+          .ep-item-bar .ep-form-group{width:100%!important;min-width:0!important;flex:none!important}
+          .ep-item-bar .ep-btn{width:100%}
+        }
+
+        @media (max-width:640px){
+          .ep-grid-3{grid-template-columns:1fr 1fr}
+        }
+        @media (max-width:440px){
+          .ep-grid-2,.ep-grid-3{grid-template-columns:1fr}
+          .expenses-page .ep-stats{gap:8px;padding:10px 6px 0}
+          .expenses-page .ep-card{min-height:66px;padding:9px 10px}
+          .expenses-page .ep-card-info h3{font-size:11px}
+          .expenses-page .ep-card-info .value{font-size:19px}
+          .expenses-page .ep-card-info .sub{font-size:9px}
+          .expenses-page .ep-icon{font-size:18px;flex-basis:22px}
+          .ep-detail-grid{grid-template-columns:1fr}
+          .ep-detail-grid .ep-detail-item:last-child{grid-column:auto}
+          .ep-toast{top:10px;inset-inline:10px;width:auto}
+        }
+
+        .expenses-page[dir="rtl"]{text-align:right}
+        .expenses-page[dir="ltr"]{text-align:left}
+        .expenses-page input,.expenses-page textarea,.expenses-page select{max-width:100%}
+        .ep-amt{direction:ltr;unicode-bidi:isolate}
+      `}</style>
+
       {error && <div className="ep-toast danger" role="alert"><span>⚠</span><div style={{ flex: 1 }}>{error}</div><button type="button" className="btn-icon" onClick={() => setError('')}><i className="fas fa-times" /></button></div>}
       {success && <div className="ep-toast success" role="status"><span>✓</span><div style={{ flex: 1 }}>{success}</div><button type="button" className="btn-icon" onClick={() => setSuccess('')}><i className="fas fa-times" /></button></div>}
 
+      {/* Cartes stats : 2×2 sur mobile comme la page Affectation */}
       <section className="ep-stats">
         <div className="ep-card tone-violet">
           <div className="ep-card-info">
@@ -801,25 +1003,23 @@ const VentesPage = () => {
 
       <header className="ep-hero">
         <div className="ep-title">
-          <span className="ep-eyebrow"><i className="fas fa-chart-line" style={{ marginInlineEnd: 6 }} />{t.eyebrow}</span>
           <h1><span className="ep-title-icon"><i className="fas fa-cash-register" /></span>{t.title}</h1>
-          <p>{t.subtitle}</p>
         </div>
         <div className="ep-hero-actions">
-          <button type="button" className="ep-btn ep-btn-outline ep-hero-refresh" onClick={() => { fetchSales(); fetchProducts(); fetchCustomers(); }} disabled={loadingSales}>
-            <i className={`fas fa-sync-alt ${loadingSales ? 'fa-spin' : ''}`} />{t.refresh}
+          <button type="button" className="ep-hero-refresh" onClick={() => { fetchSales(); fetchProducts(); fetchCustomers(); }} disabled={loadingSales}>
+            <i className={`fas fa-sync-alt ${loadingSales ? 'fa-spin' : ''}`} /> {t.refresh}
           </button>
           <button type="button" className="ep-btn-add" onClick={() => setShowAddModal(true)}>
-            <i className="fas fa-plus" />{t.add}
+            <i className="fas fa-plus" /> {t.add}
           </button>
         </div>
       </header>
 
       <div className="ep-panel">
         <div className="ep-panel-head">
-          <div><h5><i className="fas fa-list-alt" style={{ color: '#fff', marginInlineEnd: 8 }} />{t.history}</h5><p>{t.search_ph}</p></div>
-          <button type="button" className="ep-btn ep-btn-outline" onClick={() => { fetchSales(); fetchProducts(); }} disabled={loadingSales}>
-            <i className={`fas fa-sync-alt ${loadingSales ? 'fa-spin' : ''}`} style={{ marginInlineEnd: 6 }} />{t.refresh}
+          <h5><i className="fas fa-list-alt" />{t.history}</h5>
+          <button type="button" className="ep-hero-refresh" onClick={() => { fetchSales(); fetchProducts(); }} disabled={loadingSales}>
+            <i className={`fas fa-sync-alt ${loadingSales ? 'fa-spin' : ''}`} /> {t.refresh}
           </button>
         </div>
 
@@ -864,10 +1064,10 @@ const VentesPage = () => {
             <label>Fin</label>
             <input type="date" className="ep-filter-input" value={endDateFilter} onChange={e => setEndDateFilter(e.target.value)} />
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="ep-fg-actions">
             {hasFilters && (
               <button type="button" className="ep-reset" onClick={resetFilters}>
-                <i className="fas fa-rotate-left" />
+                <i className="fas fa-times" /> {t.cancel}
               </button>
             )}
             <button type="button" className="ep-btn ep-btn-save" onClick={exportFilteredSales} style={{ height: 38, whiteSpace: 'nowrap' }}>
@@ -881,21 +1081,20 @@ const VentesPage = () => {
             <thead>
               <tr>
                 <th>{t.th_index}</th>
-                <th className="sortable" onClick={() => handleSort('invoice')} title={t.sort_by}>
-                  {t.th_products} <i className={`fas ${sortIcon('invoice')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
+                <th className="sortable" onClick={() => handleSort('products')} title={t.sort_by}>
+                  {t.th_products} <i className={`fas ${sortIcon('products')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
                 </th>
-                <th className="sortable" onClick={() => handleSort('category')} title={t.sort_by}>
+                <th className="sortable col-sm-hide" onClick={() => handleSort('category')} title={t.sort_by}>
                   {t.th_category} <i className={`fas ${sortIcon('category')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
                 </th>
                 <th className="sortable" onClick={() => handleSort('customer')} title={t.sort_by}>
                   {t.th_customer} <i className={`fas ${sortIcon('customer')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
                 </th>
                 <th className="ep-col-center">{t.th_qty}</th>
-                <th className="ep-col-end">{t.th_unit}</th>
+                <th className="ep-col-end col-sm-hide">{t.th_unit}</th>
                 <th className="ep-col-end sortable" onClick={() => handleSort('total')} title={t.sort_by}>
                   {t.th_total} <i className={`fas ${sortIcon('total')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
                 </th>
-                {/* ✅ SUPPRIMÉ : colonne المتبقي / Reste à payer */}
                 <th className="sortable" onClick={() => handleSort('status')} title={t.sort_by}>
                   {t.th_status} <i className={`fas ${sortIcon('status')}`} style={{ opacity: 0.6, marginInlineStart: 4 }} />
                 </th>
@@ -907,9 +1106,9 @@ const VentesPage = () => {
             </thead>
             <tbody>
               {loadingSales ? (
-                <tr><td colSpan="11" className="ep-state"><span className="ep-spinner" />{t.loading_sales}</td></tr>
+                <tr><td colSpan="10" className="ep-state"><span className="ep-spinner" />{t.loading_sales}</td></tr>
               ) : filteredSales.length === 0 ? (
-                <tr><td colSpan="11" className="ep-state">
+                <tr><td colSpan="10" className="ep-state">
                   <div style={{ marginBottom: 8, fontSize: 22, color: 'var(--primary)' }}><i className="fas fa-file-invoice" /></div>
                   <div style={{ fontWeight: 800, color: '#2a3a55', fontSize: 15 }}>{t.no_data}</div>
                   <div style={{ marginTop: 4, fontSize: 12 }}>{t.no_data_sub}</div>
@@ -926,7 +1125,7 @@ const VentesPage = () => {
                     <tr key={sale.id}>
                       <td style={{ color: '#000204' }}>{i + 1}</td>
                       <td style={{ color: '#044dba' }} title={names}>{names}</td>
-                      <td title={cats}><span className="ep-badge badge-violet">{cats}</span></td>
+                      <td className="col-sm-hide" title={cats}><span className="ep-badge badge-violet">{cats}</span></td>
                       <td>
                         <div className="ep-customer-cell">
                           <div className="ep-avatar"><i className="fas fa-user" /></div>
@@ -934,9 +1133,8 @@ const VentesPage = () => {
                         </div>
                       </td>
                       <td className="ep-col-center"><span className="ep-badge badge-gray">{t.units(qty)}</span></td>
-                      <td className="ep-col-end ep-money">{formatNumber(avg)} {cur}</td>
+                      <td className="ep-col-end ep-money col-sm-hide">{formatNumber(avg)} {cur}</td>
                       <td className="ep-col-end ep-money ep-money-total">{formatNumber(sale.grand_total ?? sale.total)} {cur}</td>
-                      {/* ✅ SUPPRIMÉ : cellule المتبقي */}
                       <td><span className={`ep-badge badge-${st.tone}`}><i className={`fas ${st.icon}`} style={{ marginInlineEnd: 5 }} />{st.label}</span></td>
                       <td style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{formatDate(sale.invoice_date || sale.created_at, t.locale)}</td>
                       <td className="ep-col-end">
@@ -987,7 +1185,7 @@ const VentesPage = () => {
                 <thead>
                   <tr>
                     <th>{t.f_product}</th>
-                    <th>{t.th_category}</th>
+                    <th className="col-sm-hide">{t.th_category}</th>
                     <th className="ep-col-center">{t.f_qty}</th>
                     <th className="ep-col-end">{t.f_price}</th>
                     <th className="ep-col-end">{t.th_total}</th>
@@ -1003,7 +1201,7 @@ const VentesPage = () => {
                     return (
                       <tr key={idx}>
                         <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
-                        <td><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
+                        <td className="col-sm-hide"><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
                         <td className="ep-col-center">{q}</td>
                         <td className="ep-col-end">{formatNumber(p)} {cur}</td>
                         <td className="ep-col-end" style={{ fontWeight: 800 }}>{formatNumber(lt)} {cur}</td>
@@ -1045,9 +1243,9 @@ const VentesPage = () => {
                   <thead>
                     <tr>
                       <th>{t.f_product}</th>
-                      <th>{t.th_category}</th>
-                      <th className="ep-col-center" style={{ width: 90 }}>{t.f_qty}</th>
-                      <th className="ep-col-end" style={{ width: 130 }}>{t.f_price}</th>
+                      <th className="col-sm-hide">{t.th_category}</th>
+                      <th className="ep-col-center" style={{ width: 80 }}>{t.f_qty}</th>
+                      <th className="ep-col-end" style={{ width: 110 }}>{t.f_price}</th>
                       <th className="ep-col-end">{t.th_total}</th>
                     </tr>
                   </thead>
@@ -1055,7 +1253,7 @@ const VentesPage = () => {
                     {editItems.map((it, idx) => (
                       <tr key={idx}>
                         <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
-                        <td><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
+                        <td className="col-sm-hide"><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
                         <td className="ep-col-center">
                           <input type="number" min="1" style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 6, padding: 5, textAlign: 'center' }} value={it.quantity} onChange={e => { const a = [...editItems]; a[idx].quantity = parseInt(e.target.value, 10) || 1; setEditItems(a); }} />
                         </td>
@@ -1067,9 +1265,9 @@ const VentesPage = () => {
                     ))}
                   </tbody>
                 </table>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+                <div className="ep-grid-2" style={{ marginTop: 16 }}>
                   <div className="ep-form-group" style={{ marginBottom: 0 }}>
-                    <label>Statut</label>
+                    <label>{t.f_status}</label>
                     <select value={editStatus} onChange={e => setEditStatus(e.target.value)}>
                       <option value="paid">{t.paid}</option>
                       <option value="partial">{t.partial}</option>
@@ -1078,7 +1276,7 @@ const VentesPage = () => {
                     </select>
                   </div>
                   <div className="ep-form-group" style={{ marginBottom: 0 }}>
-                    <label>Observation</label>
+                    <label>{t.f_notes}</label>
                     <textarea rows="1" value={editNotes} onChange={e => setEditNotes(e.target.value)} />
                   </div>
                 </div>
@@ -1086,7 +1284,7 @@ const VentesPage = () => {
               <div className="ep-modal-footer">
                 <button type="button" className="ep-btn ep-btn-cancel" onClick={() => setSaleToEdit(null)} disabled={actionLoading}>{t.cancel}</button>
                 <button type="submit" className="ep-btn ep-btn-save" disabled={actionLoading}>
-                  {actionLoading ? <><i className="fas fa-spinner fa-spin" style={{ marginInlineEnd: 6 }} />Enregistrement...</> : <><i className="fas fa-save" style={{ marginInlineEnd: 6 }} />{t.save}</>}
+                  {actionLoading ? <><i className="fas fa-spinner fa-spin" style={{ marginInlineEnd: 6 }} />{t.saving}</> : <><i className="fas fa-save" style={{ marginInlineEnd: 6 }} />{t.save}</>}
                 </button>
               </div>
             </form>
@@ -1138,7 +1336,7 @@ const VentesPage = () => {
                 <thead>
                   <tr>
                     <th>{t.f_product}</th>
-                    <th>{t.th_category}</th>
+                    <th className="col-sm-hide">{t.th_category}</th>
                     <th className="ep-col-center">{t.f_qty}</th>
                     <th className="ep-col-end">{t.f_price}</th>
                     <th className="ep-col-end">{t.th_total}</th>
@@ -1152,7 +1350,7 @@ const VentesPage = () => {
                     return (
                       <tr key={idx}>
                         <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
-                        <td><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
+                        <td className="col-sm-hide"><span className="ep-badge badge-violet">{getItemCategory(it, productById)}</span></td>
                         <td className="ep-col-center">{q}</td>
                         <td className="ep-col-end">{formatNumber(p)} {cur}</td>
                         <td className="ep-col-end" style={{ fontWeight: 800 }}>{formatNumber(lt)} {cur}</td>
@@ -1182,6 +1380,5 @@ const VentesPage = () => {
     </div>
   );
 };
-
 
 export default VentesPage;

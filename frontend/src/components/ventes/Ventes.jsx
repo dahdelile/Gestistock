@@ -1,2874 +1,1074 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+// src/components/ventes/Ventes.jsx
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-    Table, Button, Card, Spinner,
-    Badge, Form, Modal, Toast, ToastContainer,
-    Alert, Row, Col, InputGroup, Tabs, Tab
+  Table, Button, Card, Spinner, Badge, Form, Modal,
+  Toast, ToastContainer, Alert, Row, Col, InputGroup
 } from 'react-bootstrap';
 import {
-    FaFilter, FaExchangeAlt, FaInfoCircle,
-    FaSyncAlt, FaUserTie, FaCalendarAlt,
-    FaPlus, FaEdit, FaTrash, FaCar, FaSearch,
-    FaLock, FaUserShield, FaUser, FaTimes,
-    FaHistory, FaCheck, FaBan, FaChartPie,
-    FaUsers, FaExchangeAlt as FaExchange,
-    FaChartBar, FaExclamationTriangle, FaWarning,
-    FaArrowRight, FaRedoAlt
+  FaInfoCircle, FaSyncAlt, FaPlus, FaEdit, FaTrash, FaSearch,
+  FaLock, FaUserShield, FaUser, FaTimes, FaPrint, FaDownload,
+  FaMoneyBillWave, FaShoppingCart, FaCalendarAlt, FaExchangeAlt,
+  FaCashRegister, FaFilter, FaFileExcel, FaEye
 } from 'react-icons/fa';
+import { productsApi, customersApi, salesApi } from '../../api';
+import { useLanguage } from '../../context/LanguageContext';
+import './Ventes.css';
 
-// ============================================
-// GESTION DES VARIABLES D'ENVIRONNEMENT
-// ============================================
-const API_BASE_URL = 'https://intranet-attm.com/api';
-const CHAUFFEURS_URL = `${API_BASE_URL}/chauffeurs`;
-const PROJETS_URL = `${API_BASE_URL}/projets`;
-const VOITURES_URL = `${API_BASE_URL}/voitures`;
-const AFFECTATIONS_URL = `${API_BASE_URL}/affectations-chauffeurs`;
-const AUTH_API_URL = 'https://intranet-attm.com/api';
+const STORE = { name: 'GESTION STOCK', address: 'Nouakchott, Mauritanie', phone: '+222 XX XX XX XX' };
 
-// ============================================
-// FONCTION POUR LES REQUÊTES AVEC TOKEN
-// ============================================
-const fetchWithToken = async (url, options = {}) => {
-    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-    const defaultOptions = {
-        headers: {
-            'Authorization': token ? `Bearer ${token}` : '',
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-        },
-    };
-    if (options.body instanceof FormData) {
-        delete defaultOptions.headers['Content-Type'];
-    }
-    const response = await fetch(url, {
-        ...defaultOptions,
-        ...options,
-        headers: {
-            ...defaultOptions.headers,
-            ...options.headers,
-        },
-    });
-    
-    if (!response.ok) {
-        let errorMessage = `Erreur HTTP: ${response.status}`;
-        try {
-            const errorData = await response.json();
-            console.error('🔴 Erreur API détaillée:', {
-                status: response.status,
-                url: url,
-                data: errorData
-            });
-            
-            if (response.status === 500) {
-                errorMessage = errorData.message || 'Erreur serveur interne. Contactez l\'administrateur.';
-            } else if (response.status === 401) {
-                errorMessage = 'Session expirée. Veuillez vous reconnecter.';
-                localStorage.removeItem('auth_token');
-                localStorage.removeItem('user');
-                window.location.href = '/login';
-            } else if (response.status === 403) {
-                errorMessage = 'Accès refusé. Permissions insuffisantes.';
-            } else if (response.status === 409) {
-                errorMessage = errorData.message || 'Conflit: Cette ressource est déjà utilisée.';
-            } else if (response.status === 422) {
-                errorMessage = 'Erreurs de validation:\n';
-                if (errorData.errors) {
-                    Object.keys(errorData.errors).forEach(field => {
-                        errorMessage += `• ${field}: ${errorData.errors[field].join(', ')}\n`;
-                    });
-                }
-            } else {
-                errorMessage = errorData.message || errorData.error || errorMessage;
-            }
-        } catch (e) {
-            const text = await response.text();
-            console.error('🔴 Réponse brute:', text);
-            errorMessage = `Erreur ${response.status}: ${text || 'Erreur inconnue'}`;
-        }
-        throw new Error(errorMessage);
-    }
-    return response;
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const toNumOrNull = (v) => {
+  if (v === '' || v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const toNumOrZero = (v) => toNumOrNull(v) ?? 0;
+const toTextOrNull = (v) => {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+};
+const formatNumber = (v) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(Number(v) || 0);
+const formatDate = (v, locale = 'fr-FR') => {
+  if (!v) return '—';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString(locale, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const getItemCategory = (item, productById) => {
+  if (!item) return '—';
+  const fromMap = item.product_id != null ? productById?.[String(item.product_id)] : null;
+  return fromMap?.categories?.name || fromMap?.category?.name || fromMap?.category_name ||
+    item?.category_name || item?.category || '—';
+};
+const getSaleCategories = (sale, productById) => {
+  const items = sale?.items || sale?.invoice_items || sale?.items_sale || [];
+  const cats = [];
+  items.forEach((it) => {
+    const c = getItemCategory(it, productById);
+    if (c && c !== '—' && !cats.includes(c)) cats.push(c);
+  });
+  return cats.length ? cats.join(', ') : '—';
 };
 
-// ============================================
-// FONCTION D'EXTRACTION SÉCURISÉE DES DONNÉES
-// ============================================
-const extractDataFromResponse = (data) => {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (data.data && Array.isArray(data.data)) return data.data;
-    if (data.success && data.data && Array.isArray(data.data)) return data.data;
-    if (typeof data === 'object' && data !== null) {
-        for (let key in data) {
-            if (Object.prototype.hasOwnProperty.call(data, key) && Array.isArray(data[key])) {
-                return data[key];
-            }
-        }
+/* ============================================================
+   TRADUCTIONS - inchangées
+   ============================================================ */
+const I18N = {
+  fr: {
+    dir: 'ltr', locale: 'fr-FR', currency: 'MRU',
+    title: 'Gestion des ventes', add: 'Nouvelle vente', refresh: 'Rafraîchir',
+    stat_revenue: 'Montant global', stat_revenue_sub: 'MRU · Toutes les ventes',
+    stat_count: 'Total ventes', stat_count_sub: 'Transactions enregistrées',
+    stat_month: 'Ventes du mois', stat_month_sub: (v) => `Revenus : ${v}`,
+    stat_day: 'Ventes du jour', stat_day_sub: (v) => `Revenus : ${v}`,
+    history: 'Historique des ventes', search_ph: 'N° facture ou nom du client...',
+    all_status: 'Tous les statuts', all_payments: 'Tous les paiements', all_categories: 'Toutes les catégories',
+    paid: 'Payée', partial: 'Crédit', draft: 'Brouillon', cancelled: 'Annulée',
+    th_invoice: 'Facture', th_customer: 'Client', th_products: 'Produit(s)', th_category: 'Catégorie',
+    th_qty: 'Qté', th_unit: 'P.U.', th_total: 'Total', th_status: 'Statut', th_date: 'Date', th_actions: 'Actions',
+    view: 'Voir', edit: 'Modifier', delete: 'Supprimer', print: 'Imprimer', export: 'Exporter',
+    cash: 'Espèces', bankily: 'Bankily', masrivi: 'Masrivi', sedad: 'Sedad', credit: 'Crédit', walk_in: 'Client comptant',
+    units: (n) => `${n} unité(s)`,
+    form_title: 'Nouvelle vente', f_customer: 'Client', f_date: 'Date de vente', f_status: 'Statut',
+    f_payment: 'Mode de paiement', f_notes: 'Observation', f_category: 'Catégorie', f_product: 'Produit',
+    f_qty: 'Quantité', f_price: 'Prix unitaire', f_add_item: 'Ajouter',
+    stock_available: (n) => `Stock dispo : ${n}`, err_stock: (n) => `Stock insuffisant. Il ne reste que ${n} unité(s).`,
+    err_qty_invalid: 'Quantité invalide.', err_price_invalid: 'Saisissez un prix unitaire valide.',
+    err_customer_credit: 'Sélectionnez un client pour le crédit.', no_items: 'Aucun article ajouté.',
+    save: 'Enregistrer', cancel: 'Annuler', close: 'Fermer', saving: 'Enregistrement...',
+    err_save: "Erreur lors de l'enregistrement.", ok_sale: 'Vente enregistrée avec succès.',
+    edit_title: 'Modifier la vente', ok_edit: 'Vente modifiée.', err_edit: 'Erreur modification.',
+    delete_q: 'Supprimer cette vente ?', delete_confirm: 'Oui, supprimer', deleting: 'Suppression...',
+    ok_delete: 'Vente supprimée.', err_delete: 'Erreur suppression.',
+    details_title: 'Détails de la vente', success_invoice: 'Vente enregistrée', facture: 'FACTURE',
+    thanks: 'Merci pour votre achat !', thanks_sub: 'Nous vous remercions de votre confiance.',
+    err_load: 'Impossible de charger les ventes.', loading: 'Chargement des ventes...',
+    no_data: 'Aucune vente trouvée', no_data_sub: 'Modifiez votre recherche ou créez une nouvelle vente.',
+    export_all: 'Exporter', footer_count: (n) => `${n} vente(s)`,
+    role_admin: 'Admin', role_user: 'Lecture', err_permission: 'Action réservée aux administrateurs.',
+    reset: 'Réinitialiser',
+  },
+  ar: {
+    dir: 'rtl', locale: 'ar-u-nu-latn', currency: 'أوقية',
+    title: 'إدارة المبيعات', add: 'بيع جديد', refresh: 'تحديث',
+    stat_revenue: 'المبلغ الإجمالي', stat_revenue_sub: 'أوقية · كل المبيعات',
+    stat_count: 'إجمالي المبيعات', stat_count_sub: 'المعاملات المسجلة',
+    stat_month: 'مبيعات الشهر', stat_month_sub: (v) => `الإيرادات: ${v}`,
+    stat_day: 'مبيعات اليوم', stat_day_sub: (v) => `الإيرادات: ${v}`,
+    history: 'سجل المبيعات', search_ph: 'رقم الفاتورة أو اسم العميل...',
+    all_status: 'كل الحالات', all_payments: 'كل طرق الدفع', all_categories: 'كل الفئات',
+    paid: 'مدفوعة', partial: 'آجل', draft: 'مسودة', cancelled: 'ملغاة',
+    th_invoice: 'الفاتورة', th_customer: 'العميل', th_products: 'المنتج', th_category: 'الفئة',
+    th_qty: 'الكمية', th_unit: 'السعر', th_total: 'الإجمالي', th_status: 'الحالة', th_date: 'التاريخ', th_actions: 'إجراءات',
+    view: 'عرض', edit: 'تعديل', delete: 'حذف', print: 'طباعة', export: 'تصدير',
+    cash: 'نقدًا', bankily: 'بنكيلي', masrivi: 'مصرفي', sedad: 'سداد', credit: 'آجل', walk_in: 'عميل نقدي',
+    units: (n) => `${n} وحدة`,
+    form_title: 'بيع جديد', f_customer: 'العميل', f_date: 'تاريخ البيع', f_status: 'الحالة',
+    f_payment: 'طريقة الدفع', f_notes: 'ملاحظة', f_category: 'الفئة', f_product: 'المنتج',
+    f_qty: 'الكمية', f_price: 'سعر الوحدة', f_add_item: 'إضافة',
+    stock_available: (n) => `المخزون المتاح: ${n}`, err_stock: (n) => `المخزون غير كافٍ. تبقى فقط ${n} وحدة.`,
+    err_qty_invalid: 'الكمية غير صالحة.', err_price_invalid: 'أدخل سعر وحدة صحيحًا.',
+    err_customer_credit: 'اختر عميلًا للبيع بالآجل.', no_items: 'لم يتم إضافة أصناف.',
+    save: 'حفظ', cancel: 'إلغاء', close: 'إغلاق', saving: 'جارٍ التسجيل...',
+    err_save: 'خطأ في التسجيل.', ok_sale: 'تم تسجيل البيع بنجاح.',
+    edit_title: 'تعديل البيع', ok_edit: 'تم التعديل.', err_edit: 'خطأ في التعديل.',
+    delete_q: 'حذف هذا البيع؟', delete_confirm: 'نعم، احذف', deleting: 'جارٍ الحذف...',
+    ok_delete: 'تم الحذف.', err_delete: 'خطأ في الحذف.',
+    details_title: 'تفاصيل البيع', success_invoice: 'تم التسجيل', facture: 'فاتورة',
+    thanks: 'شكرًا لك!', thanks_sub: 'نشكرك على ثقتك.',
+    err_load: 'تعذّر التحميل.', loading: 'جارٍ تحميل المبيعات...',
+    no_data: 'لا توجد مبيعات', no_data_sub: 'عدّل البحث أو أنشئ بيعًا جديدًا.',
+    export_all: 'تصدير', footer_count: (n) => `${n} عملية بيع`,
+    role_admin: 'مدير', role_user: 'قراءة', err_permission: 'الإجراء مخصص للمديرين فقط.',
+    reset: 'إعادة تعيين',
+  },
+};
+
+/* ============================================================
+   PAGE PRINCIPALE — STRUCTURE IDENTIQUE À CHAUFFEURMANAGER
+   ============================================================ */
+const VentesPage = () => {
+  const { lang } = useLanguage();
+  const t = I18N[lang];
+  const cur = t.currency;
+
+  /* ---------- RÔLES (copié de ChauffeurManager) ---------- */
+  const [userRole, setUserRole] = useState(null);
+  const [userLoading, setUserLoading] = useState(true);
+  const isAdmin = () => userRole === 'admin' || userRole === 'administrateur';
+  const isChefEnt = () => userRole === 'chef_ent' || userRole === 'chef_entreprise';
+  const isDM = () => userRole === 'DM' || userRole === 'dm';
+  const canEdit = () => isAdmin() || isDM() || isChefEnt();
+  const canAdd = useCallback(() => canEdit(), [userRole]);
+  const canDelete = useCallback(() => canEdit(), [userRole]);
+
+  // ✅ FIX 1 : charger le rôle comme dans ChauffeurManager, sinon userLoading reste true à vie
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        const u = JSON.parse(stored);
+        setUserRole(u.role || u.roles?.[0] || 'user');
+      } else {
+        setUserRole('user');
+      }
+    } catch { setUserRole('user'); }
+    finally { setUserLoading(false); }
+  }, []);
+
+  /* ---------- ÉTATS ---------- */
+  const [sales, setSales] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState(null);
+  const [toasts, setToasts] = useState([]);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPayment, setFilterPayment] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [form, setForm] = useState({ customer_id: '', status: 'paid', payment_method: 'cash', date: '', notes: '' });
+  const [items, setItems] = useState([]);
+  const [newItem, setNewItem] = useState({ product_id: '', quantity: 1, price: '' });
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [localError, setLocalError] = useState('');
+
+  const [saleToEdit, setSaleToEdit] = useState(null);
+  const [editItems, setEditItems] = useState([]);
+  const [editStatus, setEditStatus] = useState('paid');
+  const [editNotes, setEditNotes] = useState('');
+
+  const [selectedSale, setSelectedSale] = useState(null);
+  const [saleToDelete, setSaleToDelete] = useState(null);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [lastSale, setLastSale] = useState(null);
+
+  const showToast = (message, variant = 'success') => {
+    const newToast = { id: Date.now(), message, variant };
+    setToasts(prev => [...prev, newToast]);
+    setTimeout(() => setToasts(prev => prev.filter(tt => tt.id !== newToast.id)), 5000);
+  };
+
+  /* ---------- CHARGEMENTS ---------- */
+  const fetchSales = async () => {
+    try {
+      setLoading(true); setError(null);
+      const res = await salesApi.getAll();
+      const data = res?.data;
+      setSales(Array.isArray(data) ? data : data?.data || []);
+    } catch (err) {
+      console.error(err); setError(err.message || t.err_load); setSales([]);
+      showToast(err.message || t.err_load, 'danger');
+    } finally { setLoading(false); }
+  };
+  const fetchProducts = async () => {
+    try {
+      const res = await productsApi.getAll();
+      const data = res?.data;
+      setProducts(Array.isArray(data) ? data : data?.data || []);
+    } catch (err) { console.error(err); }
+  };
+  const fetchCustomers = async () => {
+    try {
+      const res = await customersApi.getAll();
+      const data = res?.data;
+      setCustomers(Array.isArray(data) ? data : data?.data || []);
+    } catch (err) { console.warn(err); }
+  };
+
+  useEffect(() => { fetchSales(); fetchProducts(); fetchCustomers(); }, []);
+
+  /* ---------- COMPUTÉS ---------- */
+  const productById = useMemo(() => {
+    const m = {}; products.forEach((p) => { m[String(p.id)] = p; }); return m;
+  }, [products]);
+
+  const allCategories = useMemo(() => {
+    const cats = products.map(p => p.categories?.name || p.category?.name || p.category_name).filter(Boolean);
+    return [...new Set(cats)].sort();
+  }, [products]);
+
+  const getStatus = (status, paymentMethod) => {
+    if (status === 'paid') {
+      const map = {
+        bankily: { label: t.bankily, bg: 'primary' },
+        masrivi: { label: t.masrivi, bg: 'warning' },
+        sedad: { label: t.sedad, bg: 'success' },
+        credit: { label: t.credit, bg: 'warning' },
+        cash: { label: t.cash, bg: 'success' },
+      };
+      return map[paymentMethod] || map.cash;
     }
-    console.warn('Format de données inattendu:', data);
-    return [];
-};
+    const statuses = {
+      partial: { label: t.partial, bg: 'warning' },
+      draft: { label: t.draft, bg: 'secondary' },
+      cancelled: { label: t.cancelled, bg: 'danger' },
+    };
+    return statuses[status] || { label: status || '—', bg: 'secondary' };
+  };
 
-// ============================================
-// FONCTION DE TRI PAR MATRICULE
-// ============================================
-const sortByMatricule = (data, matriculeAccessor) => {
-    if (!data || !Array.isArray(data)) return [];
-    return [...data].sort((a, b) => {
-        const getMatricule = (item) => {
-            if (typeof matriculeAccessor === 'function') {
-                return matriculeAccessor(item)?.toString() || '';
-            }
-            if (typeof matriculeAccessor === 'string') {
-                return item[matriculeAccessor]?.toString() || '';
-            }
-            return item?.toString() || '';
-        };
-        const matA = getMatricule(a);
-        const matB = getMatricule(b);
-        if (!isNaN(matA) && !isNaN(matB)) {
-            return parseInt(matA) - parseInt(matB);
-        }
-        return matA.localeCompare(matB, undefined, { numeric: true, sensitivity: 'base' });
+  const getSaleItems = (sale) => sale?.items || sale?.invoice_items || sale?.items_sale || [];
+  const getCustomerName = (sale) => {
+    if (!sale) return t.walk_in;
+    const c = customers.find(i => String(i.id) === String(sale.customer_id));
+    return sale.customers?.name || sale.customer?.name || c?.name || t.walk_in;
+  };
+  const getTotalQuantity = (sale) => getSaleItems(sale).reduce((s, i) => s + Number(i.quantity || 0), 0);
+  const getProductNames = (sale) => {
+    const names = getSaleItems(sale).map(i => i.product_name || i.name || i.products?.name || 'Produit');
+    return names.length > 0 ? names.join(', ') : '—';
+  };
+
+  const filteredSales = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return sales.filter((sale) => {
+      const inv = String(sale.invoice_number || '').toLowerCase();
+      const cust = String(sale.customers?.name || sale.customer?.name || t.walk_in).toLowerCase();
+      const prodNames = getProductNames(sale).toLowerCase();
+      const cats = getSaleCategories(sale, productById).toLowerCase();
+      const matchesSearch = !q || inv.includes(q) || cust.includes(q) || prodNames.includes(q) || cats.includes(q);
+      const matchesStatus = filterStatus === 'all' || sale.status === filterStatus;
+      const matchesPayment = filterPayment === 'all' || sale.payment_method === filterPayment;
+      const matchesCategory = filterCategory === 'all' || getSaleCategories(sale, productById).split(', ').includes(filterCategory);
+      const dStr = String(sale.invoice_date || sale.created_at || '').slice(0, 10);
+      const matchesStart = !startDateFilter || dStr >= startDateFilter;
+      const matchesEnd = !endDateFilter || dStr <= endDateFilter;
+      return matchesSearch && matchesStatus && matchesPayment && matchesCategory && matchesStart && matchesEnd;
     });
-};
+  }, [sales, searchTerm, filterStatus, filterPayment, filterCategory, startDateFilter, endDateFilter, t.walk_in, productById]);
 
-// ============================================
-// COMPOSANT DE RECHERCHE DE VOITURE AVEC AJOUT
-// ============================================
-const VoitureSearchWithAdd = ({ 
-    value, 
-    onChange, 
-    voitures, 
-    onAddVoiture, 
-    disabled, 
-    label = "Véhicule *",
-    placeholder = "Rechercher ou créer un véhicule...",
-    showToast
-}) => {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [showDropdown, setShowDropdown] = useState(false);
-    const [showAddModal, setShowAddModal] = useState(false);
-    const [isAdding, setIsAdding] = useState(false);
-    const [newVoiture, setNewVoiture] = useState({
-        matricule: '',
-        marque: '',
-        modele: '',
-        site: '',
-        compteur_actuel: 0
+  const stats = useMemo(() => {
+    const valid = sales.filter(s => s.status !== 'cancelled');
+    const now = new Date(); const today = now.toISOString().split('T')[0];
+    let dailyS = 0, dailyR = 0, monthlyS = 0, monthlyR = 0;
+    valid.forEach(s => {
+      const d = new Date(s.invoice_date || s.created_at);
+      if (Number.isNaN(d.getTime())) return;
+      const ds = d.toISOString().split('T')[0];
+      const amt = Number(s.grand_total ?? s.total ?? 0);
+      if (ds === today) { dailyS++; dailyR += amt; }
+      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) { monthlyS++; monthlyR += amt; }
     });
-    const dropdownRef = useRef(null);
+    return { count: valid.length, revenue: valid.reduce((a, x) => a + Number(x.grand_total ?? x.total ?? 0), 0), dailyS, dailyR, monthlyS, monthlyR };
+  }, [sales]);
 
-    const filteredVoitures = useMemo(() => {
-        if (!searchTerm.trim()) return voitures.slice(0, 10);
-        const term = searchTerm.toLowerCase();
-        return voitures.filter(v => 
-            v.matricule?.toLowerCase().includes(term) ||
-            v.marque?.toLowerCase().includes(term) ||
-            v.modele?.toLowerCase().includes(term)
-        ).slice(0, 15);
-    }, [searchTerm, voitures]);
+  /* ---------- ACTIONS ---------- */
+  const openAddModal = () => {
+    if (!canAdd()) { showToast(t.err_permission, 'warning'); return; }
+    setForm({ customer_id: '', status: 'paid', payment_method: 'cash', date: new Date().toISOString().slice(0, 16), notes: '' });
+    setItems([]); setNewItem({ product_id: '', quantity: 1, price: '' });
+    setCategoryFilter(''); setLocalError('');
+    setShowAddModal(true);
+  };
 
-    const selectedVoiture = useMemo(() => {
-        return voitures.find(v => v.id == value);
-    }, [value, voitures]);
+  const handleChange = (e) => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+  const handleSelectProduct = (e) => { setNewItem(p => ({ ...p, product_id: e.target.value, price: '' })); setLocalError(''); };
 
-    useEffect(() => {
-        if (selectedVoiture) {
-            setSearchTerm(`${selectedVoiture.matricule} - ${selectedVoiture.marque || ''} ${selectedVoiture.modele || ''}`.trim());
-        } else if (!value) {
-            setSearchTerm('');
-        }
-    }, [selectedVoiture, value]);
+  const addItem = () => {
+    if (!newItem.product_id) return setLocalError(t.f_product + ' *');
+    const prod = products.find(p => String(p.id) === String(newItem.product_id));
+    const price = Number(newItem.price);
+    const qty = Number(newItem.quantity);
+    const stock = Number(prod?.quantity ?? prod?.stock ?? 0);
+    if (!Number.isFinite(price) || price <= 0) return setLocalError(t.err_price_invalid);
+    if (!Number.isFinite(qty) || qty <= 0) return setLocalError(t.err_qty_invalid);
+    const existingQty = items.filter(i => String(i.product_id) === String(newItem.product_id)).reduce((sum, i) => sum + i.quantity, 0);
+    if (existingQty + qty > stock) return setLocalError(t.err_stock(stock - existingQty));
+    setItems(prev => [...prev, {
+      product_id: newItem.product_id, name: prod?.name || 'Produit',
+      category: prod?.categories?.name || prod?.category?.name || prod?.category_name || '—',
+      quantity: qty, price, stock,
+    }]);
+    setNewItem({ product_id: '', quantity: 1, price: '' }); setLocalError('');
+  };
 
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setShowDropdown(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+  const submitSale = async () => {
+    if (!canEdit()) { showToast(t.err_permission, 'danger'); return; }
+    if (items.length === 0) return setLocalError(t.no_items);
+    const isCredit = form.payment_method === 'credit' || form.status === 'partial';
+    if (isCredit && !form.customer_id) return setLocalError(t.err_customer_credit);
+    setIsUpdating(true); setLocalError('');
+    try {
+      const totalNum = items.reduce((s, i) => s + (Number(i.price) * Number(i.quantity)), 0);
+      const payload = {
+        invoice_number: `INV-${Date.now().toString().slice(-6)}`,
+        customer_id: toNumOrNull(form.customer_id),
+        status: toTextOrNull(form.status) || 'paid',
+        payment_method: toTextOrNull(form.payment_method) || 'cash',
+        notes: toTextOrNull(form.notes),
+        invoice_date: form.date ? new Date(form.date).toISOString() : new Date().toISOString(),
+        total: totalNum, grand_total: totalNum, subtotal: totalNum, discount: 0,
+        paid_amount: isCredit ? 0 : totalNum, balance: isCredit ? totalNum : 0,
+        amount_received: isCredit ? 0 : totalNum, change_amount: 0,
+        items: items.map(i => ({
+          product_id: toNumOrNull(i.product_id), quantity: toNumOrZero(i.quantity),
+          price: toNumOrZero(i.price), unit_price: toNumOrZero(i.price),
+          total: toNumOrZero(Number(i.price) * Number(i.quantity)),
+        })),
+      };
+      const res = await salesApi.checkout(payload);
+      const saleData = res?.data || {};
+      const completed = {
+        ...saleData, invoice_number: saleData.invoice_number || payload.invoice_number,
+        items: saleData.items || payload.items.map(i => ({ ...i, product_name: i.name })),
+        grand_total: Number(saleData.grand_total ?? saleData.total ?? totalNum),
+        invoice_date: saleData.invoice_date || payload.invoice_date,
+        created_at: saleData.created_at || payload.invoice_date,
+      };
+      setLastSale(completed); setShowAddModal(false); setShowInvoice(true);
+      await Promise.all([fetchProducts(), fetchSales()]);
+      showToast(t.ok_sale, 'success');
+    } catch (err) {
+      console.error(err); setLocalError(err.message || t.err_save);
+      showToast(err.message || t.err_save, 'danger');
+    } finally { setIsUpdating(false); }
+  };
 
-    const handleSelectVoiture = (voiture) => {
-        const event = { target: { name: 'voiture_id', value: voiture.id } };
-        onChange(event);
-        setSearchTerm(`${voiture.matricule} - ${voiture.marque || ''} ${voiture.modele || ''}`.trim());
-        setShowDropdown(false);
-    };
+  const handleOpenEdit = (sale) => {
+    if (!canEdit()) { showToast(t.err_permission, 'warning'); return; }
+    setSaleToEdit(sale); setEditStatus(sale.status || 'paid'); setEditNotes(sale.notes || '');
+    setEditItems(getSaleItems(sale).map(i => ({ ...i, quantity: Number(i.quantity) || 1, price: Number(i.price ?? i.unit_price) || 0 })));
+  };
 
-    const handleInputChange = (e) => {
-        setSearchTerm(e.target.value);
-        setShowDropdown(true);
-        if (e.target.value === '') {
-            onChange({ target: { name: 'voiture_id', value: '' } });
-        }
-    };
+  const submitEdit = async () => {
+    if (!saleToEdit) return;
+    setIsUpdating(true);
+    try {
+      const newTotal = editItems.reduce((s, i) => s + Number(i.quantity) * Number(i.price), 0);
+      await salesApi.updateSale(saleToEdit.id, { status: editStatus, notes: toTextOrNull(editNotes), total: toNumOrZero(newTotal), grand_total: toNumOrZero(newTotal) });
+      setSaleToEdit(null); await fetchSales(); showToast(t.ok_edit, 'success');
+    } catch (err) { console.error(err); showToast(err.message || t.err_edit, 'danger'); }
+    finally { setIsUpdating(false); }
+  };
 
-    const handleClearSelection = () => {
-        setSearchTerm('');
-        onChange({ target: { name: 'voiture_id', value: '' } });
-    };
+  const confirmDelete = async () => {
+    if (!saleToDelete) return;
+    if (!canDelete()) { showToast(t.err_permission, 'danger'); return; }
+    setIsUpdating(true);
+    try {
+      await salesApi.deleteSale(saleToDelete.id, getSaleItems(saleToDelete));
+      setSaleToDelete(null); await Promise.all([fetchSales(), fetchProducts()]);
+      showToast(t.ok_delete, 'success');
+    } catch (err) { console.error(err); showToast(err.message || t.err_delete, 'danger'); }
+    finally { setIsUpdating(false); }
+  };
 
-    const handleAddNewVoiture = async () => {
-        if (!newVoiture.matricule.trim()) {
-            if (showToast) showToast('Le matricule est obligatoire', 'warning');
-            return;
-        }
-        
-        setIsAdding(true);
-        try {
-            const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-            const response = await fetch(VOITURES_URL, {
-                method: 'POST',
-                headers: {
-                    'Authorization': token ? `Bearer ${token}` : '',
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({
-                    matricule: newVoiture.matricule.trim(),
-                    marque: newVoiture.marque || null,
-                    modele: newVoiture.modele || null,
-                    site: newVoiture.site || null,
-                    compteur_actuel: parseFloat(newVoiture.compteur_actuel) || 0
-                })
-            });
+  const printInvoice = (saleToPrint = null) => {
+    const sale = saleToPrint || lastSale; if (!sale) return;
+    const itemsL = getSaleItems(sale);
+    const invNum = sale.invoice_number || `VENTE-${sale.id}`;
+    const custName = getCustomerName(sale);
+    const itemsHtml = itemsL.map(i => {
+      const n = i.product_name || i.name || i.products?.name || 'Produit';
+      const cat = getItemCategory(i, productById);
+      const q = Number(i.quantity) || 0; const p = Number(i.price ?? i.unit_price) || 0; const lt = Number(i.total ?? q * p);
+      return `<tr><td>${escapeHtml(n)}</td><td>${escapeHtml(cat)}</td><td class="center">${q}</td><td class="right">${formatNumber(p)}</td><td class="right">${formatNumber(lt)}</td></tr>`;
+    }).join('');
+    const sub = Number(sale.subtotal ?? sale.total ?? 0); const disc = Number(sale.discount ?? 0);
+    const tot = Number(sale.grand_total ?? sale.total ?? 0);
+    const win = window.open('', '_blank', 'width=900,height=900');
+    if (!win) return showToast('Pop-up bloqué.', 'danger');
+    win.document.write(`<!DOCTYPE html><html lang="${lang}" dir="${t.dir}"><head><meta charset="UTF-8"><title>${invNum}</title>
+    <style>*{box-sizing:border-box}body{margin:0;padding:30px;color:#14213d;font-family:${lang === 'ar' ? "'Cairo'," : ''}Arial,sans-serif}.inv{max-width:800px;margin:auto}.hdr{text-align:center;border-bottom:2px solid #14213d;padding-bottom:18px}.store{font-size:26px;font-weight:800}.muted{color:#66748b}h2{text-align:center;margin:24px 0}.meta{display:flex;justify-content:space-between;gap:15px;margin:25px 0}.meta>div{flex:1}.lbl{display:block;font-size:11px;color:#66748b;margin-bottom:5px}table{width:100%;border-collapse:collapse;margin-top:20px}th{background:#e8efff;text-align:${t.dir === 'rtl' ? 'right' : 'left'}}th,td{padding:11px 9px;border-bottom:1px solid #e3e9f2}.center{text-align:center}.right{text-align:${t.dir === 'rtl' ? 'left' : 'right'}}.totals{width:330px;margin:22px 0 0 auto}.row{display:flex;justify-content:space-between;padding:8px 0}.grand{border-top:2px solid #14213d;border-bottom:2px solid #14213d;font-size:19px;font-weight:800;padding:13px 0}.footer{margin-top:40px;border-top:1px solid #ddd;padding-top:18px;text-align:center;color:#66748b}@media print{body{padding:0}}</style></head><body>
+    <div class="inv"><div class="hdr"><div class="store">${escapeHtml(STORE.name)}</div><div class="muted">${escapeHtml(STORE.address)}<br>${escapeHtml(STORE.phone)}</div></div>
+    <h2>${t.facture}</h2><div class="meta"><div><span class="lbl">N°</span><strong>${escapeHtml(invNum)}</strong></div><div><span class="lbl">${t.th_date.toUpperCase()}</span><strong>${escapeHtml(formatDate(sale.invoice_date || sale.created_at, t.locale))}</strong></div><div><span class="lbl">${t.f_customer.toUpperCase()}</span><strong>${escapeHtml(custName)}</strong></div></div>
+    <table><thead><tr><th>${t.f_product}</th><th>${t.th_category}</th><th class="center">${t.th_qty}</th><th class="right">${t.f_price}</th><th class="right">${t.th_total}</th></tr></thead><tbody>${itemsHtml}</tbody></table>
+    <div class="totals"><div class="row"><span>Sous-total</span><strong>${formatNumber(sub)} ${cur}</strong></div><div class="row"><span>Remise</span><strong>- ${formatNumber(disc)} ${cur}</strong></div><div class="row grand"><span>TOTAL</span><span>${formatNumber(tot)} ${cur}</span></div></div>
+    <div class="footer">${t.thanks}<br>${t.thanks_sub}</div></div></body></html>`);
+    win.document.close(); win.focus(); win.onload = () => win.print();
+  };
 
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || `Erreur: ${response.status}`);
-            }
+  const exportSale = (sale) => {
+    const itemsL = getSaleItems(sale);
+    const rows = [
+      [t.th_invoice, sale.invoice_number || sale.id],
+      [t.th_date, formatDate(sale.invoice_date || sale.created_at, t.locale)],
+      [t.f_customer, getCustomerName(sale)],
+      [t.th_status, getStatus(sale.status, sale.payment_method).label], [],
+      [t.f_product, t.th_category, t.th_qty, t.f_price, t.th_total],
+      ...itemsL.map(i => [i.product_name || i.name, getItemCategory(i, productById), i.quantity, i.price, i.total ?? i.quantity * i.price]),
+      [], ['TOTAL', '', '', '', sale.grand_total ?? sale.total],
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = `Vente_${sale.invoice_number || sale.id}.csv`;
+    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+  };
 
-            const data = await response.json();
-            const voitureCreee = data.data || data;
-            
-            if (onAddVoiture) {
-                onAddVoiture(voitureCreee);
-            }
-            
-            handleSelectVoiture(voitureCreee);
-            setShowAddModal(false);
-            setNewVoiture({
-                matricule: '',
-                marque: '',
-                modele: '',
-                site: '',
-                compteur_actuel: 0
-            });
-            
-            if (showToast) {
-                showToast(`Véhicule ${voitureCreee.matricule} ajouté avec succès`, 'success');
-            }
-        } catch (err) {
-            console.error('[ERROR] Erreur création voiture:', err);
-            if (showToast) {
-                showToast(`Erreur: ${err.message}`, 'danger');
-            }
-        } finally {
-            setIsAdding(false);
-        }
-    };
+  const exportAll = () => {
+    const rows = [
+      [t.th_invoice, t.f_customer, t.th_products, t.th_category, t.th_qty, t.th_total, t.th_status, t.th_date],
+      ...filteredSales.map(s => [
+        s.invoice_number || `VENTE-${s.id}`, getCustomerName(s), getProductNames(s),
+        getSaleCategories(s, productById), getTotalQuantity(s),
+        Number(s.grand_total ?? s.total ?? 0), getStatus(s.status, s.payment_method).label,
+        formatDate(s.invoice_date || s.created_at, t.locale),
+      ]),
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = `Ventes_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+  };
 
+  const hasFilters = Boolean(searchTerm || filterStatus !== 'all' || filterPayment !== 'all' || filterCategory !== 'all' || startDateFilter || endDateFilter);
+  const resetFilters = () => {
+    setSearchTerm(''); setFilterStatus('all'); setFilterPayment('all');
+    setFilterCategory('all'); setStartDateFilter(''); setEndDateFilter('');
+  };
+
+  const displayedProducts = useMemo(() => {
+    if (!categoryFilter) return products;
+    return products.filter(p => (p.categories?.name || p.category?.name || p.category_name || 'Non catégorisé') === categoryFilter);
+  }, [products, categoryFilter]);
+
+  const selectedProduct = products.find(p => String(p.id) === String(newItem.product_id));
+  const subtotal = items.reduce((s, i) => s + (i.price * i.quantity), 0);
+
+  if (userLoading) {
     return (
-        <>
-            <div className="position-relative" ref={dropdownRef}>
-                <Form.Group className="mb-3">
-                    <Form.Label><strong>{label}</strong></Form.Label>
-                    <div className="d-flex gap-2">
-                        <div className="position-relative flex-grow-1">
-                            <InputGroup>
-                                <Form.Control
-                                    type="text"
-                                    placeholder={placeholder}
-                                    value={searchTerm}
-                                    onChange={handleInputChange}
-                                    onFocus={() => setShowDropdown(true)}
-                                    disabled={disabled}
-                                    className={selectedVoiture ? 'border-success' : ''}
-                                />
-                                {selectedVoiture && (
-                                    <InputGroup.Text className="text-success">
-                                        <FaCheck />
-                                    </InputGroup.Text>
-                                )}
-                                {!selectedVoiture && searchTerm && !disabled && (
-                                    <Button
-                                        variant="outline-primary"
-                                        onClick={() => setShowAddModal(true)}
-                                        title="Créer un nouveau véhicule"
-                                    >
-                                        <FaPlus />
-                                    </Button>
-                                )}
-                            </InputGroup>
-                        </div>
-                        {selectedVoiture && (
-                            <Button variant="outline-secondary" size="sm" onClick={handleClearSelection}>
-                                <FaTimes />
-                            </Button>
-                        )}
-                    </div>
-                    
-                    {showDropdown && filteredVoitures.length > 0 && (
-                        <div className="position-absolute bg-white border rounded shadow-sm w-100 mt-1" style={{ zIndex: 1000, maxHeight: '300px', overflowY: 'auto' }}>
-                            {filteredVoitures.map(voiture => (
-                                <div 
-                                    key={voiture.id} 
-                                    className="p-2 border-bottom d-flex justify-content-between align-items-center" 
-                                    onClick={() => handleSelectVoiture(voiture)} 
-                                    style={{ cursor: 'pointer' }}
-                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
-                                    onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-                                >
-                                    <div>
-                                        <span className="fw-bold">{voiture.matricule}</span>
-                                        <span className="ms-2 text-muted">{voiture.marque || ''} {voiture.modele || ''}</span>
-                                    </div>
-                                    {voiture.site && <Badge bg="secondary">{voiture.site}</Badge>}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                    
-                    {showDropdown && filteredVoitures.length === 0 && searchTerm && (
-                        <div className="position-absolute bg-white border rounded shadow-sm w-100 mt-1" style={{ zIndex: 1000 }}>
-                            <div className="p-3 text-center">
-                                <FaSearch className="text-muted me-2" />
-                                <span className="text-muted">Aucun véhicule trouvé</span>
-                                <Button 
-                                    variant="outline-primary" 
-                                    size="sm" 
-                                    className="ms-2"
-                                    onClick={() => setShowAddModal(true)}
-                                >
-                                    <FaPlus className="me-1" />
-                                    Créer "{searchTerm}"
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </Form.Group>
-            </div>
-
-            {/* Modal d'ajout de véhicule */}
-            <Modal show={showAddModal} onHide={() => setShowAddModal(false)}>
-                <Modal.Header closeButton className="bg-primary text-white">
-                    <Modal.Title>
-                        <FaCar className="me-2" />
-                        Ajouter un nouveau véhicule
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <Form>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Matricule *</Form.Label>
-                            <Form.Control
-                                type="text"
-                                value={newVoiture.matricule}
-                                onChange={(e) => setNewVoiture(prev => ({ ...prev, matricule: e.target.value }))}
-                                placeholder="Ex: CH-001"
-                                disabled={isAdding}
-                            />
-                        </Form.Group>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Marque</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        value={newVoiture.marque}
-                                        onChange={(e) => setNewVoiture(prev => ({ ...prev, marque: e.target.value }))}
-                                        placeholder="Ex: Toyota"
-                                        disabled={isAdding}
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Modèle</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        value={newVoiture.modele}
-                                        onChange={(e) => setNewVoiture(prev => ({ ...prev, modele: e.target.value }))}
-                                        placeholder="Ex: Hilux"
-                                        disabled={isAdding}
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Site</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        value={newVoiture.site}
-                                        onChange={(e) => setNewVoiture(prev => ({ ...prev, site: e.target.value }))}
-                                        placeholder="Ex: Site A"
-                                        disabled={isAdding}
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Compteur actuel (km)</Form.Label>
-                                    <Form.Control
-                                        type="number"
-                                        value={newVoiture.compteur_actuel}
-                                        onChange={(e) => setNewVoiture(prev => ({ ...prev, compteur_actuel: parseFloat(e.target.value) || 0 }))}
-                                        min="0"
-                                        step="1"
-                                        disabled={isAdding}
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Alert variant="info">
-                            <small>
-                                <FaInfoCircle className="me-2" />
-                                Le véhicule sera automatiquement sélectionné après création.
-                            </small>
-                        </Alert>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowAddModal(false)} disabled={isAdding}>
-                        Annuler
-                    </Button>
-                    <Button 
-                        variant="primary" 
-                        onClick={handleAddNewVoiture} 
-                        disabled={!newVoiture.matricule.trim() || isAdding}
-                    >
-                        {isAdding ? <Spinner size="sm" className="me-2" /> : <FaPlus className="me-2" />}
-                        Ajouter le véhicule
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-        </>
+      <div className="container-fluid py-4 text-center">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-3">Vérification des permissions...</p>
+      </div>
     );
-};
+  }
 
-// ============================================
-// COMPOSANT PRINCIPAL
-// ============================================
-const ChauffeurManager = () => {
-    // ============================================
-    // GESTION DES RÔLES UTILISATEUR
-    // ============================================
-    const [userRole, setUserRole] = useState(null);
-    const [userLoading, setUserLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('chauffeurs');
-    
-    const isAdmin = () => userRole === 'admin' || userRole === 'administrateur';
-    const isChefEnt = () => userRole === 'chef_ent' || userRole === 'chef_entreprise';
-    const isDM = () => userRole === 'DM' || userRole === 'dm';
-    const canEdit = () => isAdmin() || isDM() || isChefEnt();
-    
-    useEffect(() => {
-        const fetchUserRole = async () => {
-            try {
-                setUserLoading(true);
-                const storedUser = localStorage.getItem('user');
-                if (storedUser) {
-                    try {
-                        const userData = JSON.parse(storedUser);
-                        const role = userData.role || userData.roles?.[0] || 'user';
-                        setUserRole(role);
-                        setUserLoading(false);
-                        return;
-                    } catch (e) {
-                        console.error("Erreur parsing user:", e);
-                    }
-                }
-                const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-                if (token) {
-                    const response = await fetch(`${AUTH_API_URL}/user`, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Accept': 'application/json'
-                        }
-                    });
-                    if (response.ok) {
-                        const userData = await response.json();
-                        const role = userData.role || userData.roles?.[0] || 'user';
-                        setUserRole(role);
-                        localStorage.setItem('user', JSON.stringify({
-                            id: userData.id,
-                            email: userData.email,
-                            role: role
-                        }));
-                    } else {
-                        setUserRole('user');
-                    }
-                } else {
-                    setUserRole('user');
-                }
-            } catch (err) {
-                console.error("Erreur récupération rôle:", err);
-                setUserRole('user');
-            } finally {
-                setUserLoading(false);
-            }
-        };
-        fetchUserRole();
-    }, []);
-    
-    const canAdd = useCallback(() => canEdit(), [userRole]);
-    const canDelete = useCallback(() => canEdit(), [userRole]);
-    
-    // ============================================
-    // ÉTATS PRINCIPAUX
-    // ============================================
-    const [chauffeurs, setChauffeurs] = useState([]);
-    const [projets, setProjets] = useState([]);
-    const [voitures, setVoitures] = useState([]);
-    const [affectations, setAffectations] = useState([]);
-    const [historiqueGlobal, setHistoriqueGlobal] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [selectedProject, setSelectedProject] = useState(null);
-    const [stats, setStats] = useState({
-        totalChauffeurs: 0,
-        totalVoitures: 0,
-        totalAffectations: 0,
-        affectationsActives: 0,
-        parProjet: []
-    });
-    const [searchTerm, setSearchTerm] = useState('');
-    const [searchTermAffectations, setSearchTermAffectations] = useState('');
-    const [searchTermHistorique, setSearchTermHistorique] = useState('');
-    const [showAffectationModal, setShowAffectationModal] = useState(false);
-    const [affectationForm, setAffectationForm] = useState({
-        chauffeur_id: '',
-        voiture_id: '',
-        projet_id: '',
-        date_debut: new Date().toISOString().split('T')[0],
-        date_fin: ''
-    });
-    const [showFinAffectationModal, setShowFinAffectationModal] = useState(false);
-    const [selectedAffectation, setSelectedAffectation] = useState(null);
-    const [motifFin, setMotifFin] = useState('');
-    const [isUpdating, setIsUpdating] = useState(false);
-    const [toasts, setToasts] = useState([]);
-    const [showAddModal, setShowAddModal] = useState(false);
-    const [currentChauffeur, setCurrentChauffeur] = useState({
-        id: null,
-        matricule: '',
-        nom: '',
-        statut: 'ACTIF',
-        projet_id: '',
-        voiture_id: '',
-        date_affectation: ''
-    });
-    const [isEditing, setIsEditing] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [chauffeurToDelete, setChauffeurToDelete] = useState(null);
-    const [showHistoriqueModal, setShowHistoriqueModal] = useState(false);
-    const [historiqueIndividuel, setHistoriqueIndividuel] = useState([]);
-    const [historiqueType, setHistoriqueType] = useState('');
-    const [historiqueTitre, setHistoriqueTitre] = useState('');
-    
-    // ============================================
-    // ÉTATS POUR L'AJOUT DE VÉHICULE
-    // ============================================
-    const [showAddVehiculeModal, setShowAddVehiculeModal] = useState(false);
-    const [newVehicule, setNewVehicule] = useState({
-        matricule: '',
-        marque: '',
-        modele: '',
-        site: '',
-        compteur_actuel: 0
-    });
-    const [isAddingVehicule, setIsAddingVehicule] = useState(false);
-    
-    // MODALS DE RÉAFFECTATION
-    const [showChangeProjetModal, setShowChangeProjetModal] = useState(false);
-    const [showChangeVoitureModal, setShowChangeVoitureModal] = useState(false);
-    const [showChangeChauffeurModal, setShowChangeChauffeurModal] = useState(false);
-    const [selectedChauffeurForChange, setSelectedChauffeurForChange] = useState(null);
-    const [selectedVoitureForChange, setSelectedVoitureForChange] = useState(null);
-    const [changeForm, setChangeForm] = useState({
-        nouveau_projet_id: '',
-        nouvelle_voiture_id: '',
-        nouveau_chauffeur_id: '',
-        date_debut: new Date().toISOString().split('T')[0],
-        motif: ''
-    });
-    const [existingAssignment, setExistingAssignment] = useState(null);
-    
-    // ============================================
-    // FONCTIONS UTILITAIRES
-    // ============================================
-    const formatDate = (dateString) => {
-        if (!dateString) return 'Non spécifiée';
-        try {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('fr-FR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            });
-        } catch {
-            return dateString;
-        }
-    };
-    
-    const formatDateTime = (dateString) => {
-        if (!dateString) return 'Non spécifiée';
-        try {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('fr-FR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        } catch {
-            return dateString;
-        }
-    };
-    
-    const showToast = (message, variant = 'success') => {
-        const newToast = { id: Date.now(), message, variant };
-        setToasts(prev => [...prev, newToast]);
-        setTimeout(() => {
-            setToasts(prev => prev.filter(t => t.id !== newToast.id));
-        }, 5000);
-    };
-    
-    const getVoitureInfo = (voitureData) => {
-        if (!voitureData) return 'Non affecté';
-        if (typeof voitureData === 'object' && voitureData?.matricule) return voitureData.matricule;
-        if (typeof voitureData === 'number' || typeof voitureData === 'string') {
-            const voiture = Array.isArray(voitures) ? voitures.find(v => v?.id == voitureData) : null;
-            return voiture?.matricule || 'Inconnu';
-        }
-        return 'Non affecté';
-    };
-    
-    const getProjetName = (projetData) => {
-        if (!projetData) return 'Non affecté';
-        if (typeof projetData === 'object' && projetData?.name) return projetData.name;
-        if (typeof projetData === 'number' || typeof projetData === 'string') {
-            const projet = Array.isArray(projets) ? projets.find(p => p?.id == projetData) : null;
-            return projet?.name || 'Inconnu';
-        }
-        return 'Non affecté';
-    };
-    
-    const getStatutBadge = (statut) => {
-        switch(statut) {
-            case 'ACTIF': return <Badge bg="success">Actif</Badge>;
-            case 'INACTIF': return <Badge bg="danger">Inactif</Badge>;
-            default: return <Badge bg="secondary">{statut || 'Inconnu'}</Badge>;
-        }
-    };
-    
-    const getAffectationStatutBadge = (affectation) => {
-        if (!affectation) return <Badge bg="secondary">Inconnu</Badge>;
-        const now = new Date();
-        const dateFin = affectation.date_fin ? new Date(affectation.date_fin) : null;
-        
-        if (affectation.statut === 'terminee' || (dateFin && dateFin < now)) {
-            return <Badge bg="danger">Terminée</Badge>;
-        }
-        if (new Date(affectation.date_debut) > now) {
-            return <Badge bg="warning">À venir</Badge>;
-        }
-        return <Badge bg="success">Active</Badge>;
-    };
-    
-    // ============================================
-    // FONCTIONS DE VÉRIFICATION
-    // ============================================
-    const getAvailableChauffeurs = useCallback(() => {
-        return chauffeurs.filter(c => c.statut === 'ACTIF');
-    }, [chauffeurs]);
-    
-    const getAvailableVoitures = useCallback(() => {
-        return voitures;
-    }, [voitures]);
-    
-    const getChauffeurAssignment = useCallback((chauffeurId) => {
-        const now = new Date();
-        return affectations.find(a => 
-            a.chauffeur_id == chauffeurId && 
-            a.statut === 'active' && 
-            (!a.date_fin || new Date(a.date_fin) >= now)
-        );
-    }, [affectations]);
-    
-    const getVoitureAssignment = useCallback((voitureId) => {
-        const now = new Date();
-        return affectations.find(a => 
-            a.voiture_id == voitureId && 
-            a.statut === 'active' && 
-            (!a.date_fin || new Date(a.date_fin) >= now)
-        );
-    }, [affectations]);
-    
-    const getActiveAssignmentForChauffeur = useCallback((chauffeurId) => {
-        const now = new Date();
-        return affectations.find(a => 
-            a.chauffeur_id == chauffeurId && 
-            a.statut === 'active' && 
-            (!a.date_fin || new Date(a.date_fin) >= now)
-        );
-    }, [affectations]);
-    
-    const getActiveAssignmentForVoiture = useCallback((voitureId) => {
-        const now = new Date();
-        return affectations.find(a => 
-            a.voiture_id == voitureId && 
-            a.statut === 'active' && 
-            (!a.date_fin || new Date(a.date_fin) >= now)
-        );
-    }, [affectations]);
-    
-    // ============================================
-    // CHARGEMENT DES DONNÉES
-    // ============================================
-    const loadReferences = async () => {
-        try {
-            const [projetsRes, voituresRes] = await Promise.allSettled([
-                fetchWithToken(PROJETS_URL),
-                fetchWithToken(VOITURES_URL)
-            ]);
-            
-            let projetsData = [];
-            let voituresData = [];
-            
-            if (projetsRes.status === 'fulfilled' && projetsRes.value.ok) {
-                const data = await projetsRes.value.json();
-                projetsData = extractDataFromResponse(data);
-            }
-            
-            if (voituresRes.status === 'fulfilled' && voituresRes.value.ok) {
-                const data = await voituresRes.value.json();
-                voituresData = extractDataFromResponse(data);
-            }
-            
-            setProjets(projetsData);
-            setVoitures(voituresData);
-        } catch (err) {
-            console.error('[ERROR] Erreur chargement références:', err);
-        }
-    };
-    
-    const fetchChauffeurs = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            
-            const response = await fetchWithToken(CHAUFFEURS_URL);
-            const data = await response.json();
-            
-            let chauffeursData = [];
-            if (data.success) {
-                chauffeursData = data.data || [];
-            } else if (Array.isArray(data)) {
-                chauffeursData = data;
-            } else if (data.data && Array.isArray(data.data)) {
-                chauffeursData = data.data;
-            }
-            
-            chauffeursData = sortByMatricule(chauffeursData, 'matricule');
-            setChauffeurs(chauffeursData);
-            
-        } catch (err) {
-            console.error('[ERROR] Erreur chargement chauffeurs:', err);
-            setError(err.message || "Impossible de charger les chauffeurs");
-            setChauffeurs([]);
-            showToast(err.message || "Erreur de chargement des chauffeurs", 'danger');
-        } finally {
-            setLoading(false);
-        }
-    };
-    
-    const fetchAffectations = async () => {
-        try {
-            const response = await fetchWithToken(AFFECTATIONS_URL);
-            const data = await response.json();
-            let affectationsData = extractDataFromResponse(data);
-            affectationsData = sortByMatricule(affectationsData, (item) => item.chauffeur?.matricule);
-            setAffectations(affectationsData);
-        } catch (err) {
-            console.error('[ERROR] Erreur chargement affectations:', err);
-            setAffectations([]);
-        }
-    };
-    
-    const fetchHistoriqueGlobal = async () => {
-        try {
-            const response = await fetchWithToken(`${AFFECTATIONS_URL}?historique=complet`);
-            const data = await response.json();
-            let historiqueData = extractDataFromResponse(data);
-            historiqueData = sortByMatricule(historiqueData, (item) => item.chauffeur_matricule);
-            setHistoriqueGlobal(historiqueData);
-        } catch (err) {
-            console.error('[ERROR] Erreur chargement historique global:', err);
-            setHistoriqueGlobal([]);
-        }
-    };
-    
-    const fetchHistoriqueIndividuel = async (type, id, nom) => {
-        try {
-            const url = type === 'chauffeur'
-                ? `${AFFECTATIONS_URL}/chauffeur/${id}/historique`
-                : `${AFFECTATIONS_URL}/voiture/${id}/historique`;
-            const response = await fetchWithToken(url);
-            const data = await response.json();
-            let historiqueData = extractDataFromResponse(data);
-            historiqueData.sort((a, b) => new Date(b.date_debut) - new Date(a.date_debut));
-            setHistoriqueIndividuel(historiqueData);
-            setHistoriqueType(type);
-            setHistoriqueTitre(nom);
-            setShowHistoriqueModal(true);
-        } catch (err) {
-            console.error('[ERROR] Erreur chargement historique:', err);
-            showToast("Erreur lors du chargement de l'historique", 'danger');
-        }
-    };
-    
-    const calculerStats = useCallback(() => {
-        const totalChauffeurs = chauffeurs.length;
-        const totalVoitures = voitures.length;
-        const totalAffectations = affectations.length;
-        const affectationsActives = affectations.filter(a =>
-            a.statut === 'active' && (!a.date_fin || new Date(a.date_fin) >= new Date())
-        ).length;
-        
-        const statsParProjet = projets.map(projet => {
-            const chauffeursDansProjet = chauffeurs.filter(c =>
-                c.projet_id == projet.id
-            ).length;
-            
-            const voituresDansProjet = voitures.filter(v =>
-                v.projet_id == projet.id
-            ).length;
-            
-            const affectationsDansProjet = affectations.filter(a =>
-                a.projet_id == projet.id
-            ).length;
-            
-            const affectationsActivesDansProjet = affectations.filter(a =>
-                a.projet_id == projet.id &&
-                a.statut === 'active' && (!a.date_fin || new Date(a.date_fin) >= new Date())
-            ).length;
-            
-            return {
-                id: projet.id,
-                nom: projet.name,
-                chauffeurs: chauffeursDansProjet,
-                voitures: voituresDansProjet,
-                affectations: affectationsDansProjet,
-                affectationsActives: affectationsActivesDansProjet
-            };
-        });
-        
-        setStats({
-            totalChauffeurs,
-            totalVoitures,
-            totalAffectations,
-            affectationsActives,
-            parProjet: statsParProjet
-        });
-    }, [chauffeurs, voitures, affectations, projets]);
-    
-    // ============================================
-    // CHARGEMENT INITIAL
-    // ============================================
-    useEffect(() => {
-        const initialize = async () => {
-            await loadReferences();
-            await fetchChauffeurs();
-            await fetchAffectations();
-            await fetchHistoriqueGlobal();
-        };
-        initialize();
-    }, []);
-    
-    useEffect(() => {
-        calculerStats();
-    }, [chauffeurs, voitures, affectations, projets, calculerStats]);
-    
-    useEffect(() => {
-        if (activeTab === 'chauffeurs') {
-            fetchChauffeurs();
-        }
-    }, [selectedProject, searchTerm, activeTab]);
-    
-    useEffect(() => {
-        if (activeTab === 'historique') {
-            fetchHistoriqueGlobal();
-        }
-    }, [activeTab]);
-    
-    // ============================================
-    // GESTION DES AFFECTATIONS
-    // ============================================
-    const handleAffectationChange = (e) => {
-        const { name, value } = e.target;
-        setAffectationForm(prev => ({
-            ...prev,
-            [name]: value
-        }));
-        
-        if (name === 'chauffeur_id' && value) {
-            const assignment = getChauffeurAssignment(value);
-            setExistingAssignment(assignment || null);
-        }
-    };
-    
-    const openAffectationModal = () => {
-        if (!canAdd()) {
-            showToast("Seuls les administrateurs et DM peuvent créer des affectations", 'warning');
-            return;
-        }
-        setAffectationForm({
-            chauffeur_id: '',
-            voiture_id: '',
-            projet_id: '',
-            date_debut: new Date().toISOString().split('T')[0],
-            date_fin: ''
-        });
-        setExistingAssignment(null);
-        setShowAffectationModal(true);
-    };
-    
-    const submitAffectation = async () => {
-        if (!canAdd()) {
-            showToast("Action non autorisée", 'danger');
-            return;
-        }
-        if (!affectationForm.chauffeur_id || !affectationForm.voiture_id || !affectationForm.date_debut) {
-            setError("Veuillez remplir tous les champs obligatoires");
-            return;
-        }
-        
-        setIsUpdating(true);
-        setError(null);
-        
-        try {
-            const activeAssignment = getChauffeurAssignment(affectationForm.chauffeur_id);
-            
-            let url = AFFECTATIONS_URL;
-            let payload;
-            
-            if (activeAssignment) {
-                url = `${AFFECTATIONS_URL}/reassigner`;
-                payload = {
-                    chauffeur_id: parseInt(affectationForm.chauffeur_id),
-                    voiture_id: parseInt(affectationForm.voiture_id),
-                    projet_id: affectationForm.projet_id ? parseInt(affectationForm.projet_id) : null,
-                    date_debut: affectationForm.date_debut,
-                    date_fin: affectationForm.date_fin || null,
-                    motif: `Réaffectation - Nouveau véhicule: ${getVoitureInfo(affectationForm.voiture_id)}`
-                };
-            } else {
-                payload = {
-                    chauffeur_id: parseInt(affectationForm.chauffeur_id),
-                    voiture_id: parseInt(affectationForm.voiture_id),
-                    projet_id: affectationForm.projet_id ? parseInt(affectationForm.projet_id) : null,
-                    date_debut: affectationForm.date_debut,
-                    date_fin: affectationForm.date_fin || null
-                };
-            }
-            
-            const response = await fetchWithToken(url, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || `Erreur: ${response.status}`);
-            }
-            
-            const result = await response.json();
-            showToast(result.message || "Affectation créée avec succès");
-            setShowAffectationModal(false);
-            setExistingAssignment(null);
-            await fetchAffectations();
-            await fetchChauffeurs();
-            if (activeTab === 'historique') await fetchHistoriqueGlobal();
-            
-        } catch (err) {
-            console.error("Erreur:", err);
-            setError(err.message);
-            showToast(err.message, 'danger');
-        } finally {
-            setIsUpdating(false);
-        }
-    };
-    
-    // ============================================
-    // FONCTIONS DE RÉAFFECTATION
-    // ============================================
-    const openChangeProjetModal = (chauffeur) => {
-        if (!canEdit()) {
-            showToast("Action non autorisée", 'danger');
-            return;
-        }
-        const activeAssignment = getActiveAssignmentForChauffeur(chauffeur.id);
-        setSelectedChauffeurForChange(chauffeur);
-        setChangeForm({
-            nouveau_projet_id: '',
-            nouvelle_voiture_id: activeAssignment?.voiture_id || chauffeur.voiture_id || '',
-            nouveau_chauffeur_id: '',
-            date_debut: new Date().toISOString().split('T')[0],
-            motif: `Changement de projet pour le chauffeur ${chauffeur.matricule} - ${chauffeur.nom}`
-        });
-        setExistingAssignment(activeAssignment);
-        setShowChangeProjetModal(true);
-    };
-    
-    const submitChangeProjet = async () => {
-        if (!selectedChauffeurForChange) return;
-        if (!changeForm.nouveau_projet_id) {
-            setError("Veuillez sélectionner un nouveau projet");
-            return;
-        }
-        
-        setIsUpdating(true);
-        setError(null);
-        
-        try {
-            const activeAssignment = getActiveAssignmentForChauffeur(selectedChauffeurForChange.id);
-            
-            const payload = {
-                chauffeur_id: parseInt(selectedChauffeurForChange.id),
-                voiture_id: activeAssignment?.voiture_id ? parseInt(activeAssignment.voiture_id) : null,
-                projet_id: parseInt(changeForm.nouveau_projet_id),
-                date_debut: changeForm.date_debut,
-                motif: changeForm.motif || `Changement de projet vers: ${getProjetName(changeForm.nouveau_projet_id)}`
-            };
-            
-            const response = await fetchWithToken(`${AFFECTATIONS_URL}/reassigner`, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Erreur lors de la réaffectation");
-            }
-            
-            showToast(`Chauffeur ${selectedChauffeurForChange.nom} transféré vers le projet ${getProjetName(changeForm.nouveau_projet_id)}`);
-            setShowChangeProjetModal(false);
-            await fetchAffectations();
-            await fetchChauffeurs();
-            if (activeTab === 'historique') await fetchHistoriqueGlobal();
-            
-        } catch (err) {
-            console.error("Erreur:", err);
-            setError(err.message);
-            showToast(err.message, 'danger');
-        } finally {
-            setIsUpdating(false);
-        }
-    };
-    
-    const openChangeVoitureModal = (chauffeur) => {
-        if (!canEdit()) {
-            showToast("Action non autorisée", 'danger');
-            return;
-        }
-        const activeAssignment = getActiveAssignmentForChauffeur(chauffeur.id);
-        setSelectedChauffeurForChange(chauffeur);
-        setChangeForm({
-            nouveau_projet_id: activeAssignment?.projet_id || chauffeur.projet_id || '',
-            nouvelle_voiture_id: '',
-            nouveau_chauffeur_id: '',
-            date_debut: new Date().toISOString().split('T')[0],
-            motif: `Changement de véhicule pour le chauffeur ${chauffeur.matricule} - ${chauffeur.nom}`
-        });
-        setExistingAssignment(activeAssignment);
-        setShowChangeVoitureModal(true);
-    };
-    
-    const submitChangeVoiture = async () => {
-        if (!selectedChauffeurForChange) return;
-        if (!changeForm.nouvelle_voiture_id) {
-            setError("Veuillez sélectionner un nouveau véhicule");
-            return;
-        }
-        
-        setIsUpdating(true);
-        setError(null);
-        
-        try {
-            const activeAssignment = getActiveAssignmentForChauffeur(selectedChauffeurForChange.id);
-            
-            const payload = {
-                chauffeur_id: parseInt(selectedChauffeurForChange.id),
-                voiture_id: parseInt(changeForm.nouvelle_voiture_id),
-                projet_id: activeAssignment?.projet_id ? parseInt(activeAssignment.projet_id) : null,
-                date_debut: changeForm.date_debut,
-                motif: changeForm.motif || `Changement de véhicule vers: ${getVoitureInfo(changeForm.nouvelle_voiture_id)}`
-            };
-            
-            const response = await fetchWithToken(`${AFFECTATIONS_URL}/reassigner`, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Erreur lors de la réaffectation");
-            }
-            
-            showToast(`Chauffeur ${selectedChauffeurForChange.nom} réaffecté au véhicule ${getVoitureInfo(changeForm.nouvelle_voiture_id)}`);
-            setShowChangeVoitureModal(false);
-            await fetchAffectations();
-            await fetchChauffeurs();
-            if (activeTab === 'historique') await fetchHistoriqueGlobal();
-            
-        } catch (err) {
-            console.error("Erreur:", err);
-            setError(err.message);
-            showToast(err.message, 'danger');
-        } finally {
-            setIsUpdating(false);
-        }
-    };
-    
-    const openChangeChauffeurModal = (voiture) => {
-        if (!canEdit()) {
-            showToast("Action non autorisée", 'danger');
-            return;
-        }
-        const activeAssignment = getActiveAssignmentForVoiture(voiture.id);
-        setSelectedVoitureForChange(voiture);
-        setChangeForm({
-            nouveau_projet_id: activeAssignment?.projet_id || '',
-            nouvelle_voiture_id: voiture.id,
-            nouveau_chauffeur_id: '',
-            date_debut: new Date().toISOString().split('T')[0],
-            motif: `Changement de chauffeur pour le véhicule ${voiture.matricule}`
-        });
-        setExistingAssignment(activeAssignment);
-        setShowChangeChauffeurModal(true);
-    };
-    
-    const submitChangeChauffeur = async () => {
-        if (!selectedVoitureForChange) return;
-        if (!changeForm.nouveau_chauffeur_id) {
-            setError("Veuillez sélectionner un nouveau chauffeur");
-            return;
-        }
-        
-        setIsUpdating(true);
-        setError(null);
-        
-        try {
-            const activeAssignment = getActiveAssignmentForVoiture(selectedVoitureForChange.id);
-            
-            const payload = {
-                chauffeur_id: parseInt(changeForm.nouveau_chauffeur_id),
-                voiture_id: parseInt(selectedVoitureForChange.id),
-                projet_id: activeAssignment?.projet_id ? parseInt(activeAssignment.projet_id) : null,
-                date_debut: changeForm.date_debut,
-                motif: changeForm.motif || `Changement de chauffeur vers: ${chauffeurs.find(c => c.id == changeForm.nouveau_chauffeur_id)?.nom}`
-            };
-            
-            const response = await fetchWithToken(`${AFFECTATIONS_URL}/reassigner`, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Erreur lors de la réaffectation");
-            }
-            
-            showToast(`Véhicule ${selectedVoitureForChange.matricule} réaffecté au chauffeur ${chauffeurs.find(c => c.id == changeForm.nouveau_chauffeur_id)?.nom}`);
-            setShowChangeChauffeurModal(false);
-            await fetchAffectations();
-            await fetchChauffeurs();
-            if (activeTab === 'historique') await fetchHistoriqueGlobal();
-            
-        } catch (err) {
-            console.error("Erreur:", err);
-            setError(err.message);
-            showToast(err.message, 'danger');
-        } finally {
-            setIsUpdating(false);
-        }
-    };
-    
-    // ============================================
-    // GESTION DES FIN D'AFFECTATION
-    // ============================================
-    const openFinAffectationModal = (affectation) => {
-        if (!canEdit()) {
-            showToast("Action non autorisée", 'danger');
-            return;
-        }
-        setSelectedAffectation(affectation);
-        setMotifFin('');
-        setShowFinAffectationModal(true);
-    };
-    
-    const submitFinAffectation = async () => {
-        if (!selectedAffectation) return;
-        if (!canEdit()) {
-            showToast("Action non autorisée", 'danger');
-            return;
-        }
-        if (!motifFin.trim()) {
-            setError("Le motif de fin est obligatoire");
-            return;
-        }
-        
-        setIsUpdating(true);
-        setError(null);
-        
-        try {
-            const response = await fetchWithToken(`${AFFECTATIONS_URL}/${selectedAffectation.id}/terminer`, {
-                method: 'POST',
-                body: JSON.stringify({ motif_fin: motifFin })
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || `Erreur: ${response.status}`);
-            }
-            
-            showToast("Affectation terminée avec succès");
-            setShowFinAffectationModal(false);
-            await fetchAffectations();
-            await fetchChauffeurs();
-            if (activeTab === 'historique') await fetchHistoriqueGlobal();
-        } catch (err) {
-            console.error("Erreur:", err);
-            setError(err.message);
-            showToast(err.message, 'danger');
-        } finally {
-            setIsUpdating(false);
-        }
-    };
-    
-    // ============================================
-    // GESTION DES CHAUFFEURS
-    // ============================================
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setCurrentChauffeur(prev => ({
-            ...prev,
-            [name]: value
-        }));
-    };
-    
-    const validateForm = () => {
-        if (!currentChauffeur.matricule?.trim()) {
-            setError("Le matricule est obligatoire");
-            return false;
-        }
-        if (!currentChauffeur.nom?.trim()) {
-            setError("Le nom est obligatoire");
-            return false;
-        }
-        return true;
-    };
-    
-    const handleAddChauffeur = () => {
-        if (!canAdd()) {
-            showToast("Seuls les administrateurs et DM peuvent ajouter des chauffeurs", 'warning');
-            return;
-        }
-        setCurrentChauffeur({
-            id: null,
-            matricule: '',
-            nom: '',
-            statut: 'ACTIF',
-            projet_id: '',
-            voiture_id: '',
-            date_affectation: new Date().toISOString().slice(0, 16).replace('T', ' ')
-        });
-        setIsEditing(false);
-        setShowAddModal(true);
-    };
-    
-    const handleEditChauffeur = (chauffeur) => {
-        if (!canEdit()) {
-            showToast("Seuls les administrateurs et DM peuvent modifier des chauffeurs", 'warning');
-            return;
-        }
-        setCurrentChauffeur({
-            id: chauffeur?.id || null,
-            matricule: chauffeur?.matricule || '',
-            nom: chauffeur?.nom || '',
-            statut: chauffeur?.statut || 'ACTIF',
-            projet_id: chauffeur?.projet_id || '',
-            voiture_id: chauffeur?.voiture_id || '',
-            date_affectation: chauffeur?.date_affectation ? chauffeur.date_affectation.slice(0, 16).replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' ')
-        });
-        setIsEditing(true);
-        setShowAddModal(true);
-    };
-    
-    const submitChauffeur = async () => {
-        if (!canEdit()) {
-            showToast("Action non autorisée", 'danger');
-            return;
-        }
-        if (!validateForm()) return;
-        
-        setIsUpdating(true);
-        setError(null);
-        
-        try {
-            const chauffeurData = {
-                matricule: currentChauffeur.matricule,
-                nom: currentChauffeur.nom,
-                statut: currentChauffeur.statut,
-                projet_id: currentChauffeur.projet_id ? parseInt(currentChauffeur.projet_id) : null,
-                voiture_id: currentChauffeur.voiture_id ? parseInt(currentChauffeur.voiture_id) : null,
-                date_affectation: currentChauffeur.date_affectation || new Date().toISOString()
-            };
-            
-            let response;
-            if (isEditing) {
-                response = await fetchWithToken(`${CHAUFFEURS_URL}/${currentChauffeur.id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify(chauffeurData)
-                });
-            } else {
-                response = await fetchWithToken(CHAUFFEURS_URL, {
-                    method: 'POST',
-                    body: JSON.stringify(chauffeurData)
-                });
-            }
-            
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || `Erreur: ${response.status}`);
-            }
-            
-            showToast(`Chauffeur ${currentChauffeur.nom} ${isEditing ? 'modifié' : 'ajouté'} avec succès`);
-            setShowAddModal(false);
-            fetchChauffeurs();
-        } catch (err) {
-            console.error("Erreur:", err);
-            setError(err.message);
-            showToast(err.message, 'danger');
-        } finally {
-            setIsUpdating(false);
-        }
-    };
-    
-    const handleDeleteChauffeur = (chauffeur) => {
-        if (!canDelete()) {
-            showToast("Seuls les administrateurs et DM peuvent supprimer des chauffeurs", 'warning');
-            return;
-        }
-        setChauffeurToDelete(chauffeur);
-        setShowDeleteModal(true);
-    };
-    
-    const confirmDelete = async () => {
-        if (!chauffeurToDelete) return;
-        if (!canDelete()) {
-            showToast("Action non autorisée", 'danger');
-            return;
-        }
-        
-        try {
-            setIsUpdating(true);
-            const response = await fetchWithToken(`${CHAUFFEURS_URL}/${chauffeurToDelete.id}`, {
-                method: 'DELETE'
-            });
-            
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || `Erreur: ${response.status}`);
-            }
-            
-            showToast(`Chauffeur ${chauffeurToDelete.nom} supprimé avec succès`);
-            fetchChauffeurs();
-            setShowDeleteModal(false);
-        } catch (err) {
-            console.error("Erreur:", err);
-            showToast(err.message || "Erreur lors de la suppression", 'danger');
-        } finally {
-            setIsUpdating(false);
-            setChauffeurToDelete(null);
-        }
-    };
-    
-    // ============================================
-    // GESTION DES VÉHICULES
-    // ============================================
-    const handleAddVehicule = () => {
-        if (!canAdd()) {
-            showToast("Seuls les administrateurs et DM peuvent ajouter des véhicules", 'warning');
-            return;
-        }
-        setNewVehicule({
-            matricule: '',
-            marque: '',
-            modele: '',
-            site: '',
-            compteur_actuel: 0
-        });
-        setIsAddingVehicule(false);
-        setShowAddVehiculeModal(true);
-    };
+  return (
+    <div className="container-fluid py-4 ventes-page">
+      <ToastContainer position="top-end" className="p-3">
+        {toasts.map(toast => (
+          <Toast key={toast.id} onClose={() => setToasts(prev => prev.filter(tt => tt.id !== toast.id))}
+            bg={toast.variant} autohide delay={5000}>
+            <Toast.Body className="text-white">{toast.message}</Toast.Body>
+          </Toast>
+        ))}
+      </ToastContainer>
 
-    const submitVehicule = async () => {
-        if (!canEdit()) {
-            showToast("Action non autorisée", 'danger');
-            return;
-        }
-        if (!newVehicule.matricule.trim()) {
-            setError("Le matricule est obligatoire");
-            return;
-        }
-        
-        setIsAddingVehicule(true);
-        setError(null);
-        
-        try {
-            const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-            const response = await fetch(VOITURES_URL, {
-                method: 'POST',
-                headers: {
-                    'Authorization': token ? `Bearer ${token}` : '',
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({
-                    matricule: newVehicule.matricule.trim(),
-                    marque: newVehicule.marque || null,
-                    modele: newVehicule.modele || null,
-                    site: newVehicule.site || null,
-                    compteur_actuel: parseFloat(newVehicule.compteur_actuel) || 0
-                })
-            });
+      {/* ====== STATS : MÊME QUE ChauffeurManager - xs={3} = 4 sur 1 ligne téléphone ====== */}
+      <Row className="mb-4 ventes-stats-row g-2">
+        <Col xs={3} md={3}>
+          <Card className="bg-primary text-white shadow-sm h-100">
+            <Card.Body className="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 className="mb-0">{t.stat_revenue}</h6>
+                <h2 className="mb-0">{formatNumber(stats.revenue)}</h2>
+              </div>
+              <FaMoneyBillWave size={40} className="stat-icon" />
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col xs={3} md={3}>
+          <Card className="bg-success text-white shadow-sm h-100">
+            <Card.Body className="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 className="mb-0">{t.stat_count}</h6>
+                <h2 className="mb-0">{stats.count}</h2>
+              </div>
+              <FaShoppingCart size={40} className="stat-icon" />
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col xs={3} md={3}>
+          <Card className="bg-info text-white shadow-sm h-100">
+            <Card.Body className="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 className="mb-0">{t.stat_month}</h6>
+                <h2 className="mb-0">{stats.monthlyS}</h2>
+              </div>
+              <FaCalendarAlt size={40} className="stat-icon" />
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col xs={3} md={3}>
+          <Card className="bg-warning text-white shadow-sm h-100">
+            <Card.Body className="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 className="mb-0">{t.stat_day}</h6>
+                <h2 className="mb-0">{stats.dailyS}</h2>
+              </div>
+              <FaExchangeAlt size={40} className="stat-icon" />
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
 
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || `Erreur: ${response.status}`);
-            }
-
-            const data = await response.json();
-            const voitureCreee = data.data || data;
-            
-            setVoitures(prev => [...prev, voitureCreee]);
-            
-            showToast(`Véhicule ${voitureCreee.matricule} ajouté avec succès`, 'success');
-            setShowAddVehiculeModal(false);
-            calculerStats();
-            
-        } catch (err) {
-            console.error("Erreur:", err);
-            setError(err.message);
-            showToast(err.message, 'danger');
-        } finally {
-            setIsAddingVehicule(false);
-        }
-    };
-    
-    const handleAddVoiture = (newVoiture) => {
-        setVoitures(prev => [...prev, newVoiture]);
-        calculerStats();
-    };
-    
-    const resetFilters = () => {
-        setSelectedProject(null);
-        setSearchTerm('');
-    };
-    
-    const filteredAffectations = affectations.filter(aff => {
-        if (!searchTermAffectations) return true;
-        const term = searchTermAffectations.toLowerCase();
-        return (
-            (aff.chauffeur?.nom?.toLowerCase().includes(term)) ||
-            (aff.chauffeur?.matricule?.toLowerCase().includes(term)) ||
-            (aff.voiture?.matricule?.toLowerCase().includes(term)) ||
-            (aff.projet?.name?.toLowerCase().includes(term))
-        );
-    });
-    
-    const filteredHistorique = historiqueGlobal.filter(item => {
-        if (!searchTermHistorique) return true;
-        const term = searchTermHistorique.toLowerCase();
-        return (
-            (item.chauffeur_nom?.toLowerCase().includes(term)) ||
-            (item.chauffeur_matricule?.toLowerCase().includes(term)) ||
-            (item.voiture_matricule?.toLowerCase().includes(term)) ||
-            (item.projet_nom?.toLowerCase().includes(term))
-        );
-    });
-    
-    // ============================================
-    // RENDU
-    // ============================================
-    if (userLoading) {
-        return (
-            <div className="container-fluid py-4 text-center">
-                <Spinner animation="border" variant="primary" />
-                <p className="mt-3">Vérification des permissions...</p>
+      {/* ====== CARTE PRINCIPALE IDENTIQUE À L'AFFECTATION ====== */}
+      <Card className="shadow-sm">
+        <Card.Header className="bg-primary text-white">
+          <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h3 className="mb-0 d-flex align-items-center">
+              <FaCashRegister className="me-2" />
+              {t.title}
+              <Badge bg={canEdit() ? 'success' : 'secondary'} className="ms-2" style={{ fontSize: '0.6em' }}>
+                {canEdit() ? <FaUserShield className="me-1" /> : <FaUser className="me-1" />}
+              </Badge>
+            </h3>
+            <div className="d-flex align-items-center gap-2">
+              <Button variant="outline-success" onClick={exportAll}>
+                <FaFileExcel className="me-2" />{t.export_all}
+              </Button>
+              <Button variant="light" onClick={() => { fetchSales(); fetchProducts(); fetchCustomers(); }} disabled={loading}>
+                <FaSyncAlt className={loading ? "spin" : ""} />
+                <span className="ms-2">{t.refresh}</span>
+              </Button>
+              {canAdd() && (
+                <Button variant="success" onClick={openAddModal} disabled={loading}>
+                  <FaPlus className="me-1" />
+                  {t.add}
+                </Button>
+              )}
             </div>
-        );
-    }
-    
-    return (
-        <div className="container-fluid py-4">
-            <ToastContainer position="top-end" className="p-3">
-                {toasts.map(toast => (
-                    <Toast
-                        key={toast.id}
-                        onClose={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-                        bg={toast.variant}
-                        autohide
-                        delay={5000}
-                    >
-                        <Toast.Body className="text-white">{toast.message}</Toast.Body>
-                    </Toast>
-                ))}
-            </ToastContainer>
-            
-            {/* Statistiques générales */}
-            <Row className="mb-4">
-                <Col md={3}>
-                    <Card className="bg-primary text-white shadow-sm">
-                        <Card.Body className="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 className="mb-0">Total chauffeurs</h6>
-                                <h2 className="mb-0">{stats.totalChauffeurs}</h2>
-                            </div>
-                            <FaUserTie size={40} />
-                        </Card.Body>
-                    </Card>
-                </Col>
-                <Col md={3}>
-                    <Card className="bg-success text-white shadow-sm">
-                        <Card.Body className="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 className="mb-0">Total équipements</h6>
-                                <h2 className="mb-0">{stats.totalVoitures}</h2>
-                            </div>
-                            <FaCar size={40} />
-                        </Card.Body>
-                    </Card>
-                </Col>
-                <Col md={3}>
-                    <Card className="bg-info text-white shadow-sm">
-                        <Card.Body className="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 className="mb-0">Affectations actives</h6>
-                                <h2 className="mb-0">{stats.affectationsActives}</h2>
-                            </div>
-                            <FaCheck size={40} />
-                        </Card.Body>
-                    </Card>
-                </Col>
-                <Col md={3}>
-                    <Card className="bg-warning text-white shadow-sm">
-                        <Card.Body className="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 className="mb-0">Total affectations</h6>
-                                <h2 className="mb-0">{stats.totalAffectations}</h2>
-                            </div>
-                            <FaExchange size={40} />
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
-            
-            <Card className="shadow-sm">
-                <Card.Header className="bg-primary text-white">
-                    <div className="d-flex justify-content-between align-items-center">
-                        <h3 className="mb-0 d-flex align-items-center">
-                            <FaUserTie className="me-2" />
-                            Gestion des chauffeurs et affectations
-                            <Badge
-                                bg={canEdit() ? 'success' : 'secondary'}
-                                className="ms-2"
-                                style={{ fontSize: '0.6em' }}
-                            >
-                                {canEdit() ? <FaUserShield className="me-1" /> : <FaUser className="me-1" />}
-                                {isAdmin() ? 'Admin' : isDM() ? 'DM' : isChefEnt() ? 'Chef' : 'Lecture'}
-                            </Badge>
-                        </h3>
-                        <div className="d-flex align-items-center gap-2">
-                            <Button variant="outline-success" onClick={handleAddVehicule} disabled={loading}>
-                                        <FaCar className="me-1" />
-                                        Ajouter véhicule
-                                    </Button>
-                            <Button variant="light" onClick={() => {
-                                fetchChauffeurs();
-                                fetchAffectations();
-                                if (activeTab === 'historique') fetchHistoriqueGlobal();
-                            }} disabled={loading}>
-                                <FaSyncAlt className={loading ? "spin" : ""} />
-                                <span className="ms-2">Rafraîchir</span>
-                            </Button>
-                            {canAdd() && activeTab === 'chauffeurs' && (
+          </div>
+        </Card.Header>
+
+        <Card.Body>
+          {error && (
+            <Alert variant="danger" onClose={() => setError(null)} dismissible className="mb-3">
+              <FaInfoCircle className="me-2" />
+              {error}
+            </Alert>
+          )}
+
+          {/* Filtres - MÊME Row que ChauffeurManager */}
+          <Row className="mb-3">
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="fw-bold"><FaSearch className="me-2" />{t.th_invoice}</Form.Label>
+                <InputGroup>
+                  <Form.Control type="text" placeholder={t.search_ph} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  {searchTerm && <Button variant="outline-secondary" onClick={() => setSearchTerm('')}>×</Button>}
+                </InputGroup>
+              </Form.Group>
+            </Col>
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="fw-bold">{t.f_payment}</Form.Label>
+                <Form.Select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)}>
+                  <option value="all">{t.all_payments}</option>
+                  <option value="cash">{t.cash}</option>
+                  <option value="bankily">{t.bankily}</option>
+                  <option value="masrivi">{t.masrivi}</option>
+                  <option value="sedad">{t.sedad}</option>
+                  <option value="credit">{t.credit}</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="fw-bold">{t.th_category}</Form.Label>
+                <Form.Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                  <option value="all">{t.all_categories}</option>
+                  {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="fw-bold">{t.th_date}</Form.Label>
+                <Form.Control type="date" value={startDateFilter} onChange={(e) => setStartDateFilter(e.target.value)} />
+              </Form.Group>
+            </Col>
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="fw-bold">Fin</Form.Label>
+                <Form.Control type="date" value={endDateFilter} onChange={(e) => setEndDateFilter(e.target.value)} />
+              </Form.Group>
+            </Col>
+            <Col md={2} className="d-flex align-items-end gap-2">
+              {hasFilters && (
+                <Button variant="outline-secondary" onClick={resetFilters} className="w-100">
+                  <FaTimes className="me-2" />{t.reset}
+                </Button>
+              )}
+            </Col>
+          </Row>
+
+          <p className="text-muted mb-2">{t.footer_count(filteredSales.length)}</p>
+
+          {/* Tableau - MÊME que ChauffeurManager */}
+          {loading ? (
+            <div className="text-center py-5">
+              <Spinner animation="border" variant="primary" />
+              <p className="mt-2">{t.loading}</p>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <Table striped bordered hover>
+                <thead className="table-dark">
+                  <tr>
+                    <th>{t.th_products}</th>
+                    <th>{t.th_category}</th>
+                    <th className="text-center">{t.th_qty}</th>
+                    <th className="text-end">{t.th_unit}</th>
+                    <th className="text-end">{t.th_total}</th>
+                    <th>{t.th_status}</th>
+                    <th>{t.th_date}</th>
+                    <th style={{ width: '160px' }}>{t.th_actions}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSales.length > 0 ? (
+                    filteredSales.map((sale) => {
+                      const st = getStatus(sale.status, sale.payment_method);
+                      const qty = getTotalQuantity(sale);
+                      const avg = qty > 0 ? Number(sale.grand_total ?? sale.total ?? 0) / qty : 0;
+                      const names = getProductNames(sale);
+                      const cats = getSaleCategories(sale, productById);
+                      return (
+                        <tr key={sale.id}>
+                          <td title={names}>{names}</td>
+                          <td><Badge bg="primary">{cats}</Badge></td>
+                          <td className="text-center"><Badge bg="secondary">{t.units(qty)}</Badge></td>
+                          <td className="text-end">{formatNumber(avg)} {cur}</td>
+                          <td className="text-end fw-bold text-success">{formatNumber(sale.grand_total ?? sale.total)} {cur}</td>
+                          <td><Badge bg={st.bg}>{st.label}</Badge></td>
+                          <td>{formatDate(sale.invoice_date || sale.created_at, t.locale)}</td>
+                          <td>
+                            <div className="d-flex gap-1 flex-wrap">
+                              <Button variant="outline-info" size="sm" onClick={() => setSelectedSale(sale)} title={t.view}>
+                                <FaEye />
+                              </Button>
+                              {canEdit() && (
                                 <>
-                                    <Button variant="success" onClick={openAffectationModal} disabled={loading}>
-                                        <FaExchangeAlt className="me-1" />
-                                        Nouvelle affectation
-                                    </Button>
-                                    <Button variant="primary" onClick={handleAddChauffeur} disabled={loading}>
-                                        <FaPlus className="me-1" />
-                                        Ajouter chauffeur
-                                    </Button>
-                                   
+                                  <Button variant="outline-success" size="sm" onClick={() => handleOpenEdit(sale)} title={t.edit}>
+                                    <FaEdit />
+                                  </Button>
+                                  <Button variant="outline-danger" size="sm" onClick={() => setSaleToDelete(sale)} title={t.delete}>
+                                    <FaTrash />
+                                  </Button>
                                 </>
-                            )}
-                        </div>
-                    </div>
-                </Card.Header>
-                <Card.Body>
-                    <Tabs
-                        activeKey={activeTab}
-                        onSelect={(k) => setActiveTab(k)}
-                        className="mb-3"
-                        fill
-                    >
-                        {/* Onglet Chauffeurs */}
-                        <Tab
-                            eventKey="chauffeurs"
-                            title={
-                                <span>
-                                    <FaUsers className="me-2" />
-                                    Chauffeurs
-                                </span>
-                            }
-                        >
-                            {error && (
-                                <Alert variant="danger" onClose={() => setError(null)} dismissible className="mb-3">
-                                    <FaInfoCircle className="me-2" />
-                                    {error}
-                                </Alert>
-                            )}
-                            <Row className="mb-3">
-                                <Col md={4}>
-                                    <Form.Group>
-                                        <Form.Label className="fw-bold">
-                                            <FaFilter className="me-2" />
-                                            Filtre par projet
-                                        </Form.Label>
-                                        <Form.Select
-                                            value={selectedProject || ''}
-                                            onChange={(e) => setSelectedProject(e.target.value ? parseInt(e.target.value) : null)}
-                                        >
-                                            <option value="">Tous les projets</option>
-                                            {projets.map(projet => (
-                                                <option key={projet.id} value={projet.id}>
-                                                    {projet.name}
-                                                </option>
-                                            ))}
-                                        </Form.Select>
-                                    </Form.Group>
-                                </Col>
-                                <Col md={6}>
-                                    <Form.Group>
-                                        <Form.Label className="fw-bold">
-                                            <FaSearch className="me-2" />
-                                            Recherche
-                                        </Form.Label>
-                                        <InputGroup>
-                                            <Form.Control
-                                                type="text"
-                                                placeholder="Matricule ou nom..."
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                            />
-                                            {searchTerm && (
-                                                <Button variant="outline-secondary" onClick={() => setSearchTerm('')}>
-                                                    ×
-                                                </Button>
-                                            )}
-                                        </InputGroup>
-                                    </Form.Group>
-                                </Col>
-                                <Col md={2} className="d-flex align-items-end">
-                                    <Button variant="outline-secondary" onClick={resetFilters} className="w-100">
-                                        <FaTimes className="me-2" />Réinitialiser
-                                    </Button>
-                                </Col>
-                            </Row>
-                            {loading ? (
-                                <div className="text-center py-5">
-                                    <Spinner animation="border" variant="primary" />
-                                    <p className="mt-2">Chargement des chauffeurs...</p>
-                                </div>
-                            ) : (
-                                <div className="table-responsive">
-                                    <Table striped bordered hover>
-                                        <thead className="table-dark">
-                                            <tr>
-                                                <th>Matricule</th>
-                                                <th>Nom</th>
-                                                <th>Statut</th>
-                                                <th>Equipement</th>
-                                                <th>Projet</th>
-                                                <th>Date affectation</th>
-                                                <th style={{ width: '200px' }}>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {chauffeurs.length > 0 ? (
-                                                chauffeurs.map(chauffeur => (
-                                                    <tr key={chauffeur.id}>
-                                                        <td className="fw-bold">{chauffeur.matricule}</td>
-                                                        <td>{chauffeur.nom}</td>
-                                                        <td>{getStatutBadge(chauffeur.statut)}</td>
-                                                        <td>{getVoitureInfo(chauffeur.voiture || chauffeur.voiture_id)}</td>
-                                                        <td>{getProjetName(chauffeur.projet || chauffeur.projet_id)}</td>
-                                                        <td>{formatDateTime(chauffeur.date_affectation)}</td>
-                                                        <td>
-                                                            <div className="d-flex gap-1 flex-wrap">
-                                                                <Button
-                                                                    variant="outline-info"
-                                                                    size="sm"
-                                                                    onClick={() => fetchHistoriqueIndividuel('chauffeur', chauffeur.id, chauffeur.nom)}
-                                                                    title="Historique"
-                                                                >
-                                                                    <FaHistory />
-                                                                </Button>
-                                                                {canEdit() && (
-                                                                    <>
-                                                                        <Button
-                                                                            variant="outline-success"
-                                                                            size="sm"
-                                                                            onClick={() => handleEditChauffeur(chauffeur)}
-                                                                            title="Modifier"
-                                                                        >
-                                                                            <FaEdit />
-                                                                        </Button>
-                                                                        <Button
-                                                                            variant="outline-danger"
-                                                                            size="sm"
-                                                                            onClick={() => handleDeleteChauffeur(chauffeur)}
-                                                                            title="Supprimer"
-                                                                        >
-                                                                            <FaTrash />
-                                                                        </Button>
-                                                                    </>
-                                                                )}
-                                                                {!canEdit() && (
-                                                                    <Button variant="outline-secondary" size="sm" disabled title="Actions réservées">
-                                                                        <FaLock />
-                                                                    </Button>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            ) : (
-                                                <tr>
-                                                    <td colSpan="7" className="text-center py-4">
-                                                        <FaInfoCircle className="me-2" />
-                                                        Aucun chauffeur trouvé
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </Table>
-                                </div>
-                            )}
-                        </Tab>
-                        
-                        {/* Onglet Affectations */}
-                        <Tab
-                            eventKey="affectations"
-                            title={
-                                <span>
-                                    <FaExchangeAlt className="me-2" />
-                                    Affectations
-                                </span>
-                            }
-                        >
-                            <div className="mb-3">
-                                <Row>
-                                    <Col md={8}>
-                                        <Form.Group>
-                                            <Form.Label className="fw-bold">
-                                                <FaSearch className="me-2" />
-                                                Rechercher une affectation
-                                            </Form.Label>
-                                            <InputGroup>
-                                                <Form.Control
-                                                    type="text"
-                                                    placeholder="Chauffeur, matricule, véhicule..."
-                                                    value={searchTermAffectations}
-                                                    onChange={(e) => setSearchTermAffectations(e.target.value)}
-                                                />
-                                                {searchTermAffectations && (
-                                                    <Button variant="outline-secondary" onClick={() => setSearchTermAffectations('')}>
-                                                        ×
-                                                    </Button>
-                                                )}
-                                            </InputGroup>
-                                        </Form.Group>
-                                    </Col>
-                                    <Col md={4} className="d-flex align-items-end justify-content-end">
-                                        {canAdd() && (
-                                            <Button variant="success" onClick={openAffectationModal}>
-                                                <FaPlus className="me-1" />
-                                                Nouvelle affectation
-                                            </Button>
-                                        )}
-                                    </Col>
-                                </Row>
+                              )}
+                              {!canEdit() && (
+                                <Button variant="outline-secondary" size="sm" disabled title="Actions réservées">
+                                  <FaLock />
+                                </Button>
+                              )}
                             </div>
-                            <div className="table-responsive">
-                                <Table striped bordered hover>
-                                    <thead className="table-dark">
-                                        <tr>
-                                            <th>Matricule</th>
-                                            <th>Chauffeur</th>
-                                            <th>Véhicule</th>
-                                            <th>Projet</th>
-                                            <th>Date début</th>
-                                            <th>Date fin</th>
-                                            <th>Statut</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredAffectations.length > 0 ? (
-                                            filteredAffectations.map(aff => (
-                                                <tr key={aff.id}>
-                                                    <td className="fw-bold">{aff.chauffeur?.matricule || '-'}</td>
-                                                    <td>{aff.chauffeur?.nom || '-'}</td>
-                                                    <td>{aff.voiture?.matricule || '-'}</td>
-                                                    <td>{aff.projet?.name || '-'}</td>
-                                                    <td>{formatDate(aff.date_debut)}</td>
-                                                    <td>{formatDate(aff.date_fin)}</td>
-                                                    <td>{getAffectationStatutBadge(aff)}</td>
-                                                    <td>
-                                                        <div className="d-flex gap-1">
-                                                            <Button
-                                                                variant="outline-info"
-                                                                size="sm"
-                                                                onClick={() => fetchHistoriqueIndividuel('voiture', aff.voiture_id, aff.voiture?.matricule)}
-                                                                title="Historique véhicule"
-                                                            >
-                                                                <FaHistory />
-                                                            </Button>
-                                                            {aff.statut === 'active' && canEdit() && (
-                                                                <>
-                                                                    <Button
-                                                                        variant="outline-warning"
-                                                                        size="sm"
-                                                                        onClick={() => openChangeChauffeurModal(aff.voiture)}
-                                                                        title="Changer de chauffeur"
-                                                                    >
-                                                                        <FaRedoAlt />
-                                                                    </Button>
-                                                                    <Button
-                                                                        variant="outline-danger"
-                                                                        size="sm"
-                                                                        onClick={() => openFinAffectationModal(aff)}
-                                                                        title="Terminer l'affectation"
-                                                                    >
-                                                                        <FaBan />
-                                                                    </Button>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan="8" className="text-center py-4">
-                                                    <FaInfoCircle className="me-2" />
-                                                    Aucune affectation trouvée
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </Table>
-                            </div>
-                        </Tab>
-                        
-                        {/* Onglet Historique */}
-                        <Tab
-                            eventKey="historique"
-                            title={
-                                <span>
-                                    <FaHistory className="me-2" />
-                                    Historique
-                                </span>
-                            }
-                        >
-                            <div className="mb-3">
-                                <Form.Group>
-                                    <Form.Label className="fw-bold">
-                                        <FaSearch className="me-2" />
-                                        Rechercher dans l'historique
-                                    </Form.Label>
-                                    <InputGroup>
-                                        <Form.Control
-                                            type="text"
-                                            placeholder="Chauffeur, matricule, véhicule..."
-                                            value={searchTermHistorique}
-                                            onChange={(e) => setSearchTermHistorique(e.target.value)}
-                                        />
-                                        {searchTermHistorique && (
-                                            <Button variant="outline-secondary" onClick={() => setSearchTermHistorique('')}>
-                                                ×
-                                            </Button>
-                                        )}
-                                    </InputGroup>
-                                </Form.Group>
-                            </div>
-                            <div className="table-responsive">
-                                <Table striped bordered hover>
-                                    <thead className="table-dark">
-                                        <tr>
-                                            <th>Matricule</th>
-                                            <th>Chauffeur</th>
-                                            <th>Véhicule</th>
-                                            <th>Projet</th>
-                                            <th>Date début</th>
-                                            <th>Date fin</th>
-                                            <th>Durée</th>
-                                            <th>Statut</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredHistorique.length > 0 ? (
-                                            filteredHistorique.map(item => (
-                                                <tr key={item.id}>
-                                                    <td className="fw-bold">{item.chauffeur_matricule || '-'}</td>
-                                                    <td>{item.chauffeur_nom || '-'}</td>
-                                                    <td>{item.voiture_matricule || '-'}</td>
-                                                    <td>{item.projet_nom || '-'}</td>
-                                                    <td>{formatDate(item.date_debut)}</td>
-                                                    <td>{formatDate(item.date_fin)}</td>
-                                                    <td className="text-center">{item.duree || '-'}</td>
-                                                    <td>
-                                                        {item.statut === 'active'
-                                                            ? <Badge bg="success">Active</Badge>
-                                                            : <Badge bg="danger">Terminée</Badge>
-                                                        }
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan="8" className="text-center py-4">
-                                                    <FaInfoCircle className="me-2" />
-                                                    Aucun historique trouvé
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </Table>
-                            </div>
-                        </Tab>
-                        
-                        {/* Onglet Statistiques par projet */}
-                        <Tab
-                            eventKey="statistiques"
-                            title={
-                                <span>
-                                    <FaChartBar className="me-2" />
-                                    Statistiques par projet
-                                </span>
-                            }
-                        >
-                            <div className="mb-3">
-                                <Row>
-                                    <Col md={8}>
-                                        <Alert variant="info">
-                                            <FaInfoCircle className="me-2" />
-                                            Répartition des chauffeurs et véhicules par projet.
-                                        </Alert>
-                                    </Col>
-                                    <Col md={4} className="text-end">
-                                        {canAdd() && (
-                                            <Button variant="success" onClick={openAffectationModal}>
-                                                <FaPlus className="me-1" />
-                                                Nouvelle affectation
-                                            </Button>
-                                        )}
-                                    </Col>
-                                </Row>
-                            </div>
-                            <div className="table-responsive">
-                                <Table striped bordered hover>
-                                    <thead className="table-dark">
-                                        <tr>
-                                            <th>Projet</th>
-                                            <th className="text-center">Chauffeurs</th>
-                                            <th className="text-center">Véhicules</th>
-                                            <th className="text-center">Affectations actives</th>
-                                            <th className="text-center" style={{ width: '150px' }}>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {stats.parProjet.length > 0 ? (
-                                            stats.parProjet.map(projet => (
-                                                <tr key={projet.id}>
-                                                    <td className="fw-bold">{projet.nom}</td>
-                                                    <td className="text-center">
-                                                        {projet.chauffeurs > 0 ? (
-                                                            <Badge bg="primary" pill>{projet.chauffeurs}</Badge>
-                                                        ) : (
-                                                            <Badge bg="secondary" pill>0</Badge>
-                                                        )}
-                                                    </td>
-                                                    <td className="text-center">
-                                                        {projet.voitures > 0 ? (
-                                                            <Badge bg="success" pill>{projet.voitures}</Badge>
-                                                        ) : (
-                                                            <Badge bg="secondary" pill>0</Badge>
-                                                        )}
-                                                    </td>
-                                                    <td className="text-center">
-                                                        {projet.affectationsActives > 0 ? (
-                                                            <Badge bg="info" pill>{projet.affectationsActives}</Badge>
-                                                        ) : (
-                                                            <Badge bg="secondary" pill>0</Badge>
-                                                        )}
-                                                    </td>
-                                                    <td className="text-center">
-                                                        <Button
-                                                            variant="outline-primary"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                setAffectationForm({
-                                                                    chauffeur_id: '',
-                                                                    voiture_id: '',
-                                                                    projet_id: projet.id,
-                                                                    date_debut: new Date().toISOString().split('T')[0],
-                                                                    date_fin: ''
-                                                                });
-                                                                setShowAffectationModal(true);
-                                                            }}
-                                                            disabled={!canAdd()}
-                                                            title="Créer une affectation pour ce projet"
-                                                        >
-                                                            <FaExchangeAlt className="me-1" />
-                                                            Affecter
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan="5" className="text-center py-4">
-                                                    <FaInfoCircle className="me-2" />
-                                                    Aucune donnée disponible
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </Table>
-                            </div>
-                            <Card className="mt-3 bg-light">
-                                <Card.Body>
-                                    <Row>
-                                        <Col md={4}>
-                                            <div className="text-center">
-                                                <h6>Total projets</h6>
-                                                <h3>{stats.parProjet.length}</h3>
-                                            </div>
-                                        </Col>
-                                        <Col md={4}>
-                                            <div className="text-center">
-                                                <h6>Total chauffeurs</h6>
-                                                <h3>{stats.totalChauffeurs}</h3>
-                                            </div>
-                                        </Col>
-                                        <Col md={4}>
-                                            <div className="text-center">
-                                                <h6>Total véhicules</h6>
-                                                <h3>{stats.totalVoitures}</h3>
-                                            </div>
-                                        </Col>
-                                    </Row>
-                                </Card.Body>
-                            </Card>
-                        </Tab>
-                    </Tabs>
-                </Card.Body>
-            </Card>
-            
-            {/* MODAL NOUVELLE AFFECTATION avec recherche de véhicule */}
-            <Modal show={showAffectationModal} onHide={() => setShowAffectationModal(false)} size="lg">
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        <FaExchangeAlt className="me-2" />
-                        Nouvelle affectation
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <Form>
-                        {existingAssignment && (
-                            <Alert variant="warning" className="mb-3">
-                                <FaExclamationTriangle className="me-2" />
-                                <strong>Réaffectation détectée !</strong>
-                                <br />
-                                <small>
-                                    Ce chauffeur est actuellement affecté au véhicule <strong>{getVoitureInfo(existingAssignment.voiture_id)}</strong>.
-                                    <br />
-                                    L'ancienne affectation sera automatiquement terminée.
-                                </small>
-                            </Alert>
-                        )}
-                        
-                        <Alert variant="info" className="mb-3">
-                            <small>
-                                <FaInfoCircle className="me-2" />
-                                Vous pouvez réaffecter un chauffeur même s'il a déjà une affectation active.
-                            </small>
-                        </Alert>
-                        
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Chauffeur *</Form.Label>
-                                    <Form.Select
-                                        name="chauffeur_id"
-                                        value={affectationForm.chauffeur_id}
-                                        onChange={handleAffectationChange}
-                                        disabled={isUpdating}
-                                    >
-                                        <option value="">Sélectionner un chauffeur</option>
-                                        {getAvailableChauffeurs().map(chauffeur => (
-                                            <option key={chauffeur.id} value={chauffeur.id}>
-                                                {chauffeur.matricule} - {chauffeur.nom}
-                                                {getChauffeurAssignment(chauffeur.id) ? ' (Déjà affecté)' : ''}
-                                            </option>
-                                        ))}
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <VoitureSearchWithAdd
-                                    value={affectationForm.voiture_id}
-                                    onChange={handleAffectationChange}
-                                    voitures={voitures}
-                                    onAddVoiture={handleAddVoiture}
-                                    disabled={isUpdating}
-                                    label="Véhicule *"
-                                    placeholder="Rechercher ou créer un véhicule..."
-                                    showToast={showToast}
-                                />
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Projet</Form.Label>
-                                    <Form.Select
-                                        name="projet_id"
-                                        value={affectationForm.projet_id}
-                                        onChange={handleAffectationChange}
-                                        disabled={isUpdating}
-                                    >
-                                        <option value="">Aucun projet</option>
-                                        {projets.map(projet => (
-                                            <option key={projet.id} value={projet.id}>
-                                                {projet.name}
-                                            </option>
-                                        ))}
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={3}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Date début *</Form.Label>
-                                    <Form.Control
-                                        type="date"
-                                        name="date_debut"
-                                        value={affectationForm.date_debut}
-                                        onChange={handleAffectationChange}
-                                        disabled={isUpdating}
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col md={3}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Date fin</Form.Label>
-                                    <Form.Control
-                                        type="date"
-                                        name="date_fin"
-                                        value={affectationForm.date_fin}
-                                        onChange={handleAffectationChange}
-                                        disabled={isUpdating}
-                                        min={affectationForm.date_debut}
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowAffectationModal(false)} disabled={isUpdating}>
-                        Annuler
-                    </Button>
-                    <Button variant="success" onClick={submitAffectation} disabled={isUpdating}>
-                        {isUpdating ? <Spinner size="sm" /> : 'Créer l\'affectation'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-            
-            {/* MODAL CHANGER DE PROJET */}
-            <Modal show={showChangeProjetModal} onHide={() => setShowChangeProjetModal(false)} size="lg">
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        <FaArrowRight className="me-2 text-primary" />
-                        Changer de projet pour {selectedChauffeurForChange?.nom}
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {existingAssignment && (
-                        <Alert variant="warning" className="mb-3">
-                            <FaExclamationTriangle className="me-2" />
-                            <strong>Attention !</strong>
-                            <br />
-                            <small>
-                                Ce chauffeur est actuellement affecté au projet <strong>{getProjetName(existingAssignment.projet_id)}</strong> 
-                                avec le véhicule <strong>{getVoitureInfo(existingAssignment.voiture_id)}</strong>.
-                                <br />
-                                L'ancienne affectation sera automatiquement terminée.
-                            </small>
-                        </Alert>
-                    )}
-                    
-                    <Form>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Chauffeur</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        value={`${selectedChauffeurForChange?.matricule} - ${selectedChauffeurForChange?.nom}`}
-                                        disabled
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Véhicule actuel</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        value={getVoitureInfo(existingAssignment?.voiture_id || selectedChauffeurForChange?.voiture_id)}
-                                        disabled
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Nouveau projet *</Form.Label>
-                                    <Form.Select
-                                        value={changeForm.nouveau_projet_id}
-                                        onChange={(e) => setChangeForm(prev => ({ ...prev, nouveau_projet_id: e.target.value }))}
-                                        disabled={isUpdating}
-                                    >
-                                        <option value="">Sélectionner un projet</option>
-                                        {projets.map(projet => (
-                                            <option key={projet.id} value={projet.id}>
-                                                {projet.name}
-                                            </option>
-                                        ))}
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Date de début</Form.Label>
-                                    <Form.Control
-                                        type="date"
-                                        value={changeForm.date_debut}
-                                        onChange={(e) => setChangeForm(prev => ({ ...prev, date_debut: e.target.value }))}
-                                        disabled={isUpdating}
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Motif (optionnel)</Form.Label>
-                            <Form.Control
-                                as="textarea"
-                                rows={2}
-                                value={changeForm.motif}
-                                onChange={(e) => setChangeForm(prev => ({ ...prev, motif: e.target.value }))}
-                                placeholder="Raison du changement de projet..."
-                                disabled={isUpdating}
-                            />
-                        </Form.Group>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowChangeProjetModal(false)} disabled={isUpdating}>
-                        Annuler
-                    </Button>
-                    <Button variant="primary" onClick={submitChangeProjet} disabled={isUpdating || !changeForm.nouveau_projet_id}>
-                        {isUpdating ? <Spinner size="sm" /> : 'Changer de projet'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-            
-            {/* MODAL CHANGER DE VÉHICULE */}
-            <Modal show={showChangeVoitureModal} onHide={() => setShowChangeVoitureModal(false)} size="lg">
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        <FaCar className="me-2 text-warning" />
-                        Changer de véhicule pour {selectedChauffeurForChange?.nom}
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {existingAssignment && (
-                        <Alert variant="warning" className="mb-3">
-                            <FaExclamationTriangle className="me-2" />
-                            <strong>Attention !</strong>
-                            <br />
-                            <small>
-                                Ce chauffeur est actuellement affecté au projet <strong>{getProjetName(existingAssignment.projet_id)}</strong> 
-                                avec le véhicule <strong>{getVoitureInfo(existingAssignment.voiture_id)}</strong>.
-                                <br />
-                                L'ancienne affectation sera automatiquement terminée.
-                            </small>
-                        </Alert>
-                    )}
-                    
-                    <Form>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Chauffeur</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        value={`${selectedChauffeurForChange?.matricule} - ${selectedChauffeurForChange?.nom}`}
-                                        disabled
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Projet actuel</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        value={getProjetName(existingAssignment?.projet_id || selectedChauffeurForChange?.projet_id)}
-                                        disabled
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Nouveau véhicule *</Form.Label>
-                                    <Form.Select
-                                        value={changeForm.nouvelle_voiture_id}
-                                        onChange={(e) => setChangeForm(prev => ({ ...prev, nouvelle_voiture_id: e.target.value }))}
-                                        disabled={isUpdating}
-                                    >
-                                        <option value="">Sélectionner un véhicule</option>
-                                        {voitures.map(voiture => (
-                                            <option key={voiture.id} value={voiture.id}>
-                                                {voiture.matricule} {voiture.modele ? `- ${voiture.modele}` : ''}
-                                                {getVoitureAssignment(voiture.id) && voiture.id != existingAssignment?.voiture_id ? ' (Déjà affecté)' : ''}
-                                            </option>
-                                        ))}
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Date de début</Form.Label>
-                                    <Form.Control
-                                        type="date"
-                                        value={changeForm.date_debut}
-                                        onChange={(e) => setChangeForm(prev => ({ ...prev, date_debut: e.target.value }))}
-                                        disabled={isUpdating}
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Motif (optionnel)</Form.Label>
-                            <Form.Control
-                                as="textarea"
-                                rows={2}
-                                value={changeForm.motif}
-                                onChange={(e) => setChangeForm(prev => ({ ...prev, motif: e.target.value }))}
-                                placeholder="Raison du changement de véhicule..."
-                                disabled={isUpdating}
-                            />
-                        </Form.Group>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowChangeVoitureModal(false)} disabled={isUpdating}>
-                        Annuler
-                    </Button>
-                    <Button variant="warning" onClick={submitChangeVoiture} disabled={isUpdating || !changeForm.nouvelle_voiture_id}>
-                        {isUpdating ? <Spinner size="sm" /> : 'Changer de véhicule'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-            
-            {/* MODAL CHANGER DE CHAUFFEUR */}
-            <Modal show={showChangeChauffeurModal} onHide={() => setShowChangeChauffeurModal(false)} size="lg">
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        <FaRedoAlt className="me-2 text-success" />
-                        Changer de chauffeur pour {selectedVoitureForChange?.matricule}
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {existingAssignment && (
-                        <Alert variant="warning" className="mb-3">
-                            <FaExclamationTriangle className="me-2" />
-                            <strong>Attention !</strong>
-                            <br />
-                            <small>
-                                Ce véhicule est actuellement affecté au chauffeur <strong>{existingAssignment.chauffeur?.matricule} - {existingAssignment.chauffeur?.nom}</strong>.
-                                <br />
-                                L'ancienne affectation sera automatiquement terminée.
-                            </small>
-                        </Alert>
-                    )}
-                    
-                    <Form>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Véhicule</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        value={`${selectedVoitureForChange?.matricule} ${selectedVoitureForChange?.modele ? `- ${selectedVoitureForChange.modele}` : ''}`}
-                                        disabled
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Projet actuel</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        value={getProjetName(existingAssignment?.projet_id)}
-                                        disabled
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Nouveau chauffeur *</Form.Label>
-                                    <Form.Select
-                                        value={changeForm.nouveau_chauffeur_id}
-                                        onChange={(e) => setChangeForm(prev => ({ ...prev, nouveau_chauffeur_id: e.target.value }))}
-                                        disabled={isUpdating}
-                                    >
-                                        <option value="">Sélectionner un chauffeur</option>
-                                        {getAvailableChauffeurs().map(chauffeur => (
-                                            <option key={chauffeur.id} value={chauffeur.id}>
-                                                {chauffeur.matricule} - {chauffeur.nom}
-                                                {getChauffeurAssignment(chauffeur.id) && chauffeur.id != existingAssignment?.chauffeur_id ? ' (Déjà affecté)' : ''}
-                                            </option>
-                                        ))}
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Date de début</Form.Label>
-                                    <Form.Control
-                                        type="date"
-                                        value={changeForm.date_debut}
-                                        onChange={(e) => setChangeForm(prev => ({ ...prev, date_debut: e.target.value }))}
-                                        disabled={isUpdating}
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Motif (optionnel)</Form.Label>
-                            <Form.Control
-                                as="textarea"
-                                rows={2}
-                                value={changeForm.motif}
-                                onChange={(e) => setChangeForm(prev => ({ ...prev, motif: e.target.value }))}
-                                placeholder="Raison du changement de chauffeur..."
-                                disabled={isUpdating}
-                            />
-                        </Form.Group>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowChangeChauffeurModal(false)} disabled={isUpdating}>
-                        Annuler
-                    </Button>
-                    <Button variant="success" onClick={submitChangeChauffeur} disabled={isUpdating || !changeForm.nouveau_chauffeur_id}>
-                        {isUpdating ? <Spinner size="sm" /> : 'Changer de chauffeur'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-            
-            {/* MODAL TERMINER AFFECTATION */}
-            <Modal show={showFinAffectationModal} onHide={() => setShowFinAffectationModal(false)}>
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        <FaBan className="me-2" />
-                        Terminer l'affectation
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {selectedAffectation && (
-                        <>
-                            <p>
-                                <strong>Chauffeur:</strong> {selectedAffectation.chauffeur?.matricule} - {selectedAffectation.chauffeur?.nom}<br />
-                                <strong>Véhicule:</strong> {selectedAffectation.voiture?.matricule}<br />
-                                <strong>Projet:</strong> {selectedAffectation.projet?.name || 'Non spécifié'}
-                            </p>
-                            <Form.Group className="mb-3">
-                                <Form.Label>Motif de fin *</Form.Label>
-                                <Form.Control
-                                    as="textarea"
-                                    rows={3}
-                                    value={motifFin}
-                                    onChange={(e) => setMotifFin(e.target.value)}
-                                    placeholder="Expliquez la raison de la fin de cette affectation..."
-                                    disabled={isUpdating}
-                                />
-                            </Form.Group>
-                        </>
-                    )}
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowFinAffectationModal(false)} disabled={isUpdating}>
-                        Annuler
-                    </Button>
-                    <Button variant="danger" onClick={submitFinAffectation} disabled={isUpdating}>
-                        {isUpdating ? <Spinner size="sm" /> : 'Terminer'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-            
-            {/* MODAL AJOUT/MODIFICATION CHAUFFEUR */}
-            <Modal show={showAddModal} onHide={() => setShowAddModal(false)} size="lg">
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        {isEditing ? 'Modifier' : 'Ajouter'} un chauffeur
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <Form>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Matricule *</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        name="matricule"
-                                        value={currentChauffeur.matricule}
-                                        onChange={handleInputChange}
-                                        disabled={isUpdating}
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Nom *</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        name="nom"
-                                        value={currentChauffeur.nom}
-                                        onChange={handleInputChange}
-                                        disabled={isUpdating}
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={4}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Statut</Form.Label>
-                                    <Form.Select
-                                        name="statut"
-                                        value={currentChauffeur.statut}
-                                        onChange={handleInputChange}
-                                        disabled={isUpdating}
-                                    >
-                                        <option value="ACTIF">Actif</option>
-                                        <option value="INACTIF">Inactif</option>
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Projet</Form.Label>
-                                    <Form.Select
-                                        name="projet_id"
-                                        value={currentChauffeur.projet_id}
-                                        onChange={handleInputChange}
-                                        disabled={isUpdating}
-                                    >
-                                        <option value="">Aucun</option>
-                                        {projets.map(projet => (
-                                            <option key={projet.id} value={projet.id}>
-                                                {projet.name}
-                                            </option>
-                                        ))}
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Véhicule</Form.Label>
-                                    <Form.Select
-                                        name="voiture_id"
-                                        value={currentChauffeur.voiture_id}
-                                        onChange={handleInputChange}
-                                        disabled={isUpdating}
-                                    >
-                                        <option value="">Aucun</option>
-                                        {voitures.map(voiture => (
-                                            <option key={voiture.id} value={voiture.id}>
-                                                {voiture.matricule}
-                                            </option>
-                                        ))}
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Date affectation</Form.Label>
-                                    <Form.Control
-                                        type="datetime-local"
-                                        name="date_affectation"
-                                        value={currentChauffeur.date_affectation}
-                                        onChange={handleInputChange}
-                                        disabled={isUpdating}
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowAddModal(false)} disabled={isUpdating}>
-                        Annuler
-                    </Button>
-                    <Button
-                        variant="primary"
-                        onClick={submitChauffeur}
-                        disabled={!currentChauffeur.matricule || !currentChauffeur.nom || isUpdating}
-                    >
-                        {isUpdating ? <Spinner size="sm" /> : (isEditing ? 'Modifier' : 'Ajouter')}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-            
-            {/* MODAL SUPPRESSION CHAUFFEUR */}
-            <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        <FaTrash className="me-2" />
-                        Confirmer la suppression
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {chauffeurToDelete && (
-                        <p>
-                            Voulez-vous supprimer le chauffeur <strong>{chauffeurToDelete.matricule} - {chauffeurToDelete.nom}</strong> ?
-                        </p>
-                    )}
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)} disabled={isUpdating}>
-                        Annuler
-                    </Button>
-                    <Button variant="danger" onClick={confirmDelete} disabled={isUpdating}>
-                        {isUpdating ? <Spinner size="sm" /> : 'Supprimer'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-            
-            {/* MODAL AJOUT DE VÉHICULE */}
-            <Modal show={showAddVehiculeModal} onHide={() => setShowAddVehiculeModal(false)} size="lg">
-                <Modal.Header closeButton className="bg-success text-white">
-                    <Modal.Title>
-                        <FaCar className="me-2" />
-                        Ajouter un nouveau véhicule
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <Form>
-                        <Alert variant="info" className="mb-3">
-                            <FaInfoCircle className="me-2" />
-                            Remplissez les informations du nouveau véhicule. Le matricule est obligatoire.
-                        </Alert>
-                        
-                        <Form.Group className="mb-3">
-                            <Form.Label>Matricule *</Form.Label>
-                            <Form.Control
-                                type="text"
-                                value={newVehicule.matricule}
-                                onChange={(e) => setNewVehicule(prev => ({ ...prev, matricule: e.target.value }))}
-                                placeholder="Ex: CH-001"
-                                disabled={isAddingVehicule}
-                            />
-                        </Form.Group>
-                        
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Marque</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        value={newVehicule.marque}
-                                        onChange={(e) => setNewVehicule(prev => ({ ...prev, marque: e.target.value }))}
-                                        placeholder="Ex: Toyota"
-                                        disabled={isAddingVehicule}
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Modèle</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        value={newVehicule.modele}
-                                        onChange={(e) => setNewVehicule(prev => ({ ...prev, modele: e.target.value }))}
-                                        placeholder="Ex: Hilux"
-                                        disabled={isAddingVehicule}
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Site</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        value={newVehicule.site}
-                                        onChange={(e) => setNewVehicule(prev => ({ ...prev, site: e.target.value }))}
-                                        placeholder="Ex: Site A"
-                                        disabled={isAddingVehicule}
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Compteur actuel (km)</Form.Label>
-                                    <Form.Control
-                                        type="number"
-                                        value={newVehicule.compteur_actuel}
-                                        onChange={(e) => setNewVehicule(prev => ({ ...prev, compteur_actuel: parseFloat(e.target.value) || 0 }))}
-                                        min="0"
-                                        step="1"
-                                        placeholder="0"
-                                        disabled={isAddingVehicule}
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowAddVehiculeModal(false)} disabled={isAddingVehicule}>
-                        Annuler
-                    </Button>
-                    <Button 
-                        variant="success" 
-                        onClick={submitVehicule} 
-                        disabled={!newVehicule.matricule.trim() || isAddingVehicule}
-                    >
-                        {isAddingVehicule ? <Spinner size="sm" className="me-2" /> : <FaPlus className="me-2" />}
-                        Ajouter le véhicule
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-            
-            {/* MODAL HISTORIQUE INDIVIDUEL */}
-            <Modal show={showHistoriqueModal} onHide={() => setShowHistoriqueModal(false)} size="lg">
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        <FaHistory className="me-2" />
-                        Historique des affectations - {historiqueTitre}
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <div className="table-responsive">
-                        <Table striped bordered hover size="sm">
-                            <thead className="table-dark">
-                                <tr>
-                                    <th>Date début</th>
-                                    <th>Date fin</th>
-                                    <th>{historiqueType === 'chauffeur' ? 'Véhicule' : 'Chauffeur'}</th>
-                                    <th>Matricule</th>
-                                    <th>Projet</th>
-                                    <th className="text-center">Durée (jours)</th>
-                                    <th className="text-center">Statut</th>
-                                    <th>Motif fin</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {historiqueIndividuel.length > 0 ? (
-                                    historiqueIndividuel.map((item, index) => (
-                                        <tr key={item.id || index}>
-                                            <td>{formatDate(item.date_debut)}</td>
-                                            <td>{formatDate(item.date_fin)}</td>
-                                            <td>
-                                                {historiqueType === 'chauffeur' 
-                                                    ? (item.voiture || item.voiture_matricule || '-')
-                                                    : (item.chauffeur || item.chauffeur_nom || '-')}
-                                            </td>
-                                            <td>
-                                                {historiqueType === 'chauffeur' 
-                                                    ? (item.voiture_matricule || '-')
-                                                    : (item.chauffeur_matricule || '-')}
-                                            </td>
-                                            <td>{item.projet || item.projet_nom || '-'}</td>
-                                            <td className="text-center">{item.duree || '-'}</td>
-                                            <td className="text-center">
-                                                {item.statut === 'active' ? (
-                                                    <Badge bg="success">Active</Badge>
-                                                ) : item.statut === 'terminee' ? (
-                                                    <Badge bg="danger">Terminée</Badge>
-                                                ) : (
-                                                    <Badge bg="secondary">{item.statut || '-'}</Badge>
-                                                )}
-                                            </td>
-                                            <td>{item.motif_fin || '-'}</td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan="8" className="text-center py-4">
-                                            <FaInfoCircle className="me-2" />
-                                            Aucun historique trouvé pour ce {historiqueType === 'chauffeur' ? 'chauffeur' : 'véhicule'}
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </Table>
-                    </div>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowHistoriqueModal(false)}>
-                        Fermer
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-        </div>
-    );
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="8" className="text-center py-4">
+                        <FaInfoCircle className="me-2" />
+                        {t.no_data}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </Table>
+            </div>
+          )}
+        </Card.Body>
+      </Card>
+
+      {/* ====== MODAL AJOUT ====== */}
+      <Modal show={showAddModal} onHide={() => !isUpdating && setShowAddModal(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title><FaCashRegister className="me-2" />{t.form_title}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {localError && <Alert variant="danger" className="mb-3"><FaInfoCircle className="me-2" />{localError}</Alert>}
+          <Form>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>{t.f_date}</Form.Label>
+                  <Form.Control type="datetime-local" name="date" value={form.date} onChange={handleChange} disabled={isUpdating} />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>{t.f_notes}</Form.Label>
+                  <Form.Control as="textarea" rows={1} name="notes" value={form.notes} onChange={handleChange} disabled={isUpdating} />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Row>
+              <Col md={4}>
+                <Form.Group className="mb-3">
+                  <Form.Label>{t.f_status}</Form.Label>
+                  <Form.Select name="status" value={form.status} onChange={handleChange} disabled={isUpdating}>
+                    <option value="paid">{t.paid}</option>
+                    <option value="partial">{t.partial}</option>
+                    <option value="draft">{t.draft}</option>
+                    <option value="cancelled">{t.cancelled}</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group className="mb-3">
+                  <Form.Label>{t.f_payment}</Form.Label>
+                  <Form.Select name="payment_method" value={form.payment_method} onChange={handleChange} disabled={isUpdating}>
+                    <option value="cash">{t.cash}</option>
+                    <option value="bankily">{t.bankily}</option>
+                    <option value="masrivi">{t.masrivi}</option>
+                    <option value="sedad">{t.sedad}</option>
+                    <option value="credit">{t.credit}</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group className="mb-3">
+                  <Form.Label>{t.f_category}</Form.Label>
+                  <Form.Select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setNewItem(p => ({ ...p, product_id: '' })); }} disabled={isUpdating}>
+                    <option value="">Toutes</option>
+                    {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <hr />
+            <h6 className="fw-bold mb-3">{t.f_product}</h6>
+            <Row className="align-items-end">
+              <Col md={5}>
+                <Form.Group className="mb-2">
+                  <Form.Control as="select" value={newItem.product_id} onChange={handleSelectProduct} disabled={isUpdating}>
+                    <option value="">-- Sélectionner --</option>
+                    {displayedProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </Form.Control>
+                  {selectedProduct && (
+                    <Form.Text className="text-primary fw-bold">{t.stock_available(selectedProduct.quantity ?? selectedProduct.stock ?? 0)}</Form.Text>
+                  )}
+                </Form.Group>
+              </Col>
+              <Col md={2}>
+                <Form.Group className="mb-2">
+                  <Form.Control type="number" min="1" placeholder={t.f_qty} value={newItem.quantity} onChange={(e) => setNewItem(p => ({ ...p, quantity: e.target.value }))} disabled={isUpdating} />
+                </Form.Group>
+              </Col>
+              <Col md={3}>
+                <Form.Group className="mb-2">
+                  <Form.Control type="number" min="0" step="0.01" placeholder={t.f_price} value={newItem.price} onChange={(e) => setNewItem(p => ({ ...p, price: e.target.value }))} disabled={isUpdating} />
+                </Form.Group>
+              </Col>
+              <Col md={2}>
+                <Button variant="primary" className="w-100" onClick={addItem} disabled={isUpdating}>
+                  <FaPlus className="me-1" />{t.f_add_item}
+                </Button>
+              </Col>
+            </Row>
+
+            <div className="table-responsive mt-3">
+              <Table bordered hover size="sm">
+                <thead className="table-dark">
+                  <tr>
+                    <th>{t.f_product}</th>
+                    <th>{t.th_category}</th>
+                    <th className="text-center">{t.th_qty}</th>
+                    <th className="text-end">{t.f_price}</th>
+                    <th className="text-end">{t.th_total}</th>
+                    <th style={{ width: '60px' }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.length === 0 ? (
+                    <tr><td colSpan="6" className="text-center py-3 text-muted">{t.no_items}</td></tr>
+                  ) : items.map((item, idx) => (
+                    <tr key={idx}>
+                      <td>{item.name}</td>
+                      <td><Badge bg="primary">{item.category}</Badge></td>
+                      <td className="text-center">{item.quantity}</td>
+                      <td className="text-end">{formatNumber(item.price)}</td>
+                      <td className="text-end fw-bold">{formatNumber(item.price * item.quantity)}</td>
+                      <td className="text-center">
+                        <Button variant="outline-danger" size="sm" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>
+                          <FaTrash />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {items.length > 0 && (
+                  <tfoot>
+                    <tr className="table-light">
+                      <td colSpan="4" className="text-end fw-bold">TOTAL :</td>
+                      <td className="text-end fw-bold fs-5">{formatNumber(subtotal)} {cur}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </Table>
+            </div>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowAddModal(false)} disabled={isUpdating}>{t.cancel}</Button>
+          <Button variant="success" onClick={submitSale} disabled={isUpdating || items.length === 0}>
+            {isUpdating ? <Spinner size="sm" className="me-2" /> : <FaPlus className="me-2" />}{t.save}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* ====== MODAL ÉDITION ====== */}
+      <Modal show={!!saleToEdit} onHide={() => !isUpdating && setSaleToEdit(null)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title><FaEdit className="me-2" />{t.edit_title}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {saleToEdit && (
+            <>
+              <Row className="mb-3">
+                <Col md={4}><strong>{t.th_invoice}:</strong> {saleToEdit.invoice_number || `VENTE-${saleToEdit.id}`}</Col>
+                <Col md={4}><strong>{t.f_customer}:</strong> {getCustomerName(saleToEdit)}</Col>
+                <Col md={4}><strong>{t.th_date}:</strong> {formatDate(saleToEdit.invoice_date || saleToEdit.created_at, t.locale)}</Col>
+              </Row>
+              <div className="table-responsive">
+                <Table bordered hover size="sm">
+                  <thead className="table-dark">
+                    <tr>
+                      <th>{t.f_product}</th>
+                      <th className="text-center" style={{ width: 90 }}>{t.th_qty}</th>
+                      <th className="text-end" style={{ width: 120 }}>{t.f_price}</th>
+                      <th className="text-end">{t.th_total}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editItems.map((it, idx) => (
+                      <tr key={idx}>
+                        <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
+                        <td className="text-center">
+                          <Form.Control type="number" min="1" size="sm" value={it.quantity}
+                            onChange={(e) => { const arr = [...editItems]; arr[idx].quantity = parseInt(e.target.value, 10) || 1; setEditItems(arr); }} />
+                        </td>
+                        <td className="text-end">
+                          <Form.Control type="number" min="0" size="sm" value={it.price}
+                            onChange={(e) => { const arr = [...editItems]; arr[idx].price = parseFloat(e.target.value) || 0; setEditItems(arr); }} />
+                        </td>
+                        <td className="text-end fw-bold">{formatNumber(it.quantity * it.price)} {cur}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>{t.f_status}</Form.Label>
+                    <Form.Select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} disabled={isUpdating}>
+                      <option value="paid">{t.paid}</option>
+                      <option value="partial">{t.partial}</option>
+                      <option value="draft">{t.draft}</option>
+                      <option value="cancelled">{t.cancelled}</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>{t.f_notes}</Form.Label>
+                    <Form.Control as="textarea" rows={2} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} disabled={isUpdating} />
+                  </Form.Group>
+                </Col>
+              </Row>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setSaleToEdit(null)} disabled={isUpdating}>{t.cancel}</Button>
+          <Button variant="primary" onClick={submitEdit} disabled={isUpdating}>
+            {isUpdating ? <Spinner size="sm" className="me-2" /> : <FaEdit className="me-2" />}{t.save}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* ====== MODAL DÉTAILS ====== */}
+      <Modal show={!!selectedSale} onHide={() => setSelectedSale(null)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title><FaInfoCircle className="me-2" />{t.details_title}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedSale && (
+            <>
+              <Row className="mb-3">
+                <Col md={4}><strong>{t.th_invoice}:</strong> {selectedSale.invoice_number || `VENTE-${selectedSale.id}`}</Col>
+                <Col md={4}><strong>{t.f_customer}:</strong> {getCustomerName(selectedSale)}</Col>
+                <Col md={4}><strong>{t.th_date}:</strong> {formatDate(selectedSale.invoice_date || selectedSale.created_at, t.locale)}</Col>
+              </Row>
+              <div className="table-responsive">
+                <Table striped bordered hover size="sm">
+                  <thead className="table-dark">
+                    <tr>
+                      <th>{t.f_product}</th>
+                      <th>{t.th_category}</th>
+                      <th className="text-center">{t.th_qty}</th>
+                      <th className="text-end">{t.f_price}</th>
+                      <th className="text-end">{t.th_total}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getSaleItems(selectedSale).map((it, idx) => {
+                      const q = Number(it.quantity) || 0; const p = Number(it.price ?? it.unit_price) || 0; const lt = Number(it.total ?? q * p);
+                      return (
+                        <tr key={idx}>
+                          <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
+                          <td><Badge bg="primary">{getItemCategory(it, productById)}</Badge></td>
+                          <td className="text-center">{q}</td>
+                          <td className="text-end">{formatNumber(p)} {cur}</td>
+                          <td className="text-end fw-bold">{formatNumber(lt)} {cur}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="table-light">
+                      <td colSpan="4" className="text-end fw-bold">{t.th_total} :</td>
+                      <td className="text-end fw-bold fs-5">{formatNumber(selectedSale.grand_total ?? selectedSale.total)} {cur}</td>
+                    </tr>
+                  </tfoot>
+                </Table>
+              </div>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setSelectedSale(null)}>{t.close}</Button>
+          <Button variant="outline-success" onClick={() => exportSale(selectedSale)}>
+            <FaDownload className="me-1" />{t.export}
+          </Button>
+          <Button variant="primary" onClick={() => printInvoice(selectedSale)}>
+            <FaPrint className="me-1" />{t.print}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* ====== MODAL SUPPRESSION ====== */}
+      <Modal show={!!saleToDelete} onHide={() => !isUpdating && setSaleToDelete(null)}>
+        <Modal.Header closeButton>
+          <Modal.Title><FaTrash className="me-2" />{t.delete_q}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {saleToDelete && (
+            <p>{t.th_invoice} <strong>{saleToDelete.invoice_number || saleToDelete.id}</strong></p>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setSaleToDelete(null)} disabled={isUpdating}>{t.cancel}</Button>
+          <Button variant="danger" onClick={confirmDelete} disabled={isUpdating}>
+            {isUpdating ? <Spinner size="sm" /> : t.delete_confirm}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* ====== MODAL FACTURE APRÈS ENCAISSEMENT ====== */}
+      <Modal show={showInvoice} onHide={() => setShowInvoice(false)} size="lg">
+        <Modal.Header closeButton className="bg-success text-white">
+          <Modal.Title><FaInfoCircle className="me-2" />{t.success_invoice}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {lastSale && (
+            <>
+              <div className="text-center mb-3">
+                <h4>{STORE.name}</h4>
+                <p className="text-muted mb-0">{STORE.address} — {STORE.phone}</p>
+                <h5 className="mt-2">{t.facture} : {lastSale.invoice_number}</h5>
+              </div>
+              <div className="table-responsive">
+                <Table striped bordered hover size="sm">
+                  <thead className="table-dark">
+                    <tr>
+                      <th>{t.f_product}</th>
+                      <th className="text-center">{t.th_qty}</th>
+                      <th className="text-end">{t.f_price}</th>
+                      <th className="text-end">{t.th_total}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getSaleItems(lastSale).map((it, idx) => {
+                      const q = Number(it.quantity) || 0; const p = Number(it.price ?? it.unit_price) || 0; const lt = Number(it.total ?? q * p);
+                      return (
+                        <tr key={idx}>
+                          <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
+                          <td className="text-center">{q}</td>
+                          <td className="text-end">{formatNumber(p)}</td>
+                          <td className="text-end fw-bold">{formatNumber(lt)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="table-light">
+                      <td colSpan="3" className="text-end fw-bold">TOTAL :</td>
+                      <td className="text-end fw-bold fs-5">{formatNumber(lastSale.grand_total ?? lastSale.total)} {cur}</td>
+                    </tr>
+                  </tfoot>
+                </Table>
+              </div>
+              <p className="text-center text-muted">{t.thanks}<br />{t.thanks_sub}</p>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-primary" onClick={() => printInvoice(lastSale)}>
+            <FaPrint className="me-1" />{t.print}
+          </Button>
+          <Button variant="secondary" onClick={() => setShowInvoice(false)}>{t.close}</Button>
+          {canAdd() && (
+            <Button variant="success" onClick={() => { setShowInvoice(false); setLastSale(null); openAddModal(); }}>
+              <FaPlus className="me-1" />{t.add}
+            </Button>
+          )}
+        </Modal.Footer>
+      </Modal>
+    </div>
+  );
 };
 
-export default ChauffeurManager;
+export default VentesPage;

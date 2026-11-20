@@ -31,7 +31,7 @@ const AppContent = () => {
             )
           })}
           <Route path="/" element={<Navigate to="/home/accueil" replace />}/>
-         
+       
         </Routes>
       </Suspense>
     </CContainer>

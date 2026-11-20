@@ -9,7 +9,7 @@ const AdminDashboard = React.lazy(() => import('./views/admin/gestion/AdminDashb
 
 
 
-
+const Accueil = React.lazy(() => import('./views/home/accueil/Accueil'))
 //stock
 const Categories= React.lazy(() => import('./views/Categories/Categories'))
 const ProductList= React.lazy(() => import('./views/Products/ProductList'))
@@ -19,12 +19,12 @@ const ExpenseList= React.lazy(() => import('./views/expenses/ExpenseList'))
 const CustomerList= React.lazy(() => import('./views/Customers/CustomerList'))
 const SupplierList= React.lazy(() => import('./views/Suppliers/SupplierList'))
 const Ventes= React.lazy(() => import('./views/ventes/Ventes'))
-
-
+//const NoteDGT= React.lazy(() => import('.views/noteDG/noteTable/NoteDGT'))
+//const NoteFile2025= React.lazy(() => import('./views/noteDG/noteFile2025/NoteFile2025"'))
 const routes = [
 
 /// admin
-
+ { path: '/home/accueil', name: 'Accueil', element: Accueil},
 { path: '/admin/adminAc', name: 'AdminAc', element:   AdminAc },
   { path: '/admin/gestion', name: 'AdminDashboard', element:   AdminDashboard },
 
@@ -42,8 +42,8 @@ const routes = [
   { path: 'ventes', name: 'Ventes', element: Ventes },
 
  
-
-
+//{ path: 'vNoteFile2025', name: 'NoteFile2025', element: NoteFile2025},
+ //{ path: 'NoteDGT', name: 'NoteDGT', element: NoteDGT },
  // { path: '/widgets', name: 'Widgets', element: Widgets },
 ]
 

@@ -5,8 +5,8 @@ import { CContainer, CSpinner } from '@coreui/react'
 //import Navbar from "./components/Navbar";
 //import Home from "./pages/Home";
 //import Dashboard from "../views/dashboard/Dashboard";
-import NoteDGT from "../views/noteDG/noteTable/NoteDGT";
-import NoteFile2025 from "../views/noteDG/noteFile2025/NoteFile2025";
+//import NoteDGT from "../views/noteDG/noteTable/NoteDGT";
+//import NoteFile2025 from "../views/noteDG/noteFile2025/NoteFile2025";
 //import NotFound from "./pages/NotFound";
 //import  NoteDGF   from"../views/noteFile/NoteDGF"
 // routes config
@@ -31,9 +31,7 @@ const AppContent = () => {
             )
           })}
           <Route path="/" element={<Navigate to="/home/accueil" replace />}/>
-          <Route path="/noteTable" element={<NoteDGT />} />
-          <Route path="/noteDG" element={<NoteDGT />} />
-          <Route path="/noteFile2025" element={<NoteFile2025 />} />
+         
         </Routes>
       </Suspense>
     </CContainer>

@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-//import { salesApi, purchasesApi, expensesApi, productsApi } from '../api';
+import { salesApi, purchasesApi, expensesApi, productsApi } from '../../api';
 import { useLanguage } from '../context/LanguageContext';
 
 /* =========================================================

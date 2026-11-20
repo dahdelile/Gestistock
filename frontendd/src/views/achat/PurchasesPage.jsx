@@ -1,7 +1,7 @@
 // src/pages/PurchasesPage.jsx
 // Version bilingue Français / العربية (RTL) — design unifié ExpensesPage
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-//import { purchasesApi, suppliersApi, productsApi, categoriesApi } from '../api';
+import { purchasesApi, suppliersApi, productsApi, categoriesApi } from '../../api';
 import { useLanguage } from '../context/LanguageContext';
 /* =========================================================
    TRADUCTIONS / الترجمة

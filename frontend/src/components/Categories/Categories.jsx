@@ -2,6 +2,7 @@
 // Version bilingue Français / العربية (RTL) — liste des sous-catégories + filtre par catégorie
 import React, { useState, useEffect, useMemo } from 'react';
 import { categoriesApi } from '../../api';
+import { supabase } from './supabaseClient';
 
 /* =========================================================
    TRADUCTIONS / الترجمة

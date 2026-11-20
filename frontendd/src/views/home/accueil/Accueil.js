@@ -184,7 +184,7 @@ const Accueil = ({ userName }) => {
   }, []);
 
   const documents = [
-    { text: "Vente", img: "https://cdn-icons-png.flaticon.com/128/5442/5442020.png", path: "/sales" },
+    { text: "Ventes", img: "https://cdn-icons-png.flaticon.com/128/5442/5442020.png", path: "/ventes" },
     { text: "achat", img: "https://cdn-icons-png.flaticon.com/128/2821/2821739.png", path: "/achat" },
     { text: "Produit", img: "https://cdn-icons-png.flaticon.com/128/4408/4408296.png", path: "/products" },
     { text: "Expense", img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/expenses" },

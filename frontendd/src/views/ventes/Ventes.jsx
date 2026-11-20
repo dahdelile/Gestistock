@@ -11,7 +11,7 @@ import {
   FaCashRegister, FaFilter, FaFileExcel, FaEye
 } from 'react-icons/fa';
 import { productsApi, customersApi, salesApi } from '../../api';
-import { useLanguage } from '../../context/LanguageContext';
+import { useLanguage } from '../context/LanguageContext';
 import './Ventes.css';
 
 const STORE = { name: 'GESTION STOCK', address: 'Nouakchott, Mauritanie', phone: '+222 XX XX XX XX' };

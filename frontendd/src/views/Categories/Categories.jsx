@@ -1,7 +1,7 @@
 // src/pages/CategoriesPage.jsx
 // Version bilingue Français / العربية (RTL) — liste des sous-catégories + filtre par catégorie
 import React, { useState, useEffect, useMemo } from 'react';
-//import { categoriesApi } from '../../api';
+import { categoriesApi } from '../../api';
 
 /* =========================================================
    TRADUCTIONS / الترجمة

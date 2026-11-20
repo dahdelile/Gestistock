@@ -1,7 +1,7 @@
 // src/pages/SuppliersPage.jsx
 // Gestion des fournisseurs — Version bilingue Français / العربية (RTL)
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-//import { suppliersApi } from '../../api';
+import { suppliersApi } from '../../api';
 import { useLanguage } from '../context/LanguageContext';
 /* =========================================================
    TRADUCTIONS / الترجمة

@@ -1,1126 +1,1095 @@
-// src/components/ventes/Ventes.jsx
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  Table, Button, Card, Spinner, Badge, Form, Modal,
-  Toast, ToastContainer, Alert, Row, Col, InputGroup
-} from 'react-bootstrap';
-import {
-  FaInfoCircle, FaSyncAlt, FaPlus, FaEdit, FaTrash, FaSearch,
-  FaLock, FaUserShield, FaUser, FaTimes, FaPrint, FaDownload,
-  FaMoneyBillWave, FaShoppingCart, FaCalendarAlt, FaExchangeAlt,
-  FaCashRegister, FaFilter, FaFileExcel, FaBan, FaEye
-} from 'react-icons/fa';
-//import { productsApi, customersApi, salesApi } from '../../api';
+// src/pages/ProductsPage.jsx
+// Version bilingue Français / العربية (RTL)
+// - Le tableau n'affiche PLUS le prix de vente par défaut.
+// - Il affiche les VENTES RÉELLES : quantité vendue + total des ventes
+//   calculés depuis salesApi.getAll() -> invoices -> invoice_items
+// - Le prix de vente par défaut reste en base pour la vente, mais n'est pas affiché dans le tableau.
+import React, { useState, useEffect, useMemo } from 'react';
+//import { productsApi, categoriesApi, suppliersApi, salesApi } from '../../api';
+//import BarcodeScanner from './BarcodeScanner';
 import { useLanguage } from '../context/LanguageContext';
 
-const STORE = { name: 'GESTION STOCK', address: 'Nouakchott, Mauritanie', phone: '+222 XX XX XX XX' };
+/* =========================================================
+   TRADUCTIONS / الترجمة
+========================================================= */
 
-/* ============================================================
-   HELPERS
-   ============================================================ */
-const toNumOrNull = (v) => {
-  if (v === '' || v === null || v === undefined) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-};
-const toNumOrZero = (v) => toNumOrNull(v) ?? 0;
-const toTextOrNull = (v) => {
-  if (v === null || v === undefined) return null;
-  const s = String(v).trim();
-  return s === '' ? null : s;
-};
-const formatNumber = (v) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(Number(v) || 0);
-const formatDate = (v, locale = 'fr-FR') => {
-  if (!v) return '—';
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString(locale, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-};
-const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-const getItemCategory = (item, productById) => {
-  if (!item) return '—';
-  const fromMap = item.product_id != null ? productById?.[String(item.product_id)] : null;
-  return fromMap?.categories?.name || fromMap?.category?.name || fromMap?.category_name ||
-    item?.category_name || item?.category || '—';
-};
-const getSaleCategories = (sale, productById) => {
-  const items = sale?.items || sale?.invoice_items || sale?.items_sale || [];
-  const cats = [];
-  items.forEach((it) => {
-    const c = getItemCategory(it, productById);
-    if (c && c !== '—' && !cats.includes(c)) cats.push(c);
-  });
-  return cats.length ? cats.join(', ') : '—';
-};
-
-/* ============================================================
-   TRADUCTIONS
-   ============================================================ */
 const I18N = {
   fr: {
-    dir: 'ltr', locale: 'fr-FR', currency: 'MRU',
-    title: 'Gestion des ventes', add: 'Nouvelle vente', refresh: 'Rafraîchir',
-    stat_revenue: 'Montant global', stat_revenue_sub: 'MRU · Toutes les ventes',
-    stat_count: 'Total ventes', stat_count_sub: 'Transactions enregistrées',
-    stat_month: 'Ventes du mois', stat_month_sub: (v) => `Revenus : ${v}`,
-    stat_day: 'Ventes du jour', stat_day_sub: (v) => `Revenus : ${v}`,
-    history: 'Historique des ventes', search_ph: 'N° facture ou nom du client...',
-    all_status: 'Tous les statuts', all_payments: 'Tous les paiements', all_categories: 'Toutes les catégories',
-    paid: 'Payée', partial: 'Crédit', draft: 'Brouillon', cancelled: 'Annulée',
-    th_invoice: 'Facture', th_customer: 'Client', th_products: 'Produit(s)', th_category: 'Catégorie',
-    th_qty: 'Qté', th_unit: 'P.U.', th_total: 'Total', th_status: 'Statut', th_date: 'Date', th_actions: 'Actions',
-    view: 'Voir', edit: 'Modifier', delete: 'Supprimer', print: 'Imprimer', export: 'Exporter',
-    cash: 'Espèces', bankily: 'Bankily', masrivi: 'Masrivi', sedad: 'Sedad', credit: 'Crédit', walk_in: 'Client comptant',
-    units: (n) => `${n} unité(s)`,
-    form_title: 'Nouvelle vente', f_customer: 'Client', f_date: 'Date de vente', f_status: 'Statut',
-    f_payment: 'Mode de paiement', f_notes: 'Observation', f_category: 'Catégorie', f_product: 'Produit',
-    f_qty: 'Quantité', f_price: 'Prix unitaire', f_add_item: 'Ajouter',
-    stock_available: (n) => `Stock dispo : ${n}`, err_stock: (n) => `Stock insuffisant. Il ne reste que ${n} unité(s).`,
-    err_qty_invalid: 'Quantité invalide.', err_price_invalid: 'Saisissez un prix unitaire valide.',
-    err_customer_credit: 'Sélectionnez un client pour le crédit.', no_items: 'Aucun article ajouté.',
-    save: 'Enregistrer', cancel: 'Annuler', close: 'Fermer', saving: 'Enregistrement...',
-    err_save: 'Erreur lors de l\'enregistrement.', ok_sale: 'Vente enregistrée avec succès.',
-    edit_title: 'Modifier la vente', ok_edit: 'Vente modifiée.', err_edit: 'Erreur modification.',
-    delete_q: 'Supprimer cette vente ?', delete_confirm: 'Oui, supprimer', deleting: 'Suppression...',
-    ok_delete: 'Vente supprimée.', err_delete: 'Erreur suppression.',
-    details_title: 'Détails de la vente', success_invoice: 'Vente enregistrée', facture: 'FACTURE',
-    thanks: 'Merci pour votre achat !', thanks_sub: 'Nous vous remercions de votre confiance.',
-    err_load: 'Impossible de charger les ventes.', loading: 'Chargement des ventes...',
-    no_data: 'Aucune vente trouvée', no_data_sub: 'Modifiez votre recherche ou créez une nouvelle vente.',
-    export_all: 'Exporter', footer_count: (n) => `${n} vente(s)`,
-    role_admin: 'Admin', role_user: 'Lecture', err_permission: 'Action réservée aux administrateurs.',
+    dir: 'ltr',
+    locale: 'fr-FR',
+    currency: 'UM',
+    title: 'Gestion des produits',
+    subtitle: 'Gérez vos articles, vos prix et vos niveaux de stock.',
+    add: 'Nouveau produit',
+    refresh: 'Actualiser',
+    stat_total: 'Total produits',
+    stat_total_sub: 'Références enregistrées',
+    stat_low: 'Stock bas',
+    stat_low_sub: 'À réapprovisionner',
+    stat_out: 'Rupture',
+    stat_out_sub: 'Produits indisponibles',
+    stat_value: 'Valeur du stock',
+    stat_value_sub: "Prix d'achat × quantité",
+    filters_title: 'Recherche et filtres',
+    filters_sub: 'Retrouvez rapidement un produit dans votre inventaire.',
     reset: 'Réinitialiser',
+    search_ph: 'Nom, référence, code-barres...',
+    scan: 'Scanner un code-barres',
+    category: 'Catégorie',
+    all_categories: 'Toutes',
+    subcategory: 'Sous-catégorie',
+    all_subcategories: 'Toutes',
+    status: 'État',
+    all_status: 'Tous les états',
+    neuf: 'Neuf',
+    occasion: 'Occasion',
+    stock_level: 'Niveau de stock',
+    all_stock: 'Tous les stocks',
+    available: 'Disponible',
+    low: 'Stock bas',
+    out: 'Rupture',
+    results: 'Résultats',
+    results_count: (n) => `${n} produit(s)`,
+    inventory: 'Inventaire des produits',
+    inventory_sub: 'Ventes réelles de chaque article, calculées depuis les factures de vente.',
+    th_product: 'Produit',
+    th_category: 'Catégorie',
+    th_status: 'État',
+    th_purchase: 'Achat',
+    th_qty: 'Quantité',
+    th_total_purchase: 'Total achat',
+    th_sold_qty: 'Quantité vendue',
+    th_total_sales: 'Total des ventes',
+    th_stock: 'Stock',
+    th_actions: 'Actions',
+    loading: 'Chargement des produits...',
+    none_title: 'Aucun produit trouvé',
+    none_sub: 'Modifiez les filtres ou ajoutez un nouveau produit.',
+    none_add: 'Ajouter un produit',
+    no_category: 'Non classé',
+    no_barcode: 'Sans code-barres',
+    not_defined: 'Non défini',
+    edit: 'Modifier',
+    delete: 'Supprimer',
+    modal_new: 'Nouveau produit',
+    modal_edit: 'Modifier le produit',
+    modal_sub: "Complétez les informations de l'article.",
+    f_name: 'Nom du produit',
+    f_name_ph: 'Ex. : Ordinateur portable',
+    f_category: 'Catégorie',
+    f_category_ph: 'Sélectionner',
+    f_subcategory: 'Sous-catégorie',
+    f_subcategory_ph: 'Sélectionner (facultatif)',
+    f_barcode: 'Code-barres',
+    f_barcode_ph: 'Référence',
+    f_status: 'État du produit',
+    f_purchase: "Prix d'achat (UM)",
+    f_sale: 'Prix de vente par défaut (UM)',
+    f_sale_hint: 'Facultatif. Conservé en base pour être proposé automatiquement lors d’une vente. Il n’est pas affiché dans le tableau des produits.',
+    f_quantity: 'Quantité',
+    f_min: 'Stock minimum',
+    f_min_hint: "Seuil d'alerte de réapprovisionnement.",
+    f_supplier: 'Fournisseur',
+    no_supplier: 'Aucun fournisseur',
+    summary: 'Aperçu',
+    summary_purchase: "Valeur d'achat (stock actuel)",
+    summary_sold_qty: 'Quantité vendue (réelle)',
+    summary_total_sales: 'Total des ventes (réel)',
+    cancel: 'Annuler',
+    save: 'Enregistrer',
+    save_changes: 'Enregistrer les modifications',
+    create: 'Créer le produit',
+    saving: 'Enregistrement...',
+    delete_title: 'Supprimer ce produit ?',
+    delete_sub: 'Vous êtes sur le point de supprimer :',
+    delete_warn: 'Cette opération peut être irréversible.',
+    delete_confirm: 'Supprimer',
+    deleting: 'Suppression...',
+    err_load: 'Impossible de charger les produits. Vérifiez votre connexion et votre API.',
+    err_save: 'Échec de la sauvegarde. Vérifiez les informations saisies.',
+    err_delete: 'Impossible de supprimer ce produit.',
+    ok_save: 'Produit enregistré avec succès.',
+    ok_delete: 'Produit supprimé avec succès.',
+    close: 'Fermer',
+    retry: 'Réessayer',
+    switch_title: 'Changer de langue',
   },
   ar: {
-    dir: 'rtl', locale: 'ar-u-nu-latn', currency: 'أوقية',
-    title: 'إدارة المبيعات', add: 'بيع جديد', refresh: 'تحديث',
-    stat_revenue: 'المبلغ الإجمالي', stat_revenue_sub: 'أوقية · كل المبيعات',
-    stat_count: 'إجمالي المبيعات', stat_count_sub: 'المعاملات المسجلة',
-    stat_month: 'مبيعات الشهر', stat_month_sub: (v) => `الإيرادات: ${v}`,
-    stat_day: 'مبيعات اليوم', stat_day_sub: (v) => `الإيرادات: ${v}`,
-    history: 'سجل المبيعات', search_ph: 'رقم الفاتورة أو اسم العميل...',
-    all_status: 'كل الحالات', all_payments: 'كل طرق الدفع', all_categories: 'كل الفئات',
-    paid: 'مدفوعة', partial: 'آجل', draft: 'مسودة', cancelled: 'ملغاة',
-    th_invoice: 'الفاتورة', th_customer: 'العميل', th_products: 'المنتج', th_category: 'الفئة',
-    th_qty: 'الكمية', th_unit: 'السعر', th_total: 'الإجمالي', th_status: 'الحالة', th_date: 'التاريخ', th_actions: 'إجراءات',
-    view: 'عرض', edit: 'تعديل', delete: 'حذف', print: 'طباعة', export: 'تصدير',
-    cash: 'نقدًا', bankily: 'بنكيلي', masrivi: 'مصرفي', sedad: 'سداد', credit: 'آجل', walk_in: 'عميل نقدي',
-    units: (n) => `${n} وحدة`,
-    form_title: 'بيع جديد', f_customer: 'العميل', f_date: 'تاريخ البيع', f_status: 'الحالة',
-    f_payment: 'طريقة الدفع', f_notes: 'ملاحظة', f_category: 'الفئة', f_product: 'المنتج',
-    f_qty: 'الكمية', f_price: 'سعر الوحدة', f_add_item: 'إضافة',
-    stock_available: (n) => `المخزون المتاح: ${n}`, err_stock: (n) => `المخزون غير كافٍ. تبقى فقط ${n} وحدة.`,
-    err_qty_invalid: 'الكمية غير صالحة.', err_price_invalid: 'أدخل سعر وحدة صحيحًا.',
-    err_customer_credit: 'اختر عميلًا للبيع بالآجل.', no_items: 'لم يتم إضافة أصناف.',
-    save: 'حفظ', cancel: 'إلغاء', close: 'إغلاق', saving: 'جارٍ التسجيل...',
-    err_save: 'خطأ في التسجيل.', ok_sale: 'تم تسجيل البيع بنجاح.',
-    edit_title: 'تعديل البيع', ok_edit: 'تم التعديل.', err_edit: 'خطأ في التعديل.',
-    delete_q: 'حذف هذا البيع؟', delete_confirm: 'نعم، احذف', deleting: 'جارٍ الحذف...',
-    ok_delete: 'تم الحذف.', err_delete: 'خطأ في الحذف.',
-    details_title: 'تفاصيل البيع', success_invoice: 'تم التسجيل', facture: 'فاتورة',
-    thanks: 'شكرًا لك!', thanks_sub: 'نشكرك على ثقتك.',
-    err_load: 'تعذّر التحميل.', loading: 'جارٍ تحميل المبيعات...',
-    no_data: 'لا توجد مبيعات', no_data_sub: 'عدّل البحث أو أنشئ بيعًا جديدًا.',
-    export_all: 'تصدير', footer_count: (n) => `${n} عملية بيع`,
-    role_admin: 'مدير', role_user: 'قراءة', err_permission: 'الإجراء مخصص للمديرين فقط.',
+    dir: 'rtl',
+    locale: 'ar-u-nu-latn',
+    currency: 'أوقية',
+    title: 'إدارة المنتجات',
+    subtitle: 'أدر منتجاتك وأسعارها ومستويات مخزونها.',
+    add: 'منتج جديد',
+    refresh: 'تحديث',
+    stat_total: 'إجمالي المنتجات',
+    stat_total_sub: 'المراجع المسجلة',
+    stat_low: 'مخزون منخفض',
+    stat_low_sub: 'بحاجة إلى إعادة تعبئة',
+    stat_out: 'نفد المخزون',
+    stat_out_sub: 'منتجات غير متوفرة',
+    stat_value: 'قيمة المخزون',
+    stat_value_sub: 'سعر الشراء × الكمية',
+    filters_title: 'البحث والتصفية',
+    filters_sub: 'اعثر بسرعة على منتج في مخزونك.',
     reset: 'إعادة تعيين',
+    search_ph: 'الاسم، المرجع، الباركود...',
+    scan: 'مسح الباركود',
+    category: 'الفئة',
+    all_categories: 'الكل',
+    subcategory: 'الفئة الفرعية',
+    all_subcategories: 'الكل',
+    status: 'الحالة',
+    all_status: 'كل الحالات',
+    neuf: 'جديد',
+    occasion: 'مستعمل',
+    stock_level: 'مستوى المخزون',
+    all_stock: 'كل المستويات',
+    available: 'متوفر',
+    low: 'مخزون منخفض',
+    out: 'نفد',
+    results: 'النتائج',
+    results_count: (n) => `${n} منتج`,
+    inventory: 'مخزون المنتجات',
+    inventory_sub: 'المبيعات الفعلية لكل صنف، محسوبة من فواتير البيع.',
+    th_product: 'المنتج',
+    th_category: 'الفئة',
+    th_status: 'الحالة',
+    th_purchase: 'الشراء',
+    th_qty: 'الكمية',
+    th_total_purchase: 'إجمالي الشراء',
+    th_sold_qty: 'الكمية المباعة',
+    th_total_sales: 'إجمالي المبيعات',
+    th_stock: 'المخزون',
+    th_actions: 'إجراءات',
+    loading: 'جارٍ تحميل المنتجات...',
+    none_title: 'لا توجد منتجات',
+    none_sub: 'عدّل الفلاتر أو أضف منتجًا جديدًا.',
+    none_add: 'إضافة منتج',
+    no_category: 'غير مصنف',
+    no_barcode: 'بدون باركود',
+    not_defined: 'غير محدد',
+    edit: 'تعديل',
+    delete: 'حذف',
+    modal_new: 'منتج جديد',
+    modal_edit: 'تعديل المنتج',
+    modal_sub: 'أكمل معلومات الصنف.',
+    f_name: 'اسم المنتج',
+    f_name_ph: 'مثال: حاسوب محمول',
+    f_category: 'الفئة',
+    f_category_ph: 'اختر',
+    f_subcategory: 'الفئة الفرعية',
+    f_subcategory_ph: 'اختر (اختياري)',
+    f_barcode: 'الباركود',
+    f_barcode_ph: 'المرجع',
+    f_status: 'حالة المنتج',
+    f_purchase: 'سعر الشراء (أوقية)',
+    f_sale: 'سعر البيع الافتراضي (أوقية)',
+    f_sale_hint: 'اختياري. يبقى محفوظاً في قاعدة البيانات ليُقترح تلقائياً عند البيع، ولا يظهر في جدول المنتجات.',
+    f_quantity: 'الكمية',
+    f_min: 'الحد الأدنى للمخزون',
+    f_min_hint: 'عتبة التنبيه لإعادة التعبئة.',
+    f_supplier: 'المورد',
+    no_supplier: 'بدون مورد',
+    summary: 'نظرة عامة',
+    summary_purchase: 'قيمة الشراء (المخزون الحالي)',
+    summary_sold_qty: 'الكمية المباعة (فعلية)',
+    summary_total_sales: 'إجمالي المبيعات (فعلي)',
+    cancel: 'إلغاء',
+    save: 'حفظ',
+    save_changes: 'حفظ التعديلات',
+    create: 'إنشاء المنتج',
+    saving: 'جارٍ الحفظ...',
+    delete_title: 'حذف هذا المنتج؟',
+    delete_sub: 'أنت على وشك حذف:',
+    delete_warn: 'هذا الإجراء قد يكون غير قابل للتراجع.',
+    delete_confirm: 'حذف',
+    deleting: 'جارٍ الحذف...',
+    err_load: 'تعذّر تحميل المنتجات. تحقق من الاتصال والخادم.',
+    err_save: 'فشل الحفظ. تحقق من المعلومات المدخلة.',
+    err_delete: 'تعذّر حذف هذا المنتج.',
+    ok_save: 'تم حفظ المنتج بنجاح.',
+    ok_delete: 'تم حذف المنتج بنجاح.',
+    close: 'إغلاق',
+    retry: 'إعادة المحاولة',
+    switch_title: 'تغيير اللغة',
   },
 };
 
-/* ============================================================
-   PAGE PRINCIPALE
-   ============================================================ */
-const VentesPage = () => {
+/* =========================================================
+   UTILITAIRES
+========================================================= */
+
+const emptyForm = () => ({
+  name: '',
+  category: '',
+  subcategory: '',
+  barcode: '',
+  status: 'neuf',
+  purchase_price: '',
+  sale_price: '',
+  quantity: '',
+  min_quantity: 5,
+  supplier_id: '',
+});
+
+const formatMoney = (value, cur = 'UM') => {
+  const n = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(Number(value) || 0);
+  return `${n} ${cur}`;
+};
+const formatNumber = (value) =>
+  new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(Number(value) || 0);
+
+const hasSalePrice = (value) => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
+
+const getRows = (response) => {
+  const data = response?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
+const getCategoryName = (product) => {
+  if (product.categories && typeof product.categories === 'object') return product.categories.name || '';
+  if (product.category && typeof product.category === 'object') return product.category.name || '';
+  return typeof product.category === 'string' ? product.category : '';
+};
+
+const getSubcategoryName = (product) => {
+  if (product.subcategories && typeof product.subcategories === 'object') return product.subcategories.name || '';
+  if (product.subcategory && typeof product.subcategory === 'object') return product.subcategory.name || '';
+  return typeof product.subcategory === 'string' ? product.subcategory : '';
+};
+
+const getStockStatus = (quantity, minimum) => {
+  const qty = Number(quantity) || 0;
+  const min = Number(minimum) || 0;
+  if (qty <= 0) return { key: 'out', tone: 'rose' };
+  if (qty <= min) return { key: 'low', tone: 'amber' };
+  return { key: 'available', tone: 'green' };
+};
+
+const BADGE_TONES = ['blue', 'violet', 'green', 'amber', 'rose', 'teal'];
+const toneFor = (name = '') => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return BADGE_TONES[hash % BADGE_TONES.length];
+};
+
+/* =========================================================
+   VENTES RÉELLES depuis salesApi.getAll()
+   Structure réelle de ton API :
+   invoice = { id, status, invoice_items: [
+     { product_id, quantity, unit_price / price, total, products: { name } }
+   ]}
+   On ne calcule JAMAIS : quantité restante × prix de vente par défaut.
+========================================================= */
+const normalizeName = (v) => String(v || '').trim().toLowerCase();
+
+const buildSalesAgg = (sales) => {
+  const byId = {};
+  const byName = {};
+
+  const addLine = (pid, pname, qty, lineTotal) => {
+    if (pid !== null && pid !== undefined && pid !== '') {
+      if (!byId[pid]) byId[pid] = { qty: 0, total: 0 };
+      byId[pid].qty += qty;
+      byId[pid].total += lineTotal;
+    }
+    const n = normalizeName(pname);
+    if (n) {
+      if (!byName[n]) byName[n] = { qty: 0, total: 0 };
+      byName[n].qty += qty;
+      byName[n].total += lineTotal;
+    }
+  };
+
+  (sales || []).forEach((sale) => {
+    const st = String(sale?.status || '').toLowerCase();
+    if (['cancelled', 'annule', 'annulé', 'annulée', 'cancelled_sale', 'draft', 'brouillon'].includes(st)) return;
+
+    const items = sale?.invoice_items || sale?.sale_items || sale?.items || sale?.saleItems;
+
+    if (Array.isArray(items) && items.length > 0) {
+      items.forEach((item) => {
+        const pid = item.product_id ?? item.productId ?? item.products?.id;
+        const pname = item.products?.name ?? item.product_name ?? item.product ?? item.name;
+        const qty = Number(item.quantity) || 0;
+        const lineTotal =
+          item.total !== null && item.total !== undefined && item.total !== ''
+            ? Number(item.total) || 0
+            : qty * (Number(item.unit_price ?? item.price ?? item.sale_price) || 0);
+        addLine(pid, pname, qty, lineTotal);
+      });
+      return;
+    }
+
+    const qty = Number(sale.quantity) || 0;
+    if (qty === 0) return;
+    const pid = sale.product_id ?? sale.productId ?? sale.products?.id;
+    const pname = sale.products?.name ?? sale.product_name ?? sale.product ?? sale.name;
+    const lineTotal =
+      sale.total !== null && sale.total !== undefined && sale.total !== ''
+        ? Number(sale.total) || 0
+        : qty * (Number(sale.unit_price ?? sale.price) || 0);
+    addLine(pid, pname, qty, lineTotal);
+  });
+
+  return { byId, byName };
+};
+
+const getAggForProduct = (product, salesAgg) => {
+  if (!salesAgg) return { qty: 0, total: 0 };
+  if (salesAgg.byId?.[product.id]) return salesAgg.byId[product.id];
+  return salesAgg.byName?.[normalizeName(product.name)] || { qty: 0, total: 0 };
+};
+
+/* =========================================================
+   COMPOSANT
+========================================================= */
+
+const ProductsPage = () => {
   const { lang } = useLanguage();
   const t = I18N[lang];
+
+  const [products, setProducts] = useState([]);
+  const [sales, setSales] = useState([]);
+  const [categoriesFull, setCategoriesFull] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+
+  const [stats, setStats] = useState({ total: 0, low: 0, out: 0, value: 0 });
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [errorKey, setErrorKey] = useState('');
+  const [formErrorKey, setFormErrorKey] = useState('');
+  const [successKey, setSuccessKey] = useState('');
+
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterSubcategory, setFilterSubcategory] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStock, setFilterStock] = useState('all');
+
+  const [showForm, setShowForm] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [showSearchScanner, setShowSearchScanner] = useState(false);
+
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [productToDelete, setProductToDelete] = useState(null);
+  const [formData, setFormData] = useState(emptyForm);
+
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
+
   const cur = t.currency;
 
-  /* ---------- RÔLES ---------- */
-  const [userRole, setUserRole] = useState(null);
-  const [userLoading, setUserLoading] = useState(true);
-  const isAdmin = () => userRole === 'admin' || userRole === 'administrateur';
-  const isChefEnt = () => userRole === 'chef_ent' || userRole === 'chef_entreprise';
-  const isDM = () => userRole === 'DM' || userRole === 'dm';
-  const canEdit = () => isAdmin() || isDM() || isChefEnt();
+  const mainCategories = useMemo(
+    () => categoriesFull.filter((c) => !c.parent_id),
+    [categoriesFull]
+  );
+  const categories = useMemo(() => mainCategories.map((c) => c.name), [mainCategories]);
 
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      try {
-        setUserLoading(true);
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          const userData = JSON.parse(storedUser);
-          setUserRole(userData.role || userData.roles?.[0] || 'user');
-        } else {
-          setUserRole('user');
-        }
-      } catch (err) {
-        console.error("Erreur récupération rôle:", err);
-        setUserRole('user');
-      } finally {
-        setUserLoading(false);
-      }
-    };
-    fetchUserRole();
-  }, []);
+  const getSubcategories = (categoryName) => {
+    const main = categoriesFull.find((c) => c.name === categoryName);
+    return (main?.sous_categories || [])
+      .filter((s) => s.status !== 'inactive')
+      .map((s) => s.name);
+  };
+  const formSubcategories = useMemo(
+    () => getSubcategories(formData.category),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [formData.category, mainCategories, categoriesFull]
+  );
+  const filterSubcategories = useMemo(
+    () => (filterCategory === 'all' ? [] : getSubcategories(filterCategory)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filterCategory, mainCategories, categoriesFull]
+  );
 
-  const canAdd = useCallback(() => canEdit(), [userRole]);
-  const canDelete = useCallback(() => canEdit(), [userRole]);
+  const salesAgg = useMemo(() => buildSalesAgg(sales), [sales]);
 
-  /* ---------- ÉTATS ---------- */
-  const [sales, setSales] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [error, setError] = useState(null);
-  const [toasts, setToasts] = useState([]);
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterPayment, setFilterPayment] = useState('all');
-  const [filterCategory, setFilterCategory] = useState('all');
-  const [startDateFilter, setStartDateFilter] = useState('');
-  const [endDateFilter, setEndDateFilter] = useState('');
-
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [form, setForm] = useState({ customer_id: '', status: 'paid', payment_method: 'cash', date: '', notes: '' });
-  const [items, setItems] = useState([]);
-  const [newItem, setNewItem] = useState({ product_id: '', quantity: 1, price: '' });
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [localError, setLocalError] = useState('');
-
-  const [saleToEdit, setSaleToEdit] = useState(null);
-  const [editItems, setEditItems] = useState([]);
-  const [editStatus, setEditStatus] = useState('paid');
-  const [editNotes, setEditNotes] = useState('');
-
-  const [selectedSale, setSelectedSale] = useState(null);
-  const [saleToDelete, setSaleToDelete] = useState(null);
-  const [showInvoice, setShowInvoice] = useState(false);
-  const [lastSale, setLastSale] = useState(null);
-
-  const showToast = (message, variant = 'success') => {
-    const newToast = { id: Date.now(), message, variant };
-    setToasts(prev => [...prev, newToast]);
-    setTimeout(() => setToasts(prev => prev.filter(tt => tt.id !== newToast.id)), 5000);
+  const fetchProducts = async () => {
+    setLoading(true);
+    setErrorKey('');
+    try {
+      const response = await productsApi.getAll();
+      setProducts(getRows(response));
+    } catch (err) {
+      console.error('Erreur produits :', err);
+      setErrorKey('err_load');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  /* ---------- CHARGEMENTS ---------- */
   const fetchSales = async () => {
     try {
-      setLoading(true); setError(null);
-      const res = await salesApi.getAll();
-      const data = res?.data;
-      setSales(Array.isArray(data) ? data : data?.data || []);
+      if (!salesApi || typeof salesApi.getAll !== 'function') { setSales([]); return; }
+      const response = await salesApi.getAll();
+      setSales(getRows(response));
     } catch (err) {
-      console.error(err); setError(err.message || t.err_load); setSales([]);
-      showToast(err.message || t.err_load, 'danger');
-    } finally { setLoading(false); }
-  };
-  const fetchProducts = async () => {
-    try {
-      const res = await productsApi.getAll();
-      const data = res?.data;
-      setProducts(Array.isArray(data) ? data : data?.data || []);
-    } catch (err) { console.error(err); }
-  };
-  const fetchCustomers = async () => {
-    try {
-      const res = await customersApi.getAll();
-      const data = res?.data;
-      setCustomers(Array.isArray(data) ? data : data?.data || []);
-    } catch (err) { console.warn(err); }
-  };
-
-  useEffect(() => { fetchSales(); fetchProducts(); fetchCustomers(); }, []);
-
-  /* ---------- COMPUTÉS ---------- */
-  const productById = useMemo(() => {
-    const m = {}; products.forEach((p) => { m[String(p.id)] = p; }); return m;
-  }, [products]);
-
-  const allCategories = useMemo(() => {
-    const cats = products.map(p => p.categories?.name || p.category?.name || p.category_name).filter(Boolean);
-    return [...new Set(cats)].sort();
-  }, [products]);
-
-  const getStatus = (status, paymentMethod) => {
-    if (status === 'paid') {
-      const map = {
-        bankily: { label: t.bankily, bg: 'primary' },
-        masrivi: { label: t.masrivi, bg: 'warning' },
-        sedad: { label: t.sedad, bg: 'success' },
-        credit: { label: t.credit, bg: 'warning' },
-        cash: { label: t.cash, bg: 'success' },
-      };
-      return map[paymentMethod] || map.cash;
+      console.warn('Ventes indisponibles pour le calcul des ventes réelles :', err);
+      setSales([]);
     }
-    const statuses = {
-      partial: { label: t.partial, bg: 'warning' },
-      draft: { label: t.draft, bg: 'secondary' },
-      cancelled: { label: t.cancelled, bg: 'danger' },
-    };
-    return statuses[status] || { label: status || '—', bg: 'secondary' };
   };
 
-  const getSaleItems = (sale) => sale?.items || sale?.invoice_items || sale?.items_sale || [];
-  const getCustomerName = (sale) => {
-    if (!sale) return t.walk_in;
-    const c = customers.find(i => String(i.id) === String(sale.customer_id));
-    return sale.customers?.name || sale.customer?.name || c?.name || t.walk_in;
-  };
-  const getTotalQuantity = (sale) => getSaleItems(sale).reduce((s, i) => s + Number(i.quantity || 0), 0);
-  const getProductNames = (sale) => {
-    const names = getSaleItems(sale).map(i => i.product_name || i.name || i.products?.name || 'Produit');
-    return names.length > 0 ? names.join(', ') : '—';
-  };
-
-  const filteredSales = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    return sales.filter((sale) => {
-      const inv = String(sale.invoice_number || '').toLowerCase();
-      const cust = String(sale.customers?.name || sale.customer?.name || t.walk_in).toLowerCase();
-      const prodNames = getProductNames(sale).toLowerCase();
-      const cats = getSaleCategories(sale, productById).toLowerCase();
-      const matchesSearch = !q || inv.includes(q) || cust.includes(q) || prodNames.includes(q) || cats.includes(q);
-      const matchesStatus = filterStatus === 'all' || sale.status === filterStatus;
-      const matchesPayment = filterPayment === 'all' || sale.payment_method === filterPayment;
-      const matchesCategory = filterCategory === 'all' || getSaleCategories(sale, productById).split(', ').includes(filterCategory);
-      const dStr = String(sale.invoice_date || sale.created_at || '').slice(0, 10);
-      const matchesStart = !startDateFilter || dStr >= startDateFilter;
-      const matchesEnd = !endDateFilter || dStr <= endDateFilter;
-      return matchesSearch && matchesStatus && matchesPayment && matchesCategory && matchesStart && matchesEnd;
-    });
-  }, [sales, searchTerm, filterStatus, filterPayment, filterCategory, startDateFilter, endDateFilter, t.walk_in, productById]);
-
-  const stats = useMemo(() => {
-    const valid = sales.filter(s => s.status !== 'cancelled');
-    const now = new Date(); const today = now.toISOString().split('T')[0];
-    let dailyS = 0, dailyR = 0, monthlyS = 0, monthlyR = 0;
-    valid.forEach(s => {
-      const d = new Date(s.invoice_date || s.created_at);
-      if (Number.isNaN(d.getTime())) return;
-      const ds = d.toISOString().split('T')[0];
-      const amt = Number(s.grand_total ?? s.total ?? 0);
-      if (ds === today) { dailyS++; dailyR += amt; }
-      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) { monthlyS++; monthlyR += amt; }
-    });
-    return { count: valid.length, revenue: valid.reduce((a, x) => a + Number(x.grand_total ?? x.total ?? 0), 0), dailyS, dailyR, monthlyS, monthlyR };
-  }, [sales]);
-
-  /* ---------- ACTIONS ---------- */
-  const openAddModal = () => {
-    if (!canAdd()) { showToast(t.err_permission, 'warning'); return; }
-    setForm({ customer_id: '', status: 'paid', payment_method: 'cash', date: new Date().toISOString().slice(0, 16), notes: '' });
-    setItems([]); setNewItem({ product_id: '', quantity: 1, price: '' });
-    setCategoryFilter(''); setLocalError('');
-    setShowAddModal(true);
-  };
-
-  const handleChange = (e) => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
-  const handleSelectProduct = (e) => { setNewItem(p => ({ ...p, product_id: e.target.value, price: '' })); setLocalError(''); };
-
-  const addItem = () => {
-    if (!newItem.product_id) return setLocalError(t.f_product + ' *');
-    const prod = products.find(p => String(p.id) === String(newItem.product_id));
-    const price = Number(newItem.price);
-    const qty = Number(newItem.quantity);
-    const stock = Number(prod?.quantity ?? prod?.stock ?? 0);
-    if (!Number.isFinite(price) || price <= 0) return setLocalError(t.err_price_invalid);
-    if (!Number.isFinite(qty) || qty <= 0) return setLocalError(t.err_qty_invalid);
-    const existingQty = items.filter(i => String(i.product_id) === String(newItem.product_id)).reduce((sum, i) => sum + i.quantity, 0);
-    if (existingQty + qty > stock) return setLocalError(t.err_stock(stock - existingQty));
-    setItems(prev => [...prev, {
-      product_id: newItem.product_id, name: prod?.name || 'Produit',
-      category: prod?.categories?.name || prod?.category?.name || prod?.category_name || '—',
-      quantity: qty, price, stock,
-    }]);
-    setNewItem({ product_id: '', quantity: 1, price: '' }); setLocalError('');
-  };
-
-  const submitSale = async () => {
-    if (!canEdit()) { showToast(t.err_permission, 'danger'); return; }
-    if (items.length === 0) return setLocalError(t.no_items);
-    const isCredit = form.payment_method === 'credit' || form.status === 'partial';
-    if (isCredit && !form.customer_id) return setLocalError(t.err_customer_credit);
-    setIsUpdating(true); setLocalError('');
+  const fetchStats = async () => {
     try {
-      const totalNum = items.reduce((s, i) => s + (Number(i.price) * Number(i.quantity)), 0);
-      const payload = {
-        invoice_number: `INV-${Date.now().toString().slice(-6)}`,
-        customer_id: toNumOrNull(form.customer_id),
-        status: toTextOrNull(form.status) || 'paid',
-        payment_method: toTextOrNull(form.payment_method) || 'cash',
-        notes: toTextOrNull(form.notes),
-        invoice_date: form.date ? new Date(form.date).toISOString() : new Date().toISOString(),
-        total: totalNum, grand_total: totalNum, subtotal: totalNum, discount: 0,
-        paid_amount: isCredit ? 0 : totalNum, balance: isCredit ? totalNum : 0,
-        amount_received: isCredit ? 0 : totalNum, change_amount: 0,
-        items: items.map(i => ({
-          product_id: toNumOrNull(i.product_id), quantity: toNumOrZero(i.quantity),
-          price: toNumOrZero(i.price), unit_price: toNumOrZero(i.price),
-          total: toNumOrZero(Number(i.price) * Number(i.quantity)),
-        })),
-      };
-      const res = await salesApi.checkout(payload);
-      const saleData = res?.data || {};
-      const completed = {
-        ...saleData, invoice_number: saleData.invoice_number || payload.invoice_number,
-        items: saleData.items || payload.items.map(i => ({ ...i, product_name: i.name })),
-        grand_total: Number(saleData.grand_total ?? saleData.total ?? totalNum),
-        invoice_date: saleData.invoice_date || payload.invoice_date,
-        created_at: saleData.created_at || payload.invoice_date,
-      };
-      setLastSale(completed); setShowAddModal(false); setShowInvoice(true);
-      await Promise.all([fetchProducts(), fetchSales()]);
-      showToast(t.ok_sale, 'success');
+      const response = await productsApi.getStats();
+      const d = response?.data || {};
+      setStats({
+        total: Number(d.totalProducts ?? d.total ?? 0),
+        low: Number(d.lowStock ?? d.low_stock ?? 0),
+        out: Number(d.outOfStock ?? d.out_of_stock ?? 0),
+        value: Number(d.stockValue ?? d.stock_value ?? 0),
+      });
     } catch (err) {
-      console.error(err); setLocalError(err.message || t.err_save);
-      showToast(err.message || t.err_save, 'danger');
-    } finally { setIsUpdating(false); }
+      console.warn('Statistiques indisponibles :', err);
+    }
   };
 
-  const handleOpenEdit = (sale) => {
-    if (!canEdit()) { showToast(t.err_permission, 'warning'); return; }
-    setSaleToEdit(sale); setEditStatus(sale.status || 'paid'); setEditNotes(sale.notes || '');
-    setEditItems(getSaleItems(sale).map(i => ({ ...i, quantity: Number(i.quantity) || 1, price: Number(i.price ?? i.unit_price) || 0 })));
-  };
-
-  const submitEdit = async () => {
-    if (!saleToEdit) return;
-    setIsUpdating(true);
+  const fetchCategories = async () => {
     try {
-      const newTotal = editItems.reduce((s, i) => s + Number(i.quantity) * Number(i.price), 0);
-      await salesApi.updateSale(saleToEdit.id, { status: editStatus, notes: toTextOrNull(editNotes), total: toNumOrZero(newTotal), grand_total: toNumOrZero(newTotal) });
-      setSaleToEdit(null); await fetchSales(); showToast(t.ok_edit, 'success');
-    } catch (err) { console.error(err); showToast(err.message || t.err_edit, 'danger'); }
-    finally { setIsUpdating(false); }
+      const response = await categoriesApi.getAll();
+      setCategoriesFull(getRows(response).filter((c) => c && c.name));
+    } catch (err) {
+      console.warn('Catégories indisponibles :', err);
+    }
   };
 
-  const confirmDelete = async () => {
-    if (!saleToDelete) return;
-    if (!canDelete()) { showToast(t.err_permission, 'danger'); return; }
-    setIsUpdating(true);
+  const fetchSuppliers = async () => {
     try {
-      await salesApi.deleteSale(saleToDelete.id, getSaleItems(saleToDelete));
-      setSaleToDelete(null); await Promise.all([fetchSales(), fetchProducts()]);
-      showToast(t.ok_delete, 'success');
-    } catch (err) { console.error(err); showToast(err.message || t.err_delete, 'danger'); }
-    finally { setIsUpdating(false); }
+      const response = await suppliersApi.getAll();
+      setSuppliers(getRows(response));
+    } catch (err) {
+      console.warn('Fournisseurs indisponibles :', err);
+    }
   };
 
-  const printInvoice = (saleToPrint = null) => {
-    const sale = saleToPrint || lastSale; if (!sale) return;
-    const itemsL = getSaleItems(sale);
-    const invNum = sale.invoice_number || `VENTE-${sale.id}`;
-    const custName = getCustomerName(sale);
-    const itemsHtml = itemsL.map(i => {
-      const n = i.product_name || i.name || i.products?.name || 'Produit';
-      const cat = getItemCategory(i, productById);
-      const q = Number(i.quantity) || 0; const p = Number(i.price ?? i.unit_price) || 0; const lt = Number(i.total ?? q * p);
-      return `<tr><td>${escapeHtml(n)}</td><td>${escapeHtml(cat)}</td><td class="center">${q}</td><td class="right">${formatNumber(p)}</td><td class="right">${formatNumber(lt)}</td></tr>`;
-    }).join('');
-    const sub = Number(sale.subtotal ?? sale.total ?? 0); const disc = Number(sale.discount ?? 0);
-    const tot = Number(sale.grand_total ?? sale.total ?? 0);
-    const win = window.open('', '_blank', 'width=900,height=900');
-    if (!win) return showToast('Pop-up bloqué.', 'danger');
-    win.document.write(`<!DOCTYPE html><html lang="${lang}" dir="${t.dir}"><head><meta charset="UTF-8"><title>${invNum}</title>
-    <style>*{box-sizing:border-box}body{margin:0;padding:30px;color:#14213d;font-family:${lang === 'ar' ? "'Cairo'," : ''}Arial,sans-serif}.inv{max-width:800px;margin:auto}.hdr{text-align:center;border-bottom:2px solid #14213d;padding-bottom:18px}.store{font-size:26px;font-weight:800}.muted{color:#66748b}h2{text-align:center;margin:24px 0}.meta{display:flex;justify-content:space-between;gap:15px;margin:25px 0}.meta>div{flex:1}.lbl{display:block;font-size:11px;color:#66748b;margin-bottom:5px}table{width:100%;border-collapse:collapse;margin-top:20px}th{background:#e8efff;text-align:${t.dir === 'rtl' ? 'right' : 'left'}}th,td{padding:11px 9px;border-bottom:1px solid #e3e9f2}.center{text-align:center}.right{text-align:${t.dir === 'rtl' ? 'left' : 'right'}}.totals{width:330px;margin:22px 0 0 auto}.row{display:flex;justify-content:space-between;padding:8px 0}.grand{border-top:2px solid #14213d;border-bottom:2px solid #14213d;font-size:19px;font-weight:800;padding:13px 0}.footer{margin-top:40px;border-top:1px solid #ddd;padding-top:18px;text-align:center;color:#66748b}@media print{body{padding:0}}</style></head><body>
-    <div class="inv"><div class="hdr"><div class="store">${escapeHtml(STORE.name)}</div><div class="muted">${escapeHtml(STORE.address)}<br>${escapeHtml(STORE.phone)}</div></div>
-    <h2>${t.facture}</h2><div class="meta"><div><span class="lbl">N°</span><strong>${escapeHtml(invNum)}</strong></div><div><span class="lbl">${t.th_date.toUpperCase()}</span><strong>${escapeHtml(formatDate(sale.invoice_date || sale.created_at, t.locale))}</strong></div><div><span class="lbl">${t.f_customer.toUpperCase()}</span><strong>${escapeHtml(custName)}</strong></div></div>
-    <table><thead><tr><th>${t.f_product}</th><th>${t.th_category}</th><th class="center">${t.th_qty}</th><th class="right">${t.f_price}</th><th class="right">${t.th_total}</th></tr></thead><tbody>${itemsHtml}</tbody></table>
-    <div class="totals"><div class="row"><span>Sous-total</span><strong>${formatNumber(sub)} ${cur}</strong></div><div class="row"><span>Remise</span><strong>- ${formatNumber(disc)} ${cur}</strong></div><div class="row grand"><span>TOTAL</span><span>${formatNumber(tot)} ${cur}</span></div></div>
-    <div class="footer">${t.thanks}<br>${t.thanks_sub}</div></div></body></html>`);
-    win.document.close(); win.focus(); win.onload = () => win.print();
+  const refreshData = () => Promise.all([fetchProducts(), fetchSales(), fetchStats()]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    fetchProducts();
+    fetchSales();
+    fetchStats();
+    fetchCategories();
+    fetchSuppliers();
+  }, []);
+
+  useEffect(() => {
+    if (!successKey) return undefined;
+    const timer = setTimeout(() => setSuccessKey(''), 3500);
+    return () => clearTimeout(timer);
+  }, [successKey]);
+
+  const closeModals = () => {
+    setShowForm(false);
+    setShowDeleteModal(false);
+    setFormErrorKey('');
+    setSelectedProduct(null);
+    setProductToDelete(null);
+    setFormData(emptyForm());
   };
 
-  const exportSale = (sale) => {
-    const itemsL = getSaleItems(sale);
-    const rows = [
-      [t.th_invoice, sale.invoice_number || sale.id],
-      [t.th_date, formatDate(sale.invoice_date || sale.created_at, t.locale)],
-      [t.f_customer, getCustomerName(sale)],
-      [t.th_status, getStatus(sale.status, sale.payment_method).label], [],
-      [t.f_product, t.th_category, t.th_qty, t.f_price, t.th_total],
-      ...itemsL.map(i => [i.product_name || i.name, getItemCategory(i, productById), i.quantity, i.price, i.total ?? i.quantity * i.price]),
-      [], ['TOTAL', '', '', '', sale.grand_total ?? sale.total],
-    ];
-    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url; link.download = `Vente_${sale.invoice_number || sale.id}.csv`;
-    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+  useEffect(() => {
+    if (!showForm && !showDeleteModal) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') closeModals();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showForm, showDeleteModal]);
+
+  const handleOpenCreate = () => {
+    setSelectedProduct(null);
+    setFormData(emptyForm());
+    setFormErrorKey('');
+    setShowForm(true);
   };
 
-  const exportAll = () => {
-    const rows = [
-      [t.th_invoice, t.f_customer, t.th_products, t.th_category, t.th_qty, t.th_total, t.th_status, t.th_date],
-      ...filteredSales.map(s => [
-        s.invoice_number || `VENTE-${s.id}`, getCustomerName(s), getProductNames(s),
-        getSaleCategories(s, productById), getTotalQuantity(s),
-        Number(s.grand_total ?? s.total ?? 0), getStatus(s.status, s.payment_method).label,
-        formatDate(s.invoice_date || s.created_at, t.locale),
-      ]),
-    ];
-    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url; link.download = `Ventes_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+  const handleOpenEdit = (product) => {
+    setSelectedProduct(product);
+    setFormData({
+      name: product.name || '',
+      category: getCategoryName(product),
+      subcategory: getSubcategoryName(product),
+      barcode: product.barcode || '',
+      status: product.status || 'neuf',
+      purchase_price: product.purchase_price ?? '',
+      sale_price: hasSalePrice(product.sale_price) ? String(product.sale_price) : '',
+      quantity: product.quantity ?? '',
+      min_quantity: product.min_quantity ?? 5,
+      supplier_id: product.supplier_id ?? '',
+    });
+    setFormErrorKey('');
+    setShowForm(true);
   };
 
-  const hasFilters = Boolean(searchTerm || filterStatus !== 'all' || filterPayment !== 'all' || filterCategory !== 'all' || startDateFilter || endDateFilter);
-  const resetFilters = () => {
-    setSearchTerm(''); setFilterStatus('all'); setFilterPayment('all');
-    setFilterCategory('all'); setStartDateFilter(''); setEndDateFilter('');
+  const handleDeleteClick = (product) => {
+    setProductToDelete(product);
+    setFormErrorKey('');
+    setShowDeleteModal(true);
   };
 
-  const displayedProducts = useMemo(() => {
-    if (!categoryFilter) return products;
-    return products.filter(p => (p.categories?.name || p.category?.name || p.category_name || 'Non catégorisé') === categoryFilter);
-  }, [products, categoryFilter]);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setFormErrorKey('');
+    try {
+      const productName = formData.subcategory.trim();
+      if (!productName) {
+        setFormErrorKey('err_save');
+        setSaving(false);
+        return;
+      }
+      const { subcategory, ...restOfFormData } = formData;
+      const payload = {
+        ...restOfFormData,
+        name: productName,
+        barcode: formData.barcode?.trim() || null,
+        purchase_price: Number(formData.purchase_price) || 0,
+        // Conservé en base pour la vente, mais NON affiché dans le tableau.
+        // Vide = null (non défini), jamais 0 forcé.
+        sale_price: formData.sale_price === '' || formData.sale_price === null || formData.sale_price === undefined
+          ? null
+          : Number(formData.sale_price),
+        quantity: Number.parseInt(formData.quantity, 10) || 0,
+        min_quantity: Number.parseInt(formData.min_quantity, 10) || 0,
+        supplier_id: formData.supplier_id || null,
+      };
+      if (selectedProduct) await productsApi.update(selectedProduct.id, payload);
+      else await productsApi.create(payload);
+      closeModals();
+      setSuccessKey('ok_save');
+      await refreshData();
+    } catch (err) {
+      console.error('Erreur sauvegarde détaillée :', { code: err?.code, message: err?.message, details: err?.details, hint: err?.hint });
+      setFormErrorKey('err_save');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  const selectedProduct = products.find(p => String(p.id) === String(newItem.product_id));
-  const subtotal = items.reduce((s, i) => s + (i.price * i.quantity), 0);
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete || deleting) return;
+    setDeleting(true);
+    setFormErrorKey('');
+    try {
+      const result = await productsApi.delete(productToDelete.id);
+      closeModals();
+      if (result.archived) setSuccessKey('ok_archive');
+      else setSuccessKey('ok_delete');
+      await refreshData();
+    } catch (err) {
+      console.error('Erreur suppression :', { code: err?.code, message: err?.message, details: err?.details, hint: err?.hint });
+      setFormErrorKey('err_delete');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
-  if (userLoading) {
-    return (
-      <div className="container-fluid py-4 text-center">
-        <Spinner animation="border" variant="primary" />
-        <p className="mt-3">Vérification des permissions...</p>
-      </div>
-    );
-  }
+  const handleResetFilters = () => {
+    setSearch('');
+    setDebouncedSearch('');
+    setFilterCategory('all');
+    setFilterSubcategory('all');
+    setFilterStatus('all');
+    setFilterStock('all');
+    setSortBy('name');
+    setSortDir('asc');
+  };
+
+  const handleSort = (field) => {
+    if (sortBy === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortBy(field); setSortDir('asc'); }
+  };
+
+  const sortIcon = (field) => {
+    if (sortBy !== field) return 'fa-sort';
+    return sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
+  };
+
+  const filteredProducts = useMemo(() => {
+    const q = debouncedSearch.toLocaleLowerCase('fr');
+    return products
+      .filter((product) => {
+        const name = String(product.name || '').toLocaleLowerCase('fr');
+        const barcode = String(product.barcode || '').toLocaleLowerCase('fr');
+        const category = getCategoryName(product);
+        const subcategory = getSubcategoryName(product);
+        const matchSearch = !q || name.includes(q) || barcode.includes(q);
+        const matchCategory = filterCategory === 'all' || category === filterCategory;
+        const matchSubcategory = filterSubcategory === 'all' || subcategory === filterSubcategory;
+        const matchStatus = filterStatus === 'all' || product.status === filterStatus;
+        const qty = Number(product.quantity) || 0;
+        const min = Number(product.min_quantity) || 0;
+        let matchStock = true;
+        if (filterStock === 'out') matchStock = qty <= 0;
+        if (filterStock === 'low') matchStock = qty > 0 && qty <= min;
+        if (filterStock === 'available') matchStock = qty > min;
+        return matchSearch && matchCategory && matchSubcategory && matchStatus && matchStock;
+      })
+      .sort((a, b) => {
+        let x; let y;
+        if (sortBy === 'name') {
+          x = String(a.name || '').toLocaleLowerCase('fr');
+          y = String(b.name || '').toLocaleLowerCase('fr');
+        } else if (sortBy === 'sold_qty') {
+          x = getAggForProduct(a, salesAgg).qty || 0;
+          y = getAggForProduct(b, salesAgg).qty || 0;
+        } else if (sortBy === 'total_sales') {
+          x = getAggForProduct(a, salesAgg).total || 0;
+          y = getAggForProduct(b, salesAgg).total || 0;
+        } else {
+          x = Number(a[sortBy]) || 0;
+          y = Number(b[sortBy]) || 0;
+        }
+        let cmp = 0;
+        if (x < y) cmp = -1;
+        if (x > y) cmp = 1;
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+  }, [products, debouncedSearch, filterCategory, filterSubcategory, filterStatus, filterStock, sortBy, sortDir, salesAgg]);
+
+  const calculatedPrices = useMemo(() => {
+    const quantity = Number(formData.quantity) || 0;
+    const purchase = Number(formData.purchase_price) || 0;
+    const agg = selectedProduct ? getAggForProduct(selectedProduct, salesAgg) : { qty: 0, total: 0 };
+    return { totalPurchase: quantity * purchase, soldQty: agg.qty, totalSales: agg.total };
+  }, [formData.quantity, formData.purchase_price, selectedProduct, salesAgg]);
 
   return (
-    <div className="container-fluid py-4 ventes-compact">
-      <ToastContainer position="top-end" className="p-3">
-        {toasts.map(toast => (
-          <Toast key={toast.id} onClose={() => setToasts(prev => prev.filter(tt => tt.id !== toast.id))}
-            bg={toast.variant} autohide delay={5000}>
-            <Toast.Body className="text-white">{toast.message}</Toast.Body>
-          </Toast>
-        ))}
-      </ToastContainer>
+    <div className="expenses-page" dir={t.dir} lang={lang}>
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+        .expenses-page { --ink: #14213d; --muted: #66748b; --line: #e3e9f2; --bg: #f2f5fb; --card: #fff; --primary: #1f5eea; --primary-soft: #e8efff; --green: #0f9d74; --green-soft: #def7ee; --violet: #6a4de0; --violet-soft: #ece8fd; --amber: #e08a0b; --amber-soft: #fff0d6; --red: #d63c4a; --red-soft: #fde8ea; --teal: #0e8fa8; --teal-soft: #dcf3f8; --rose: #c2417c; --rose-soft: #fbe6f0; --fs-xs: clamp(11px, 0.70vw + 9px, 13px); --fs-sm: clamp(12px, 0.75vw + 10px, 14px); --fs-md: clamp(13px, 0.80vw + 11px, 15px); --fs-lg: clamp(15px, 0.90vw + 12px, 18px); --fs-xl: clamp(17px, 1.00vw + 13px, 21px); --fs-2xl: clamp(20px, 1.80vw + 14px, 28px); min-height: 100vh; padding: clamp(12px, 2.2vw, 28px); background: radial-gradient(1000px 340px at 100% -80px, rgba(31,94,234,.08), transparent 70%), var(--bg); color: var(--ink); font-size: var(--fs-md); font-family: Inter, 'Segoe UI', system-ui, Tahoma, Arial, sans-serif; -webkit-text-size-adjust: 100%; }
+        .expenses-page[lang="ar"] { font-family: Cairo, 'Noto Sans Arabic', Tahoma, 'Segoe UI', Arial, sans-serif; line-height: 1.6; }
+        .expenses-page * { box-sizing: border-box; }
+        .expenses-page button:focus-visible, .expenses-page input:focus-visible, .expenses-page select:focus-visible, .expenses-page textarea:focus-visible { outline: 3px solid rgba(31,94,234,.35); outline-offset: 2px; }
+        .ep-amt { direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-nums; }
+        .ep-hero { position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding: clamp(16px, 3vw, 30px); margin-bottom: 20px; border-radius: 20px; color: #fff; background: linear-gradient(125deg, #0f2f66 0%, #1b55c9 58%, #2aa3d9 100%); box-shadow: 0 14px 32px rgba(21, 74, 170, .20); }
+        .ep-hero::after { content: ""; position: absolute; z-index: -1; width: 250px; height: 250px; inset-inline-end: -70px; top: -115px; border: 32px solid rgba(255,255,255,.09); border-radius: 50%; }
+        .ep-eyebrow { font-size: var(--fs-xs); font-weight: 800; letter-spacing: 1.8px; opacity: .78; }
+        .ep-title h1 { margin: 6px 0 4px; font-size: var(--fs-2xl); font-weight: 800; display: flex; align-items: center; gap: 12px; line-height: 1.25; }
+        .ep-title-icon { display: inline-grid; place-items: center; flex: 0 0 auto; width: clamp(34px, 4vw, 42px); height: clamp(34px, 4vw, 42px); border-radius: 12px; background: rgba(255,255,255,.16); font-size: var(--fs-lg); }
+        .ep-title p { margin: 0; color: rgba(255,255,255,.82); font-size: var(--fs-md); }
+        .ep-hero-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .ep-btn-add { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border: 0; border-radius: 11px; background: #fff; color: #174078; font: inherit; font-weight: 800; font-size: var(--fs-md); cursor: pointer; box-shadow: 0 6px 16px rgba(0,0,0,.14); transition: .18s; }
+        .ep-btn-add:hover { transform: translateY(-2px); }
+        .ep-btn-ghost { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid rgba(255,255,255,.45); border-radius: 11px; background: rgba(255,255,255,.10); color: #fff; font: inherit; font-size: var(--fs-sm); font-weight: 800; cursor: pointer; transition: .18s; }
+        .ep-btn-ghost:hover { background: rgba(255,255,255,.2); }
+        .ep-alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid #f6c8cd; border-radius: 11px; background: var(--red-soft); color: #a3212e; font-size: var(--fs-sm); }
+        .ep-alert button { border: 0; padding: 7px 12px; border-radius: 8px; background: #fff; color: #a3212e; font: inherit; font-size: var(--fs-xs); font-weight: 800; cursor: pointer; }
+        .ep-success { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid #bfe8d9; border-radius: 11px; background: var(--green-soft); color: #0b6a4e; font-size: var(--fs-sm); }
+        .ep-success button { border: 0; padding: 7px 12px; border-radius: 8px; background: #fff; color: #0b6a4e; font: inherit; font-size: var(--fs-xs); font-weight: 800; cursor: pointer; }
+        .ep-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .ep-card { position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: clamp(14px, 1.8vw, 20px); background: var(--card); border: 1px solid var(--line); border-inline-start: 4px solid var(--accent); border-radius: 16px; box-shadow: 0 4px 14px rgba(20,33,61,.04); transition: transform .2s, box-shadow .2s; }
+        .ep-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(20,33,61,.08); }
+        .ep-card::after { content: ""; position: absolute; inset-inline-end: -30px; bottom: -42px; width: 105px; height: 105px; border-radius: 50%; background: var(--accent-soft); opacity: .7; }
+        .ep-card-info { position: relative; z-index: 1; min-width: 0; }
+        .ep-card-info h3 { margin: 0 0 8px; font-size: var(--fs-sm); color: var(--muted); font-weight: 800; }
+        .ep-card-info .value { font-size: var(--fs-2xl); font-weight: 800; letter-spacing: -.3px; color: var(--ink); overflow-wrap: anywhere; line-height: 1.2; }
+        .ep-card-info .value small { font-size: var(--fs-xs); color: #8896ab; font-weight: 700; }
+        .ep-card-info .sub { margin-top: 5px; font-size: var(--fs-xs); color: var(--accent); font-weight: 700; }
+        .ep-icon { position: relative; z-index: 1; flex: 0 0 auto; width: clamp(36px, 3.5vw, 44px); height: clamp(36px, 3.5vw, 44px); border-radius: 13px; display: grid; place-items: center; font-size: var(--fs-lg); background: var(--accent-soft); color: var(--accent); }
+        .tone-blue { --accent: var(--primary); --accent-soft: var(--primary-soft); }
+        .tone-amber { --accent: var(--amber); --accent-soft: var(--amber-soft); }
+        .tone-violet { --accent: var(--violet); --accent-soft: var(--violet-soft); }
+        .tone-green { --accent: var(--green); --accent-soft: var(--green-soft); }
+        .tone-rose { --accent: var(--rose); --accent-soft: var(--rose-soft); }
+        .tone-teal { --accent: var(--teal); --accent-soft: var(--teal-soft); }
+        .ep-panel { background: var(--card); border-radius: 16px; border: 1px solid var(--line); overflow: hidden; box-shadow: 0 4px 14px rgba(20,33,61,.035); }
+        .ep-panel-head { padding: 16px 20px; border-bottom: 1px solid var(--line); background: #fbfcff; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+        .ep-panel-head h5 { margin: 0 0 4px; font-size: var(--fs-lg); font-weight: 800; color: var(--ink); }
+        .ep-panel-head p { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
+        .ep-panel-head .badge-count { background: var(--primary-soft); color: var(--primary); font-weight: 800; padding: 6px 12px; border-radius: 999px; font-size: var(--fs-sm); }
+        .ep-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; padding: 15px 20px; background: #fbfcff; border-bottom: 1px solid var(--line); }
+        .ep-filters .ep-fg-search { grid-column: span 2; }
+        .ep-fg { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .ep-fg label { font-size: var(--fs-xs); font-weight: 800; color: #4b5b75; text-transform: uppercase; letter-spacing: .4px; }
+        .ep-filter-input { width: 100%; height: 42px; border: 1px solid #d9e1ed; border-radius: 9px; padding: 0 12px; font: inherit; font-size: max(16px, var(--fs-md)); color: #2a3a55; background: #fff; outline: none; }
+        .ep-filter-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+        .ep-search-input-group { display: flex; }
+        .ep-search-input-group .ep-filter-input { border-start-end-radius: 0; border-end-end-radius: 0; border-inline-end: 0; }
+        .ep-search-btn { height: 42px; padding: 0 14px; border: 1px solid #d9e1ed; border-start-start-radius: 0; border-end-start-radius: 0; border-start-end-radius: 9px; border-end-end-radius: 9px; background: var(--primary-soft); color: var(--primary); cursor: pointer; font-size: var(--fs-md); }
+        .ep-search-btn:hover { background: var(--primary); color: #fff; }
+        .ep-reset { height: 40px; padding: 0 13px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: #4b5b75; font: inherit; font-size: var(--fs-sm); font-weight: 800; cursor: pointer; white-space: nowrap; }
+        .ep-reset:hover { background: #f1f5fb; }
+        .ep-results-box { height: 42px; display: flex; align-items: center; justify-content: center; background: var(--primary-soft); color: var(--primary); font-weight: 800; border-radius: 9px; font-size: var(--fs-sm); text-align: center; padding: 0 8px; }
+        .ep-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .ep-table { width: 100%; min-width: 1100px; border-collapse: collapse; }
+        .ep-table th { background: #f3f6fc; color: #5b6b85; text-align: start; padding: 13px 14px; font-size: var(--fs-xs); font-weight: 800; letter-spacing: .4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+        .ep-table th .sort-btn { background: none; border: 0; padding: 0; font: inherit; font-size: var(--fs-xs); font-weight: 800; color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; letter-spacing: .4px; text-transform: uppercase; }
+        .ep-table th .sort-btn i { font-size: var(--fs-xs); opacity: .6; }
+        .ep-table th .sort-btn i.on { opacity: 1; color: var(--primary); }
+        .ep-table td { padding: 12px 14px; border-bottom: 1px solid #f0f3f8; font-size: var(--fs-sm); color: #44546d; vertical-align: middle; }
+        .ep-table tbody tr:nth-child(even) td { background: #fafbfe; }
+        .ep-table tbody tr:hover td { background: #eff4ff; }
+        .ep-table tr:last-child td { border-bottom: 0; }
+        .ep-col-end { text-align: end !important; }
+        .ep-col-center { text-align: center !important; }
+        .ep-state { padding: 38px 18px !important; text-align: center; color: #8896ab !important; }
+        .ep-spinner { display: inline-block; width: 22px; height: 22px; margin-inline-end: 10px; vertical-align: middle; border: 3px solid #dbeafe; border-top-color: var(--primary); border-radius: 50%; animation: ep-spin .75s linear infinite; }
+        @keyframes ep-spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .ep-spinner { animation-duration: 2s; } .ep-card, .ep-btn-add { transition: none; } }
+        .ep-prod-cell { display: flex; align-items: center; gap: 10px; }
+        .ep-prod-avatar { flex: 0 0 38px; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); font-size: var(--fs-md); }
+        .ep-prod-name { font-weight: 700; color: #2a3a55; font-size: var(--fs-md); }
+        .ep-prod-meta { font-size: var(--fs-xs); color: var(--muted); margin-top: 2px; }
+        .ep-badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 800; white-space: nowrap; }
+        .badge-blue { background: var(--primary-soft); color: #164aba; }
+        .badge-violet { background: var(--violet-soft); color: #4a32b0; }
+        .badge-green { background: var(--green-soft); color: #0b6a4e; }
+        .badge-amber { background: var(--amber-soft); color: #94590a; }
+        .badge-rose { background: var(--rose-soft); color: #9c2a62; }
+        .badge-teal { background: var(--teal-soft); color: #0a6577; }
+        .badge-gray { background: #eef2f8; color: #4b5b75; }
+        .ep-money-purchase { color: #164aba; font-weight: 700; white-space: nowrap; }
+        .ep-money-sale { color: #0b6a4e; font-weight: 700; white-space: nowrap; }
+        .ep-actions { display: flex; gap: 6px; justify-content: center; }
+        .btn-icon { width: 34px; height: 34px; border-radius: 8px; border: 1px solid transparent; display: grid; place-items: center; cursor: pointer; transition: .18s; background: transparent; color: #64748b; font-size: var(--fs-sm); }
+        .btn-icon:hover { background: #eef2f8; }
+        .btn-edit { background: var(--primary-soft); color: var(--primary); border-color: #c9daff; }
+        .btn-edit:hover { background: var(--primary); color: #fff; }
+        .btn-delete { background: var(--red-soft); color: var(--red); border-color: #f6c8cd; }
+        .btn-delete:hover { background: var(--red); color: #fff; }
+        .ep-modal-overlay { position: fixed; inset: 0; z-index: 1050; display: flex; align-items: center; justify-content: center; padding: clamp(10px, 2vw, 20px); background: rgba(15,23,42,.58); backdrop-filter: blur(4px); }
+        .ep-modal { width: 100%; max-width: 760px; max-height: calc(100vh - 24px); overflow: auto; background: #fff; border-radius: 18px; box-shadow: 0 25px 50px rgba(0,0,0,.22); }
+        .ep-modal.small { max-width: 420px; }
+        .ep-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fbfcff, #fff); }
+        .ep-modal-header h3 { margin: 0; font-size: var(--fs-lg); font-weight: 800; display: flex; align-items: center; gap: 10px; }
+        .ep-modal-header .ep-modal-icon { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--primary-soft); color: var(--primary); font-size: var(--fs-sm); }
+        .ep-modal-body { padding: clamp(14px, 2.5vw, 22px); }
+        .ep-modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; background: #f7f9fd; border-top: 1px solid var(--line); }
+        .ep-modal-footer.center { justify-content: center; }
+        .ep-form-group { margin-bottom: 15px; }
+        .ep-form-group label { display: block; margin-bottom: 6px; font-size: var(--fs-sm); font-weight: 800; color: #4b5b75; }
+        .ep-form-group input, .ep-form-group select, .ep-form-group textarea { width: 100%; border: 1px solid #d9e1ed; border-radius: 9px; padding: 10px 12px; font: inherit; font-size: max(16px, var(--fs-md)); color: #2a3a55; background: #fbfcfe; outline: none; }
+        .ep-form-group input:focus, .ep-form-group select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); background: #fff; }
+        .ep-form-hint { display: block; margin-top: 4px; font-size: var(--fs-xs); color: #8896ab; }
+        .ep-form-error { margin-bottom: 14px; padding: 11px 14px; border-radius: 9px; background: var(--red-soft); color: #a3212e; font-size: var(--fs-sm); font-weight: 600; }
+        .ep-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .ep-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        @media (max-width: 720px) { .ep-grid3, .ep-grid2 { grid-template-columns: 1fr; } }
+        .ep-barcode-group { display: flex; }
+        .ep-barcode-group input { border-start-end-radius: 0; border-end-end-radius: 0; }
+        .ep-barcode-btn { padding: 0 14px; border: 1px solid #d9e1ed; border-inline-start: 0; border-start-end-radius: 9px; border-end-end-radius: 9px; background: var(--primary-soft); color: var(--primary); cursor: pointer; font-size: var(--fs-md); }
+        .ep-barcode-btn:hover { background: var(--primary); color: #fff; }
+        .ep-summary { margin-top: 16px; padding: 16px; border-radius: 13px; background: linear-gradient(120deg, #f2f7ff, #f8fbff); border: 1px solid #e0ebff; }
+        .ep-summary h6 { margin: 0 0 12px; font-size: var(--fs-md); font-weight: 800; color: #2a3a55; }
+        .ep-summary .ep-summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        @media (max-width: 560px) { .ep-summary .ep-summary-grid { grid-template-columns: 1fr; } }
+        .ep-summary .lbl { font-size: var(--fs-xs); color: var(--muted); margin-bottom: 3px; }
+        .ep-summary .val { font-weight: 800; font-size: var(--fs-lg); }
+        .ep-summary .val.buy { color: #164aba; }
+        .ep-summary .val.sell { color: #0b6a4e; }
+        .ep-btn { padding: 10px 20px; border-radius: 10px; border: 0; font: inherit; font-size: var(--fs-md); font-weight: 800; cursor: pointer; transition: .18s; }
+        .ep-btn:hover:not(:disabled) { filter: brightness(.96); transform: translateY(-1px); }
+        .ep-btn:disabled { opacity: .6; cursor: not-allowed; }
+        .ep-btn-cancel { background: #e6ebf3; color: #44546d; }
+        .ep-btn-save { background: linear-gradient(135deg, #1f5eea, #2f7bf0); color: #fff; }
+        .ep-btn-danger { background: var(--red); color: #fff; }
+        .ep-delete-body { padding: 28px 22px 10px; text-align: center; }
+        .ep-delete-icon { display: inline-grid; place-items: center; width: 58px; height: 58px; margin-bottom: 14px; border-radius: 50%; background: var(--red-soft); color: var(--red); font-size: var(--fs-xl); }
+        .ep-delete-body h4 { margin: 0 0 6px; font-size: var(--fs-xl); font-weight: 800; }
+        .ep-delete-body p { margin: 0 0 10px; color: var(--muted); font-size: var(--fs-sm); }
+        .ep-delete-name { background: #f7f9fd; border-radius: 9px; padding: 10px 14px; font-weight: 800; font-size: var(--fs-md); margin: 10px 0; overflow-wrap: anywhere; }
+        @media (max-width: 900px) { .ep-stats { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 560px) { .expenses-page { padding: 10px; } .ep-hero { border-radius: 16px; } .ep-filters { grid-template-columns: 1fr; padding: 14px; } .ep-filters .ep-fg-search { grid-column: auto; } .ep-hero-actions { width: 100%; } .ep-btn-add, .ep-btn-ghost { flex: 1; justify-content: center; } .ep-table th, .ep-table td { padding: 10px 11px; } .ep-stats { grid-template-columns: 1fr; gap: 12px; } .ep-modal-footer .ep-btn { flex: 1; } }
+      `}</style>
 
-      {/* ====== STATISTIQUES ====== */}
-      <Row className="mb-4">
-        <Col xs={3} md={3}>
-          <Card className="bg-primary text-white shadow-sm">
-            <Card.Body className="d-flex justify-content-between align-items-center">
-              <div>
-                <h6 className="mb-0">{t.stat_revenue}</h6>
-                <h2 className="mb-0">{formatNumber(stats.revenue)}</h2>
-              </div>
-              <FaMoneyBillWave size={40} />
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={3} md={3}>
-          <Card className="bg-success text-white shadow-sm">
-            <Card.Body className="d-flex justify-content-between align-items-center">
-              <div>
-                <h6 className="mb-0">{t.stat_count}</h6>
-                <h2 className="mb-0">{stats.count}</h2>
-              </div>
-              <FaShoppingCart size={40} />
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={3} md={3}>
-          <Card className="bg-info text-white shadow-sm">
-            <Card.Body className="d-flex justify-content-between align-items-center">
-              <div>
-                <h6 className="mb-0">{t.stat_month}</h6>
-                <h2 className="mb-0">{stats.monthlyS}</h2>
-              </div>
-              <FaCalendarAlt size={40} />
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={3} md={3}>
-          <Card className="bg-warning text-white shadow-sm">
-            <Card.Body className="d-flex justify-content-between align-items-center">
-              <div>
-                <h6 className="mb-0">{t.stat_day}</h6>
-                <h2 className="mb-0">{stats.dailyS}</h2>
-              </div>
-              <FaExchangeAlt size={40} />
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+      <header className="ep-hero">
+        <div className="ep-title">
+          <span className="ep-eyebrow">GESTISTOCK / INVENTAIRE</span>
+          <h1><span className="ep-title-icon"><i className="fas fa-boxes-stacked" /></span>{t.title}</h1>
+          <p>{t.subtitle}</p>
+        </div>
+        <div className="ep-hero-actions">
+          <button type="button" className="ep-btn-ghost" onClick={refreshData} disabled={loading}>
+            <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`} /> {t.refresh}
+          </button>
+          <button type="button" className="ep-btn-add" onClick={handleOpenCreate}><i className="fas fa-plus" /> {t.add}</button>
+        </div>
+      </header>
 
-      {/* ====== CARTE PRINCIPALE ====== */}
-      <Card className="shadow-sm">
-        <Card.Header className="bg-primary text-white">
-          <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h3 className="mb-0 d-flex align-items-center">
-              <FaCashRegister className="me-2" />
-              {t.title}
-              <Badge bg={canEdit() ? 'success' : 'secondary'} className="ms-2" style={{ fontSize: '0.6em' }}>
-                {canEdit() ? <FaUserShield className="me-1" /> : <FaUser className="me-1" />}
-                {canEdit() ? t.role_admin : t.role_user}
-              </Badge>
-            </h3>
-            <div className="d-flex align-items-center gap-2">
-              <Button variant="outline-success" onClick={exportAll}>
-                <FaFileExcel className="me-2" />{t.export_all}
-              </Button>
-              <Button variant="light" onClick={() => { fetchSales(); fetchProducts(); fetchCustomers(); }} disabled={loading}>
-                <FaSyncAlt className={loading ? "spin" : ""} />
-                <span className="ms-2">{t.refresh}</span>
-              </Button>
-              {canAdd() && (
-                <Button variant="success" onClick={openAddModal} disabled={loading}>
-                  <FaPlus className="me-1" />
-                  {t.add}
-                </Button>
-              )}
+      {errorKey && (
+        <div className="ep-alert" role="alert"><span><i className="fas fa-exclamation-circle" /> &nbsp;{t[errorKey]}</span><button type="button" onClick={refreshData}>{t.retry}</button></div>
+      )}
+      {successKey && (
+        <div className="ep-success" role="status"><span><i className="fas fa-check-circle" /> &nbsp;{t[successKey]}</span><button type="button" onClick={() => setSuccessKey('')}>×</button></div>
+      )}
+
+      <section className="ep-stats">
+        <div className="ep-card tone-blue"><div className="ep-card-info"><h3>{t.stat_total}</h3><div className="value">{formatNumber(stats.total)}</div><div className="sub">{t.stat_total_sub}</div></div><div className="ep-icon"><i className="fas fa-boxes-stacked" /></div></div>
+        <div className="ep-card tone-amber"><div className="ep-card-info"><h3>{t.stat_low}</h3><div className="value">{formatNumber(stats.low)}</div><div className="sub">{t.stat_low_sub}</div></div><div className="ep-icon"><i className="fas fa-triangle-exclamation" /></div></div>
+        <div className="ep-card tone-rose"><div className="ep-card-info"><h3>{t.stat_out}</h3><div className="value">{formatNumber(stats.out)}</div><div className="sub">{t.stat_out_sub}</div></div><div className="ep-icon"><i className="fas fa-circle-xmark" /></div></div>
+        <div className="ep-card tone-green"><div className="ep-card-info"><h3>{t.stat_value}</h3><div className="value"><bdi className="ep-amt">{formatNumber(stats.value)}</bdi> <small>{cur}</small></div><div className="sub">{t.stat_value_sub}</div></div><div className="ep-icon"><i className="fas fa-coins" /></div></div>
+      </section>
+
+      <div className="ep-panel" style={{ marginBottom: 20 }}>
+        <div className="ep-panel-head">
+          <div><h5><i className="fas fa-sliders" style={{ color: 'var(--primary)', marginInlineEnd: 8 }} />{t.filters_title}</h5><p>{t.filters_sub}</p></div>
+          <button type="button" className="ep-reset" onClick={handleResetFilters}><i className="fas fa-rotate-left" /> {t.reset}</button>
+        </div>
+        <div className="ep-filters">
+          <div className="ep-fg ep-fg-search">
+            <label htmlFor="pp-search">{t.th_product}</label>
+            <div className="ep-search-input-group">
+              <input id="pp-search" type="search" className="ep-filter-input" placeholder={t.search_ph} value={search} onChange={(e) => setSearch(e.target.value)} />
+              <button type="button" className="ep-search-btn" title={t.scan} aria-label={t.scan} onClick={() => setShowSearchScanner(true)}><i className="fas fa-barcode" /></button>
             </div>
           </div>
-        </Card.Header>
-
-        <Card.Body>
-          {error && (
-            <Alert variant="danger" onClose={() => setError(null)} dismissible className="mb-3">
-              <FaInfoCircle className="me-2" />
-              {error}
-            </Alert>
+          <div className="ep-fg">
+            <label htmlFor="pp-cat">{t.category}</label>
+            <select id="pp-cat" className="ep-filter-input" value={filterCategory} onChange={(e) => { setFilterCategory(e.target.value); setFilterSubcategory('all'); }}>
+              <option value="all">{t.all_categories}</option>
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          {filterSubcategories.length > 0 && (
+            <div className="ep-fg">
+              <label htmlFor="pp-subcat">{t.subcategory}</label>
+              <select id="pp-subcat" className="ep-filter-input" value={filterSubcategory} onChange={(e) => setFilterSubcategory(e.target.value)}>
+                <option value="all">{t.all_subcategories}</option>
+                {filterSubcategories.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
           )}
+          <div className="ep-fg">
+            <label htmlFor="pp-status">{t.status}</label>
+            <select id="pp-status" className="ep-filter-input" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="all">{t.all_status}</option>
+              <option value="neuf">{t.neuf}</option>
+              <option value="occasion">{t.occasion}</option>
+            </select>
+          </div>
+          <div className="ep-fg">
+            <label htmlFor="pp-stock">{t.stock_level}</label>
+            <select id="pp-stock" className="ep-filter-input" value={filterStock} onChange={(e) => setFilterStock(e.target.value)}>
+              <option value="all">{t.all_stock}</option>
+              <option value="available">{t.available}</option>
+              <option value="low">{t.low}</option>
+              <option value="out">{t.out}</option>
+            </select>
+          </div>
+          <div className="ep-fg"><label>{t.results}</label><div className="ep-results-box">{t.results_count(filteredProducts.length)}</div></div>
+        </div>
+      </div>
 
-          {/* Filtres */}
-          <Row className="mb-3">
-            <Col md={2}>
-              <Form.Group>
-                <Form.Label className="fw-bold"><FaSearch className="me-2" />{t.th_invoice}</Form.Label>
-                <InputGroup>
-                  <Form.Control type="text" placeholder={t.search_ph} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                  {searchTerm && <Button variant="outline-secondary" onClick={() => setSearchTerm('')}>×</Button>}
-                </InputGroup>
-              </Form.Group>
-            </Col>
-            <Col md={2}>
-              <Form.Group>
-                <Form.Label className="fw-bold">{t.f_payment}</Form.Label>
-                <Form.Select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)}>
-                  <option value="all">{t.all_payments}</option>
-                  <option value="cash">{t.cash}</option>
-                  <option value="bankily">{t.bankily}</option>
-                  <option value="masrivi">{t.masrivi}</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={2}>
-              <Form.Group>
-                <Form.Label className="fw-bold">{t.th_category}</Form.Label>
-                <Form.Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-                  <option value="all">{t.all_categories}</option>
-                  {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={2}>
-              <Form.Group>
-                <Form.Label className="fw-bold">{t.th_date}</Form.Label>
-                <Form.Control type="date" value={startDateFilter} onChange={(e) => setStartDateFilter(e.target.value)} />
-              </Form.Group>
-            </Col>
-            <Col md={2}>
-              <Form.Group>
-                <Form.Label className="fw-bold">Fin</Form.Label>
-                <Form.Control type="date" value={endDateFilter} onChange={(e) => setEndDateFilter(e.target.value)} />
-              </Form.Group>
-            </Col>
-            <Col md={2} className="d-flex align-items-end">
-              {hasFilters && (
-                <Button variant="outline-secondary" onClick={resetFilters} className="w-100">
-                  <FaTimes className="me-2" />{t.reset}
-                </Button>
+      <div className="ep-panel">
+        <div className="ep-panel-head">
+          <div><h5>{t.inventory}</h5><p>{t.inventory_sub}</p></div>
+          <span className="badge-count">{t.results_count(filteredProducts.length)}</span>
+        </div>
+        <div className="ep-table-wrap">
+          <table className="ep-table">
+            <thead>
+              <tr>
+                <th style={{ width: 40 }}>#</th>
+                <th><button className="sort-btn" type="button" onClick={() => handleSort('name')}>{t.th_product} <i className={`fas ${sortIcon('name')} ${sortBy === 'name' ? 'on' : ''}`} /></button></th>
+                <th>{t.th_category}</th>
+                <th>{t.th_status}</th>
+                <th className="ep-col-end"><button className="sort-btn" type="button" onClick={() => handleSort('purchase_price')}>{t.th_purchase} <i className={`fas ${sortIcon('purchase_price')} ${sortBy === 'purchase_price' ? 'on' : ''}`} /></button></th>
+                <th className="ep-col-center"><button className="sort-btn" type="button" onClick={() => handleSort('quantity')}>{t.th_qty} <i className={`fas ${sortIcon('quantity')} ${sortBy === 'quantity' ? 'on' : ''}`} /></button></th>
+                <th className="ep-col-end">{t.th_total_purchase}</th>
+                <th className="ep-col-center"><button className="sort-btn" type="button" onClick={() => handleSort('sold_qty')}>{t.th_sold_qty} <i className={`fas ${sortIcon('sold_qty')} ${sortBy === 'sold_qty' ? 'on' : ''}`} /></button></th>
+                <th className="ep-col-end"><button className="sort-btn" type="button" onClick={() => handleSort('total_sales')}>{t.th_total_sales} <i className={`fas ${sortIcon('total_sales')} ${sortBy === 'total_sales' ? 'on' : ''}`} /></button></th>
+                <th>{t.th_stock}</th>
+                <th className="ep-col-center">{t.th_actions}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan="11" className="ep-state"><span className="ep-spinner" />{t.loading}</td></tr>
+              ) : filteredProducts.length === 0 ? (
+                <tr><td colSpan="11" className="ep-state">
+                  <div className="ep-prod-avatar" style={{ width: 56, height: 56, fontSize: 'var(--fs-xl)', margin: '0 auto 12px' }}><i className="fas fa-box-open" /></div>
+                  <div style={{ fontWeight: 800, color: '#2a3a55', fontSize: 'var(--fs-lg)' }}>{t.none_title}</div>
+                  <div style={{ marginTop: 4, fontSize: 'var(--fs-sm)' }}>{t.none_sub}</div>
+                  <button type="button" className="ep-btn ep-btn-save" style={{ marginTop: 14 }} onClick={handleOpenCreate}><i className="fas fa-plus" style={{ marginInlineEnd: 6 }} />{t.none_add}</button>
+                </td></tr>
+              ) : (
+                filteredProducts.map((product, index) => {
+                  const qty = Number(product.quantity) || 0;
+                  const purchase = Number(product.purchase_price) || 0;
+                  const agg = getAggForProduct(product, salesAgg);
+                  const stock = getStockStatus(qty, product.min_quantity);
+                  const category = getCategoryName(product) || t.no_category;
+                  const subcategory = getSubcategoryName(product);
+                  return (
+                    <tr key={product.id}>
+                      <td style={{ color: '#8896ab' }}>{index + 1}</td>
+                      <td>
+                        <div className="ep-prod-cell">
+                          <div className="ep-prod-avatar"><i className="fas fa-box" /></div>
+                          <div>
+                            <div className="ep-prod-name">{product.name}</div>
+                            <div className="ep-prod-meta"><i className="fas fa-barcode" style={{ marginInlineEnd: 4 }} />{product.barcode || t.no_barcode}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`ep-badge badge-${toneFor(category)}`}>{category}</span>
+                        {subcategory && (<div className="ep-prod-meta"><i className="fas fa-turn-up fa-rotate-90" style={{ marginInlineEnd: 4 }} />{subcategory}</div>)}
+                      </td>
+                      <td><span className={`ep-badge ${product.status === 'neuf' ? 'badge-blue' : 'badge-amber'}`}>{product.status === 'neuf' ? t.neuf : product.status === 'occasion' ? t.occasion : t.not_defined}</span></td>
+                      <td className="ep-col-end ep-money-purchase">{formatMoney(purchase, cur)}</td>
+                      <td className="ep-col-center"><span className={`ep-badge badge-${stock.tone}`}>{formatNumber(qty)}</span></td>
+                      <td className="ep-col-end ep-money-purchase">{formatMoney(qty * purchase, cur)}</td>
+                      <td className="ep-col-center"><span className="ep-badge badge-gray">{formatNumber(agg.qty)}</span></td>
+                      <td className="ep-col-end ep-money-sale">{formatMoney(agg.total, cur)}</td>
+                      <td><span className={`ep-badge badge-${stock.tone}`}><i className={`fas fa-${stock.key === 'out' ? 'circle-xmark' : stock.key === 'low' ? 'triangle-exclamation' : 'circle-check'}`} style={{ marginInlineEnd: 5 }} />{t[stock.key]}</span></td>
+                      <td className="ep-col-center">
+                        <div className="ep-actions">
+                          <button type="button" className="btn-icon btn-edit" onClick={() => handleOpenEdit(product)} title={t.edit} aria-label={t.edit}><i className="fas fa-pen" /></button>
+                          <button type="button" className="btn-icon btn-delete" onClick={() => handleDeleteClick(product)} title={t.delete} aria-label={t.delete}><i className="fas fa-trash-alt" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
-            </Col>
-          </Row>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-          <p className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>{t.footer_count(filteredSales.length)}</p>
-
-          {/* Tableau */}
-          {loading ? (
-            <div className="text-center py-5">
-              <Spinner animation="border" variant="primary" />
-              <p className="mt-2">{t.loading}</p>
+      {showForm && (
+        <div className="ep-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && closeModals()}>
+          <div className="ep-modal" role="dialog" aria-modal="true" aria-labelledby="pp-form-title">
+            <div className="ep-modal-header">
+              <h3 id="pp-form-title"><span className="ep-modal-icon"><i className={`fas ${selectedProduct ? 'fa-pen-to-square' : 'fa-box'}`} /></span>{selectedProduct ? t.modal_edit : t.modal_new}</h3>
+              <button type="button" className="btn-icon" onClick={closeModals} aria-label={t.close}><i className="fas fa-times" /></button>
             </div>
-          ) : (
-            <div className="table-responsive">
-              <Table striped bordered hover>
-                <thead className="table-dark">
-                  <tr>
-                    <th>{t.th_products}</th>
-                    <th>{t.th_category}</th>
-                    <th className="text-center">{t.th_qty}</th>
-                    <th className="text-end">{t.th_unit}</th>
-                    <th className="text-end">{t.th_total}</th>
-                    <th>{t.th_status}</th>
-                    <th>{t.th_date}</th>
-                    <th style={{ width: '140px' }}>{t.th_actions}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSales.length > 0 ? (
-                    filteredSales.map((sale, i) => {
-                      const st = getStatus(sale.status, sale.payment_method);
-                      const cn = sale.customers?.name || sale.customer?.name || t.walk_in;
-                      const qty = getTotalQuantity(sale);
-                      const avg = qty > 0 ? Number(sale.grand_total ?? sale.total ?? 0) / qty : 0;
-                      const names = getProductNames(sale);
-                      const cats = getSaleCategories(sale, productById);
-                      return (
-                        <tr key={sale.id}>
-                          <td title={names}>{names}</td>
-                          <td><Badge bg="primary">{cats}</Badge></td>
-                          <td className="text-center"><Badge bg="secondary">{t.units(qty)}</Badge></td>
-                          <td className="text-end">{formatNumber(avg)} {cur}</td>
-                          <td className="text-end fw-bold text-success">{formatNumber(sale.grand_total ?? sale.total)} {cur}</td>
-                          <td><Badge bg={st.bg}>{st.label}</Badge></td>
-                          <td>{formatDate(sale.invoice_date || sale.created_at, t.locale)}</td>
-                          <td>
-                            <div className="d-flex gap-1 flex-wrap">
-                              <Button variant="outline-info" size="sm" onClick={() => setSelectedSale(sale)} title={t.view}>
-                                <FaEye />
-                              </Button>
-                              {canEdit() && (
-                                <>
-                                  <Button variant="outline-success" size="sm" onClick={() => handleOpenEdit(sale)} title={t.edit}>
-                                    <FaEdit />
-                                  </Button>
-                                  <Button variant="outline-danger" size="sm" onClick={() => setSaleToDelete(sale)} title={t.delete}>
-                                    <FaTrash />
-                                  </Button>
-                                </>
-                              )}
-                              {!canEdit() && (
-                                <Button variant="outline-secondary" size="sm" disabled title="Actions réservées">
-                                  <FaLock />
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan="8" className="text-center py-4">
-                        <FaInfoCircle className="me-2" />
-                        {t.no_data}
-                      </td>
-                    </tr>
+            <form onSubmit={handleSubmit}>
+              <div className="ep-modal-body">
+                {formErrorKey && <div className="ep-form-error" role="alert">{t[formErrorKey]}</div>}
+                <div className="ep-form-group">
+                  <label htmlFor="pp-name">{t.f_name}</label>
+                  <input id="pp-name" type="text" value={formData.subcategory} placeholder={t.f_name_ph} readOnly required />
+                  <span className="ep-form-hint">{lang === 'ar' ? 'يتم تحديد اسم المنتج تلقائياً من الفئة الفرعية.' : 'Le nom du produit est défini automatiquement par la sous-catégorie.'}</span>
+                </div>
+                <div className="ep-grid3">
+                  <div className="ep-form-group">
+                    <label htmlFor="pp-category">{t.f_category}</label>
+                    <select id="pp-category" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value, subcategory: '', name: '' })}>
+                      <option value="">{t.f_category_ph}</option>
+                      {formData.category && !categories.includes(formData.category) && (<option value={formData.category}>{formData.category}</option>)}
+                      {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  {formSubcategories.length > 0 && (
+                    <div className="ep-form-group">
+                      <label htmlFor="pp-subcategory">{t.f_subcategory}</label>
+                      <select id="pp-subcategory" value={formData.subcategory} onChange={(e) => { const value = e.target.value; setFormData({ ...formData, subcategory: value, name: value }); }}>
+                        <option value="">{t.f_subcategory_ph}</option>
+                        {formData.subcategory && !formSubcategories.includes(formData.subcategory) && (<option value={formData.subcategory}>{formData.subcategory}</option>)}
+                        {formSubcategories.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
                   )}
-                </tbody>
-              </Table>
+                  <div className="ep-form-group">
+                    <label htmlFor="pp-barcode">{t.f_barcode}</label>
+                    <div className="ep-barcode-group">
+                      <input id="pp-barcode" type="text" placeholder={t.f_barcode_ph} value={formData.barcode} onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} />
+                      <button type="button" className="ep-barcode-btn" title={t.scan} onClick={() => setShowScanner(true)}><i className="fas fa-barcode" /></button>
+                    </div>
+                  </div>
+                  <div className="ep-form-group">
+                    <label htmlFor="pp-status-form">{t.f_status}</label>
+                    <select id="pp-status-form" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+                      <option value="neuf">{t.neuf}</option>
+                      <option value="occasion">{t.occasion}</option>
+                    </select>
+                  </div>
+                  <div className="ep-form-group">
+                    <label htmlFor="pp-purchase">{t.f_purchase} <span style={{ color: 'var(--red)' }}>*</span></label>
+                    <input id="pp-purchase" type="number" min="0" step="0.01" value={formData.purchase_price} onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })} required />
+                  </div>
+                  <div className="ep-form-group">
+                    <label htmlFor="pp-sale">{t.f_sale}</label>
+                    <input id="pp-sale" type="number" min="0" step="0.01" value={formData.sale_price} onChange={(e) => setFormData({ ...formData, sale_price: e.target.value })} placeholder="Ex : 800" />
+                    <span className="ep-form-hint">{t.f_sale_hint}</span>
+                  </div>
+                  <div className="ep-form-group">
+                    <label htmlFor="pp-qty">{t.f_quantity} <span style={{ color: 'var(--red)' }}>*</span></label>
+                    <input id="pp-qty" type="number" min="0" step="1" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} required />
+                  </div>
+                </div>
+                <div className="ep-grid2">
+                  <div className="ep-form-group">
+                    <label htmlFor="pp-min">{t.f_min}</label>
+                    <input id="pp-min" type="number" min="0" step="1" value={formData.min_quantity} onChange={(e) => setFormData({ ...formData, min_quantity: e.target.value })} />
+                    <span className="ep-form-hint">{t.f_min_hint}</span>
+                  </div>
+                  <div className="ep-form-group">
+                    <label htmlFor="pp-supplier">{t.f_supplier}</label>
+                    <select id="pp-supplier" value={formData.supplier_id} onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}>
+                      <option value="">{t.no_supplier}</option>
+                      {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="ep-summary">
+                  <h6><i className="fas fa-calculator" style={{ color: 'var(--primary)', marginInlineEnd: 8 }} />{t.summary}</h6>
+                  <div className="ep-summary-grid">
+                    <div><div className="lbl">{t.summary_purchase}</div><div className="val buy"><bdi className="ep-amt">{formatMoney(calculatedPrices.totalPurchase, cur)}</bdi></div></div>
+                    <div><div className="lbl">{t.summary_sold_qty}</div><div className="val"><bdi className="ep-amt">{formatNumber(calculatedPrices.soldQty)}</bdi></div></div>
+                    <div><div className="lbl">{t.summary_total_sales}</div><div className="val sell"><bdi className="ep-amt">{formatMoney(calculatedPrices.totalSales, cur)}</bdi></div></div>
+                  </div>
+                </div>
+              </div>
+              <div className="ep-modal-footer">
+                <button type="button" className="ep-btn ep-btn-cancel" onClick={closeModals} disabled={saving}>{t.cancel}</button>
+                <button type="submit" className="ep-btn ep-btn-save" disabled={saving}>
+                  {saving ? (<><i className="fas fa-spinner fa-spin" style={{ marginInlineEnd: 6 }} />{t.saving}</>) : (<><i className="fas fa-floppy-disk" style={{ marginInlineEnd: 6 }} />{selectedProduct ? t.save_changes : t.create}</>)}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && productToDelete && (
+        <div className="ep-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && closeModals()}>
+          <div className="ep-modal small" role="alertdialog" aria-modal="true" aria-labelledby="pp-delete-title">
+            <div className="ep-delete-body">
+              <span className="ep-delete-icon"><i className="fas fa-trash-alt" /></span>
+              <h4 id="pp-delete-title">{t.delete_title}</h4>
+              <p>{t.delete_sub}</p>
+              <div className="ep-delete-name">{productToDelete.name}</div>
+              <p style={{ fontSize: 'var(--fs-xs)' }}>{t.delete_warn}</p>
+              {formErrorKey && <div className="ep-form-error" role="alert">{t[formErrorKey]}</div>}
             </div>
-          )}
-        </Card.Body>
-      </Card>
-
-      {/* ====== MODAL AJOUT ====== */}
-      <Modal show={showAddModal} onHide={() => !isUpdating && setShowAddModal(false)} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title><FaCashRegister className="me-2" />{t.form_title}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {localError && <Alert variant="danger" className="mb-3"><FaInfoCircle className="me-2" />{localError}</Alert>}
-          <Form>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>{t.f_date}</Form.Label>
-                  <Form.Control type="datetime-local" name="date" value={form.date} onChange={handleChange} disabled={isUpdating} />
-                </Form.Group>
-              </Col>
-            </Row>
-            <Row>
-              <Col md={4}>
-                <Form.Group className="mb-3">
-                  <Form.Label>{t.f_status}</Form.Label>
-                  <Form.Select name="status" value={form.status} onChange={handleChange} disabled={isUpdating}>
-                    <option value="paid">{t.paid}</option>
-                    <option value="partial">{t.partial}</option>
-                    <option value="draft">{t.draft}</option>
-                    <option value="cancelled">{t.cancelled}</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group className="mb-3">
-                  <Form.Label>{t.f_payment}</Form.Label>
-                  <Form.Select name="payment_method" value={form.payment_method} onChange={handleChange} disabled={isUpdating}>
-                    <option value="cash">{t.cash}</option>
-                    <option value="bankily">{t.bankily}</option>
-                    <option value="masrivi">{t.masrivi}</option>
-                    <option value="sedad">{t.sedad}</option>
-                    <option value="credit">{t.credit}</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group className="mb-3">
-                  <Form.Label>{t.f_category}</Form.Label>
-                  <Form.Select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setNewItem(p => ({ ...p, product_id: '' })); }} disabled={isUpdating}>
-                    <option value="">Toutes</option>
-                    {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-            </Row>
-
-            <hr />
-            <h6 className="fw-bold mb-3">{t.f_product}</h6>
-            <Row className="align-items-end">
-              <Col md={5}>
-                <Form.Group className="mb-2">
-                  <Form.Control as="select" value={newItem.product_id} onChange={handleSelectProduct} disabled={isUpdating}>
-                    <option value="">-- Sélectionner --</option>
-                    {displayedProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </Form.Control>
-                  {selectedProduct && (
-                    <Form.Text className="text-primary fw-bold">{t.stock_available(selectedProduct.quantity ?? selectedProduct.stock ?? 0)}</Form.Text>
-                  )}
-                </Form.Group>
-              </Col>
-              <Col md={2}>
-                <Form.Group className="mb-2">
-                  <Form.Control type="number" min="1" placeholder={t.f_qty} value={newItem.quantity} onChange={(e) => setNewItem(p => ({ ...p, quantity: e.target.value }))} disabled={isUpdating} />
-                </Form.Group>
-              </Col>
-              <Col md={3}>
-                <Form.Group className="mb-2">
-                  <Form.Control type="number" min="0" step="0.01" placeholder={t.f_price} value={newItem.price} onChange={(e) => setNewItem(p => ({ ...p, price: e.target.value }))} disabled={isUpdating} />
-                </Form.Group>
-              </Col>
-              <Col md={2}>
-                <Button variant="primary" className="w-100" onClick={addItem} disabled={isUpdating}>
-                  <FaPlus className="me-1" />{t.f_add_item}
-                </Button>
-              </Col>
-            </Row>
-
-            <div className="table-responsive mt-3">
-              <Table bordered hover size="sm">
-                <thead className="table-dark">
-                  <tr>
-                    <th>{t.f_product}</th>
-                    <th>{t.th_category}</th>
-                    <th className="text-center">{t.th_qty}</th>
-                    <th className="text-end">{t.f_price}</th>
-                    <th className="text-end">{t.th_total}</th>
-                    <th style={{ width: '60px' }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.length === 0 ? (
-                    <tr><td colSpan="6" className="text-center py-3 text-muted">{t.no_items}</td></tr>
-                  ) : items.map((item, idx) => (
-                    <tr key={idx}>
-                      <td>{item.name}</td>
-                      <td><Badge bg="primary">{item.category}</Badge></td>
-                      <td className="text-center">{item.quantity}</td>
-                      <td className="text-end">{formatNumber(item.price)}</td>
-                      <td className="text-end fw-bold">{formatNumber(item.price * item.quantity)}</td>
-                      <td className="text-center">
-                        <Button variant="outline-danger" size="sm" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>
-                          <FaTrash />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                {items.length > 0 && (
-                  <tfoot>
-                    <tr className="table-light">
-                      <td colSpan="4" className="text-end fw-bold">TOTAL :</td>
-                      <td className="text-end fw-bold fs-5">{formatNumber(subtotal)} {cur}</td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                )}
-              </Table>
+            <div className="ep-modal-footer center">
+              <button type="button" className="ep-btn ep-btn-cancel" onClick={closeModals} disabled={deleting}>{t.cancel}</button>
+              <button type="button" className="ep-btn ep-btn-danger" onClick={handleDeleteConfirm} disabled={deleting}>
+                {deleting ? <><i className="fas fa-spinner fa-spin" style={{ marginInlineEnd: 6 }} />{t.deleting}</> : <><i className="fas fa-trash-alt" style={{ marginInlineEnd: 6 }} />{t.delete_confirm}</>}
+              </button>
             </div>
+          </div>
+        </div>
+      )}
 
-            <Form.Group className="mb-3">
-              <Form.Label>{t.f_notes}</Form.Label>
-              <Form.Control as="textarea" rows={2} name="notes" value={form.notes} onChange={handleChange} disabled={isUpdating} />
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowAddModal(false)} disabled={isUpdating}>{t.cancel}</Button>
-          <Button variant="success" onClick={submitSale} disabled={isUpdating || items.length === 0}>
-            {isUpdating ? <Spinner size="sm" className="me-2" /> : <FaPlus className="me-2" />}{t.save}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* ====== MODAL ÉDITION ====== */}
-      <Modal show={!!saleToEdit} onHide={() => !isUpdating && setSaleToEdit(null)} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title><FaEdit className="me-2" />{t.edit_title}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {saleToEdit && (
-            <>
-              <Row className="mb-3">
-                <Col md={4}><strong>{t.th_invoice}:</strong> {saleToEdit.invoice_number || `VENTE-${saleToEdit.id}`}</Col>
-                <Col md={4}><strong>{t.f_customer}:</strong> {getCustomerName(saleToEdit)}</Col>
-                <Col md={4}><strong>{t.th_date}:</strong> {formatDate(saleToEdit.invoice_date || saleToEdit.created_at, t.locale)}</Col>
-              </Row>
-              <div className="table-responsive">
-                <Table bordered hover size="sm">
-                  <thead className="table-dark">
-                    <tr>
-                      <th>{t.f_product}</th>
-                      <th className="text-center" style={{ width: 90 }}>{t.th_qty}</th>
-                      <th className="text-end" style={{ width: 120 }}>{t.f_price}</th>
-                      <th className="text-end">{t.th_total}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {editItems.map((it, idx) => (
-                      <tr key={idx}>
-                        <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
-                        <td className="text-center">
-                          <Form.Control type="number" min="1" size="sm" value={it.quantity}
-                            onChange={(e) => { const arr = [...editItems]; arr[idx].quantity = parseInt(e.target.value, 10) || 1; setEditItems(arr); }} />
-                        </td>
-                        <td className="text-end">
-                          <Form.Control type="number" min="0" size="sm" value={it.price}
-                            onChange={(e) => { const arr = [...editItems]; arr[idx].price = parseFloat(e.target.value) || 0; setEditItems(arr); }} />
-                        </td>
-                        <td className="text-end fw-bold">{formatNumber(it.quantity * it.price)} {cur}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </div>
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>{t.f_status}</Form.Label>
-                    <Form.Select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} disabled={isUpdating}>
-                      <option value="paid">{t.paid}</option>
-                      <option value="partial">{t.partial}</option>
-                      <option value="draft">{t.draft}</option>
-                      <option value="cancelled">{t.cancelled}</option>
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>{t.f_notes}</Form.Label>
-                    <Form.Control as="textarea" rows={2} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} disabled={isUpdating} />
-                  </Form.Group>
-                </Col>
-              </Row>
-            </>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setSaleToEdit(null)} disabled={isUpdating}>{t.cancel}</Button>
-          <Button variant="primary" onClick={submitEdit} disabled={isUpdating}>
-            {isUpdating ? <Spinner size="sm" className="me-2" /> : <FaEdit className="me-2" />}{t.save}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* ====== MODAL DÉTAILS ====== */}
-      <Modal show={!!selectedSale} onHide={() => setSelectedSale(null)} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title><FaInfoCircle className="me-2" />{t.details_title}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {selectedSale && (
-            <>
-              <Row className="mb-3">
-                <Col md={4}><strong>{t.th_invoice}:</strong> {selectedSale.invoice_number || `VENTE-${selectedSale.id}`}</Col>
-                <Col md={4}><strong>{t.f_customer}:</strong> {getCustomerName(selectedSale)}</Col>
-                <Col md={4}><strong>{t.th_date}:</strong> {formatDate(selectedSale.invoice_date || selectedSale.created_at, t.locale)}</Col>
-              </Row>
-              <div className="table-responsive">
-                <Table striped bordered hover size="sm">
-                  <thead className="table-dark">
-                    <tr>
-                      <th>{t.f_product}</th>
-                      <th>{t.th_category}</th>
-                      <th className="text-center">{t.th_qty}</th>
-                      <th className="text-end">{t.f_price}</th>
-                      <th className="text-end">{t.th_total}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {getSaleItems(selectedSale).map((it, idx) => {
-                      const q = Number(it.quantity) || 0; const p = Number(it.price ?? it.unit_price) || 0; const lt = Number(it.total ?? q * p);
-                      return (
-                        <tr key={idx}>
-                          <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
-                          <td><Badge bg="primary">{getItemCategory(it, productById)}</Badge></td>
-                          <td className="text-center">{q}</td>
-                          <td className="text-end">{formatNumber(p)} {cur}</td>
-                          <td className="text-end fw-bold">{formatNumber(lt)} {cur}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="table-light">
-                      <td colSpan="4" className="text-end fw-bold">{t.th_total} :</td>
-                      <td className="text-end fw-bold fs-5">{formatNumber(selectedSale.grand_total ?? selectedSale.total)} {cur}</td>
-                    </tr>
-                  </tfoot>
-                </Table>
-              </div>
-            </>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setSelectedSale(null)}>{t.close}</Button>
-          <Button variant="outline-success" onClick={() => exportSale(selectedSale)}>
-            <FaDownload className="me-1" />{t.export}
-          </Button>
-          <Button variant="primary" onClick={() => printInvoice(selectedSale)}>
-            <FaPrint className="me-1" />{t.print}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* ====== MODAL SUPPRESSION ====== */}
-      <Modal show={!!saleToDelete} onHide={() => !isUpdating && setSaleToDelete(null)}>
-        <Modal.Header closeButton>
-          <Modal.Title><FaTrash className="me-2" />{t.delete_q}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {saleToDelete && (
-            <p>{t.th_invoice} <strong>{saleToDelete.invoice_number || saleToDelete.id}</strong></p>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setSaleToDelete(null)} disabled={isUpdating}>{t.cancel}</Button>
-          <Button variant="danger" onClick={confirmDelete} disabled={isUpdating}>
-            {isUpdating ? <Spinner size="sm" /> : t.delete_confirm}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* ====== MODAL FACTURE APRÈS ENCAISSEMENT ====== */}
-      <Modal show={showInvoice} onHide={() => setShowInvoice(false)} size="lg">
-        <Modal.Header closeButton className="bg-success text-white">
-          <Modal.Title><FaInfoCircle className="me-2" />{t.success_invoice}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {lastSale && (
-            <>
-              <div className="text-center mb-3">
-                <h4>{STORE.name}</h4>
-                <p className="text-muted mb-0">{STORE.address} — {STORE.phone}</p>
-                <h5 className="mt-2">{t.facture} : {lastSale.invoice_number}</h5>
-              </div>
-              <div className="table-responsive">
-                <Table striped bordered hover size="sm">
-                  <thead className="table-dark">
-                    <tr>
-                      <th>{t.f_product}</th>
-                      <th className="text-center">{t.th_qty}</th>
-                      <th className="text-end">{t.f_price}</th>
-                      <th className="text-end">{t.th_total}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {getSaleItems(lastSale).map((it, idx) => {
-                      const q = Number(it.quantity) || 0; const p = Number(it.price ?? it.unit_price) || 0; const lt = Number(it.total ?? q * p);
-                      return (
-                        <tr key={idx}>
-                          <td>{it.product_name || it.name || it.products?.name || 'Produit'}</td>
-                          <td className="text-center">{q}</td>
-                          <td className="text-end">{formatNumber(p)}</td>
-                          <td className="text-end fw-bold">{formatNumber(lt)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="table-light">
-                      <td colSpan="3" className="text-end fw-bold">TOTAL :</td>
-                      <td className="text-end fw-bold fs-5">{formatNumber(lastSale.grand_total ?? lastSale.total)} {cur}</td>
-                    </tr>
-                  </tfoot>
-                </Table>
-              </div>
-              <p className="text-center text-muted">{t.thanks}<br />{t.thanks_sub}</p>
-            </>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-primary" onClick={() => printInvoice(lastSale)}>
-            <FaPrint className="me-1" />{t.print}
-          </Button>
-          <Button variant="secondary" onClick={() => setShowInvoice(false)}>{t.close}</Button>
-          {canAdd() && (
-            <Button variant="success" onClick={() => { setShowInvoice(false); setLastSale(null); openAddModal(); }}>
-              <FaPlus className="me-1" />{t.add}
-            </Button>
-          )}
-        </Modal.Footer>
-      </Modal>
-
-      {/* ====== STYLE COMPACT POUR RÉDUIRE LA TAILLE DU TEXTE ====== */}
-      <style>{`
-        .ventes-compact .card.bg-primary h6, 
-        .ventes-compact .card.bg-success h6,
-        .ventes-compact .card.bg-info h6, 
-        .ventes-compact .card.bg-warning h6 { 
-          font-size: 0.75rem !important; 
-        }
-        .ventes-compact .card.bg-primary h2, 
-        .ventes-compact .card.bg-success h2,
-        .ventes-compact .card.bg-info h2, 
-        .ventes-compact .card.bg-warning h2 { 
-          font-size: 1.25rem !important; 
-        }
-        .ventes-compact .card.bg-primary svg, 
-        .ventes-compact .card.bg-success svg,
-        .ventes-compact .card.bg-info svg, 
-        .ventes-compact .card.bg-warning svg { 
-          width: 28px !important; height: 28px !important; 
-        }
-        .ventes-compact .card-header h3 {
-          font-size: 1.1rem !important;
-        }
-        .ventes-compact .form-label {
-          font-size: 0.8rem !important;
-          margin-bottom: 0.25rem !important;
-        }
-        .ventes-compact .table th, 
-        .ventes-compact .table td {
-          font-size: 0.85rem !important;
-          padding: 0.5rem 0.75rem !important;
-        }
-        .ventes-compact .modal-title {
-          font-size: 1.1rem !important;
-        }
-        .ventes-compact .fs-5 {
-          font-size: 1rem !important;
-        }
-        .ventes-compact .btn {
-          font-size: 0.85rem !important;
-        }
-        .ventes-compact .badge {
-          font-size: 0.75rem !important;
-        }
-      `}</style>
+      {showScanner && (
+        <BarcodeScanner onScan={(code) => { setFormData((prev) => ({ ...prev, barcode: code })); setShowScanner(false); }} onClose={() => setShowScanner(false)} />
+      )}
+      {showSearchScanner && (
+        <BarcodeScanner onScan={(code) => { setSearch(code); setDebouncedSearch(code); setShowSearchScanner(false); }} onClose={() => setShowSearchScanner(false)} />
+      )}
     </div>
   );
 };
 
-export default VentesPage;
+
+export default ProductsPage;

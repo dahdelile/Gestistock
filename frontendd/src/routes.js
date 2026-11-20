@@ -61,19 +61,15 @@ const Service= React.lazy(() => import('./views/maintenance/service/Service'))
 const ServiceCentral= React.lazy(() => import('./views/maintenance/serviceCentral/ServiceCentral'))
 const Tecnic= React.lazy(() => import('./views/documents/tecnicDoc/Tecnic'))
 
-//eginn
-const FicheAvie= React.lazy(() => import('./views/engin/ficheAvie/FicheAvie'))
-
+//stock
+const Categories= React.lazy(() => import('./views/Categories/Categories'))
 const ProductList= React.lazy(() => import('./views/Products/ProductList'))
-const AjoutEngin= React.lazy(() => import('./views/engin/ajoutEngin/AjoutEngin'))
-const ArretE= React.lazy(() => import('./views/engin/arretE/ArretE'))
-const Enging= React.lazy(() => import('./views/engin/enging/Enging'))
-const ServiceEngin= React.lazy(() => import('./views/engin/serviceEngin/ServiceEngin'))
-//commentaires
+const PurchasesPage= React.lazy(() => import('./views/achat/PurchasesPage'))
+const ReportsPage= React.lazy(() => import('./views/rapportss/ReportsPage'))
+const ExpenseList= React.lazy(() => import('./views/expenses/ExpenseList'))
+const CustomerList= React.lazy(() => import('./views/Customers/CustomerList'))
+const SupplierList= React.lazy(() => import('./views/Suppliers/SupplierList'))
 
-const AjoutCom= React.lazy(() => import('./views/comentaires/ajoutCom/AjoutCom'))
-const GesCom= React.lazy(() => import('./views/comentaires/gesCom/GesCom'))
-//production
 
 
 const ProdEq= React.lazy(() => import('./views/projet/prodEqui/ProdEq'))
@@ -177,11 +173,6 @@ const routes = [
 { path: '/fiche/docE', name: 'DocE', element:  DocE},
 //
 
-///commentaires 
-
-{ path: '/comentaies/ajoutCom', name: 'AjoutCom', element:  AjoutCom},
-{ path: '/comentaires/gesCom', name: 'GesCom', element:  GesCom},
-
 //production
 { path: '/production/ajouteProVoi', name: 'AjoutProdVoi', element:  AjoutProdVoi},
 { path: '/production/listProdVoit', name: 'ListProdVoi', element:  ListProdVoi},
@@ -253,13 +244,14 @@ const routes = [
 {path: 'usine/enrobe/ajoutEnrobe', name: 'AjoutEnrobe', element:  AjoutEnrobe},
 {path: 'usine/enrobe/analiseEnrobe', name: 'AnaliseEnrobe', element:  AnaliseEnrobe},
 {path: 'usine/enrobe/enro', name: 'Enrobe', element:  Enrobe},
-
-{ path: 'Products', name: 'EntEngin', element:  ProductList},
-{ path: 'engin/ajoutEngin', name: 'AjoutEngin', element:  AjoutEngin},
-{ path: 'engin/serviceEngin', name: 'ServiceEngin', element:  ServiceEngin},
-{ path: 'engin/Enging', name: 'Enging', element:  Enging},
-{ path: 'engin/arretE', name: 'ArretE', element: ArretE},
-{ path: '/engin/ficheAvie', name: 'FicheAvie', element: FicheAvie},
+//stock
+{ path: 'Products', name: 'produits', element:  ProductList},
+{ path: 'Categories', name: 'Categories', element:  Categories},
+{ path: 'Customers', name: 'Customers', element: CustomerList},
+{ path: 'achat', name: 'purchases', element:  PurchasesPage},
+{ path: 'rapportss', name: 'ReportsPage', element:  ReportsPage},
+{ path: 'expenses', name: 'ExpenseList', element: ExpenseList},
+{ path: 'Suppliers', name: 'SupplierList', element: SupplierList},
 
 
 { path: '/documents/dpDoc', name: 'DPdoc', element:  DPdoc},

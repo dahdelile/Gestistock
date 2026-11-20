@@ -185,10 +185,12 @@ const Accueil = ({ userName }) => {
 
   const documents = [
     { text: "Vente", img: "https://cdn-icons-png.flaticon.com/128/5442/5442020.png", path: "/sales" },
-    { text: "Achat", img: "https://cdn-icons-png.flaticon.com/128/2821/2821739.png", path: "/purchases" },
+    { text: "achat", img: "https://cdn-icons-png.flaticon.com/128/2821/2821739.png", path: "/achat" },
     { text: "Produit", img: "https://cdn-icons-png.flaticon.com/128/4408/4408296.png", path: "/products" },
     { text: "Expense", img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/expenses" },
-    { text: "Les rapports", img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/reports/stock" },
+    { text: "categories", img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/categories" },
+    { text: "Les rapports", img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/rapportss" },
+    { text: "Custommers", img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/Customers" },
   ];
 
   // CORRIGÉ : plus de `t.q_sales` qui plantait, on utilise directement les labels

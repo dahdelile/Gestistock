@@ -63,7 +63,8 @@ const Tecnic= React.lazy(() => import('./views/documents/tecnicDoc/Tecnic'))
 
 //eginn
 const FicheAvie= React.lazy(() => import('./views/engin/ficheAvie/FicheAvie'))
-const EntEngin= React.lazy(() => import('./views/engin/entEngin/EntEngin'))
+
+const ProductList= React.lazy(() => import('./views/Products/ProductList'))
 const AjoutEngin= React.lazy(() => import('./views/engin/ajoutEngin/AjoutEngin'))
 const ArretE= React.lazy(() => import('./views/engin/arretE/ArretE'))
 const Enging= React.lazy(() => import('./views/engin/enging/Enging'))
@@ -253,8 +254,7 @@ const routes = [
 {path: 'usine/enrobe/analiseEnrobe', name: 'AnaliseEnrobe', element:  AnaliseEnrobe},
 {path: 'usine/enrobe/enro', name: 'Enrobe', element:  Enrobe},
 
-//engin 
-{ path: 'engin/entEngin', name: 'EntEngin', element:  EntEngin},
+{ path: 'Products', name: 'EntEngin', element:  ProductList},
 { path: 'engin/ajoutEngin', name: 'AjoutEngin', element:  AjoutEngin},
 { path: 'engin/serviceEngin', name: 'ServiceEngin', element:  ServiceEngin},
 { path: 'engin/Enging', name: 'Enging', element:  Enging},

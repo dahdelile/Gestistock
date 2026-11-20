@@ -180,29 +180,25 @@ const Accueil = ({ userName }) => {
   const [greeting, setGreeting] = useState("");
 
   useEffect(() => {
-    setGreeting("Bienvenue sur Intranet ATTM");
+    setGreeting("Bienvenue sur la gestion de stock");
   }, []);
 
- const documents = [
-    { text: "Les notes DG ATTM", img: "https://cdn-icons-png.flaticon.com/128/5442/5442020.png", path: "/noteTable" },
-    { text: "Les documents structures ATTM", img: "https://cdn-icons-png.flaticon.com/128/2821/2821739.png", path: "/dashboard"},
-    { text: "Organigrammes AATM", img: "https://cdn-icons-png.flaticon.com/128/4408/4408296.png", path: "/organigrame" },
-    { text: "Indicateurs de Performance", img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/projet/performances" },
-    { text: "Gestion des instances", img: "https://cdn-icons-png.flaticon.com/128/17801/17801484.png", path: "/instance"},
-    { text: "Gestion de maintenance", img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/maintenance/gestionMaint"},
-    { text: "Gestion de caisse", img: "https://cdn-icons-png.flaticon.com/128/781/781831.png", path: "/caise/lCaise"},
-    { text: "Gestion de budget", img: "https://cdn-icons-png.flaticon.com/128/9110/9110508.png", path: "/budget/lprojet" }
+  const documents = [
+    { text: "Vente", img: "https://cdn-icons-png.flaticon.com/128/5442/5442020.png", path: "/sales" },
+    { text: "Achat", img: "https://cdn-icons-png.flaticon.com/128/2821/2821739.png", path: "/purchases" },
+    { text: "Produit", img: "https://cdn-icons-png.flaticon.com/128/4408/4408296.png", path: "/products" },
+    { text: "Expense", img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/expenses" },
+    { text: "Les rapports", img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/reports/stock" },
   ];
+
+  // CORRIGÉ : plus de `t.q_sales` qui plantait, on utilise directement les labels
+  // et on utilise la même structure que documents pour que ça marche
   const quickLinks = [
-    { path: "/projet/aPerformance", label: "Performance" },
-    { path: "/maintenance/engin", label: "Les arrêts" },
-    { path: "/production/chauffeur", label: "Production Chauf" },
-    { path: "/production/listProdVoit", label: "Production Équi" },
-    { path: "/pneus/rapportPneu", label: "Pneus" },
-    { path: "/personne/pointage", label: "Pointage" },
-    { path: "/personne/pointage", label: "Service Central"  },
-    { path: "/engin/serviceEngint", label: "Service Engins" },
-    { path: "/usine/concasseur/afficheUsine", label: " Usines" },
+    { label: "Vente", path: "/sales" },
+    { label: "Achat", path: "/purchases" },
+    { label: "Produit", path: "/products" },
+    { label: "Expense", path: "/expenses" },
+    { label: "Les rapports", path: "/reports/stock" },
   ];
 
   const filteredDocs = useMemo(() => {
@@ -293,7 +289,7 @@ const Accueil = ({ userName }) => {
       </Container>
 
       <footer className="bg-dark text-white py-3 text-center mt-4">
-        © {new Date().getFullYear()} ATTM - Tous droits réservés
+        © {new Date().getFullYear()} Tous droits réservés dah delil
       </footer>
 
     </PageContainer>
@@ -305,6 +301,3 @@ Accueil.propTypes = {
 };
 
 export default Accueil;
-
-
-  

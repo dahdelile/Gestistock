@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Container, Row, Col, Badge } from "react-bootstrap";
 import { FaSearch, FaThLarge, FaList, FaBolt } from "react-icons/fa";
 import PropTypes from "prop-types";
 import styled, { keyframes } from "styled-components";
+import { useLanguage } from "../../../context/LanguageContext";
 
 /* ================= ANIMATIONS ================= */
 const fadeIn = keyframes`
@@ -175,39 +176,35 @@ NoteCard.propTypes = {
 
 const Accueil = ({ userName }) => {
   const navigate = useNavigate();
+  const langContext = useLanguage() || {};
+  const t = typeof langContext.t === 'function' ? langContext.t : (key) => key;
+  const lang = langContext.lang || 'fr';
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState("grid");
-  const [greeting, setGreeting] = useState("");
 
-  useEffect(() => {
-    setGreeting("Bienvenue sur la gestion de stock");
-  }, []);
+  const documents = useMemo(() => [
+    { text: t('ventes'), img: "https://cdn-icons-png.flaticon.com/128/5442/5442020.png", path: "/ventes" },
+    { text: t('achat'), img: "https://cdn-icons-png.flaticon.com/128/2821/2821739.png", path: "/achat" },
+    { text: t('produit'), img: "https://cdn-icons-png.flaticon.com/128/4408/4408296.png", path: "/products" },
+    { text: t('expense'), img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/expenses" },
+    { text: t('categories'), img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/categories" },
+    { text: t('rapports'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/rapportss" },
+    { text: t('customers'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/Customers" },
+  ], [t, lang]);
 
-  const documents = [
-    { text: "Ventes", img: "https://cdn-icons-png.flaticon.com/128/5442/5442020.png", path: "/ventes" },
-    { text: "achat", img: "https://cdn-icons-png.flaticon.com/128/2821/2821739.png", path: "/achat" },
-    { text: "Produit", img: "https://cdn-icons-png.flaticon.com/128/4408/4408296.png", path: "/products" },
-    { text: "Expense", img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/expenses" },
-    { text: "categories", img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/categories" },
-    { text: "Les rapports", img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/rapportss" },
-    { text: "Custommers", img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/Customers" },
-  ];
-
-  // CORRIGÉ : plus de `t.q_sales` qui plantait, on utilise directement les labels
-  // et on utilise la même structure que documents pour que ça marche
-  const quickLinks = [
-    { label: "Vente", path: "/sales" },
-    { label: "Achat", path: "/purchases" },
-    { label: "Produit", path: "/products" },
-    { label: "Expense", path: "/expenses" },
-    { label: "Les rapports", path: "/reports/stock" },
-  ];
+  const quickLinks = useMemo(() => [
+    { label: t('vente'), path: "/sales" },
+    { label: t('achat'), path: "/purchases" },
+    { label: t('produit'), path: "/products" },
+    { label: t('expense'), path: "/expenses" },
+    { label: t('rapports'), path: "/reports/stock" },
+  ], [t, lang]);
 
   const filteredDocs = useMemo(() => {
     return documents.filter(doc =>
       doc.text.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [searchTerm]);
+  }, [searchTerm, documents]);
 
   return (
     <PageContainer>
@@ -215,18 +212,18 @@ const Accueil = ({ userName }) => {
       <Header>
         <Container className="text-center">
           <WelcomeTitle>
-            {greeting}{userName ? `, ${userName}` : ""}
+            {t('welcome')}{userName ? `, ${userName}` : ""}
           </WelcomeTitle>
 
           <WelcomeSubtitle>
-            Votre portail unique pour accéder à toutes les ressources
+            {t('subtitle')}
           </WelcomeSubtitle>
 
           <SearchBar>
             <FaSearch />
             <input
               type="text"
-              placeholder="Rechercher un module..."
+              placeholder={t('searchModule')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -236,12 +233,11 @@ const Accueil = ({ userName }) => {
 
       <Container className="flex-grow-1">
 
-        {/* ===== Accès Rapide ===== */}
         <QuickAccessBar>
           <FaBolt />
-          {quickLinks.map((item, index) => (
+          {quickLinks.map((item) => (
             <QuickButton
-              key={index}
+              key={`quick-${item.path}-${item.label}`}
               onClick={() => navigate(item.path)}
             >
               {item.label}
@@ -266,15 +262,15 @@ const Accueil = ({ userName }) => {
         </QuickAccessBar>
 
         <div className="d-flex justify-content-between align-items-center mb-3">
-          <h5 className="fw-semibold text-primary">Les applications</h5>
+          <h5 className="fw-semibold text-primary">{t('applications')}</h5>
           <Badge bg="primary">{filteredDocs.length}</Badge>
         </div>
 
         {filteredDocs.length > 0 ? (
           <Row>
-            {filteredDocs.map((doc, index) => (
+            {filteredDocs.map((doc) => (
               <NoteCard
-                key={index}
+                key={`doc-${doc.path}-${doc.text}`}
                 imageSrc={doc.img}
                 text={doc.text}
                 link={doc.path}
@@ -284,7 +280,7 @@ const Accueil = ({ userName }) => {
           </Row>
         ) : (
           <div className="text-center py-5">
-            <h5 className="text-muted">Aucun module trouvé</h5>
+            <h5 className="text-muted">{t('noModule')}</h5>
           </div>
         )}
 

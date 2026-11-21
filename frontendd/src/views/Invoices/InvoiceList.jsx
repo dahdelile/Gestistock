@@ -30,7 +30,8 @@ import { Add, Visibility, Edit, Delete, Search, Refresh, Print } from '@mui/icon
 import { invoicesApi } from '../../api';
 import InvoiceForm from './InvoiceForm';
 import InvoiceDetails from './InvoiceDetails';
-
+// ✅ BON
+import { useLanguage } from '../../context/LanguageContext';
 const InvoiceList = () => {
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);

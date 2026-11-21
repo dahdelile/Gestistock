@@ -1,152 +1,76 @@
-
 import React from 'react'
 import { CNavGroup, CNavItem } from '@coreui/react'
+import CIcon from '@coreui/icons-react'
+import {
+  cilHome,
+  cilCart,
+  cilInbox,
+  cilMoney,
+  cilPeople,
+  cilSettings,
+  cilChart,
+  cilCalculator,
+  cilAccountLogout,
+  cilSpeedometer,
+} from '@coreui/icons'
 
-const _nav = [
-  {
-    component: CNavItem,
-    name: '🏠Accueil ',
-    to: '/home/accueil',
-  
-    badge: {
-      color: 'info',
-      text: 'NEW',
+const getNav = (tFn) => {
+  // 👇 SÉCURITÉ : si t n'est pas une fonction, on ne plante plus, on affiche la clé
+  const t = typeof tFn === 'function' ? tFn : (key) => key
+
+  return [
+    { component: CNavItem, name: t('accueil'), to: '/home/accueil', icon: <CIcon icon={cilHome} customClassName="nav-icon" />, badge: { color: 'info', text: 'NEW' } },
+    {
+      component: CNavGroup, name: t('produits'), icon: <CIcon icon={cilCart} customClassName="nav-icon" />,
+      items: [
+        { component: CNavItem, name: t('produits'), to: '/products' },
+        { component: CNavItem, name: t('categories'), to: '/categories' },
+        
+      ],
     },
-  },
-  {
-    component: CNavItem,
-    name: '📋 Note DG',
-    to: '/noteDG/noteTable',
-   
-  },
-  {
-    component: CNavItem,
-    name: '📝 Documents',
-    to: '/dashboard',
- 
-  },
-  {
-    component: CNavItem,
-    name: '🎯 Plan Action',
-    to: '/plan',
-  
-  },
-  {
-    component: CNavGroup,
-    name: '⚙️ Procédures',
-  
-    items: [
-      {
-        component: CNavItem,
-        name: 'DG',
-        to: '/procedures/dg',
-        badge: { color: 'danger', text: 'DG' }
-      },
-      {
-        component: CNavItem,
-        name: 'DAA',
-        to: '/procedures/daa',
-        badge: { color: 'warning', text: 'DAA' }
-      },
-      {
-        component: CNavItem,
-        name: 'DRH',
-        to: '/procedures/drh',
-        badge: { color: 'primary', text: 'DRH' }
-      },
-      {
-        component: CNavItem,
-        name: 'DM',
-        to: '/procedures/dm',
-        badge: { color: 'secondary', text: 'DM' }
-      },
-      {
-        component: CNavItem,
-        name: 'DT',
-        to: '/procedures/dt',
-        badge: { color: 'info', text: 'DT' }
-      },
-      {
-        component: CNavItem,
-        name: 'DCG',
-        to: '/procedures/dcg',
-        badge: { color: 'success', text: 'DCG' }
-      },
-      {
-        component: CNavItem,
-        name: 'RCF',
-        to: '/procedures/rcf',
-        badge: { color: 'dark', text: 'RCF' }
-      },
-    ],
-  },
-  {
-    component: CNavGroup,
-    name: '📈Tableau de Bord',
- 
-    items: [
-      {
-        component: CNavItem,
-        name: '⚠️ Les Arrêts',
-        to: '/panne/rapportJou',
-        badge: { color: 'danger', text: 'URGENT' }
-      },
-      {
-        component: CNavItem,
-        name: '🌀 Les Pneus',
-        to: '/pneus/rapportPneu',
-        badge: { color: 'warning', text: 'PNEU' }
-      },
-    ]
-  },
-  {
-    component: CNavItem,
-    name: '📊 Performances',
-    to: '/projet/performances',
-
-  },
-  {
-   
-component: CNavItem,
-    name: '🏢 Organigramme',
-    to: '/organigrame',
-
-
-
-  },
-  {
-    component: CNavItem,
-    name: '👥 Personnel',
-    to: '/personne/ajoutPersonne',
+    {
+      component: CNavGroup, name: t('stockEntrant'), icon: <CIcon icon={cilInbox} customClassName="nav-icon" />,
+      items: [
+        { component: CNavItem, name: t('achats'), to: '/achat' },
+        { component: CNavItem, name: t('receptions'), to: '/receptions' },
+        { component: CNavItem, name: t('retoursFournisseurs'), to: '/supplier-returns' },
+      ],
+    },
+    {
+      component: CNavGroup, name: t('stockSortant'), icon: <CIcon icon={cilMoney} customClassName="nav-icon" />,
+      items: [
+        { component: CNavItem, name: t('ventes'), to: '/ventes' },
+        { component: CNavItem, name: t('sortiesInternes'), to: '/internal-outs' },
+        { component: CNavItem, name: t('retoursClients'), to: '/customer-returns' },
+      ],
+    },
+    {
+      component: CNavGroup, name: t('partenaires'), icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
+      items: [
+        { component: CNavItem, name: t('fournisseurs'), to: '/suppliers' },
+        { component: CNavItem, name: t('clients'), to: '/customers' },
+        { component: CNavItem, name: t('personnel'), to: '/personne/ajoutPersonne' },
+      ],
+    },
+    { component: CNavItem, name: t('depenses'), to: '/expenses', icon: <CIcon icon={cilCalculator} customClassName="nav-icon" /> },
+    { component: CNavItem, name: t('caisse'), to: '/caise', icon: <CIcon icon={cilSpeedometer} customClassName="nav-icon" /> },
     
-    
-  },
-  {
-    component: CNavItem,
-    name: '🔧 Gestion Users',
-    to: '/admin/gestion',
-  
-    badge: { color: 'danger', text: 'ADMIN' }
-  },
-
- {
-    component: CNavItem,
-    name: 'Déconnexion',
-    to: '#',
-    
-    className: 'nav-item-sm logout-item-sm',
-    onClick: (e) => {
-      e.preventDefault();
-      // Simple déconnexion sans confirmation
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.href = '/login';
-    }
-  }
+    { component: CNavItem, name: t('rapports'), to: '/rapportss', icon: <CIcon icon={cilChart} customClassName="nav-icon" /> },
 
 
+    {
+      component: CNavGroup, name: t('parametres'), icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
+      items: [
+        { component: CNavItem, name: t('utilisateurs'), to: '/users' },
+        { component: CNavItem, name: t('gestionUsers'), to: '/admin/gestion', badge: { color: 'danger', text: 'ADMIN' } },
+        { component: CNavItem, name: t('parametres'), to: '/settings' },
+      ],
+    },
+    {
+      component: CNavItem, name: t('deconnexion'), to: '/login', icon: <CIcon icon={cilAccountLogout} customClassName="nav-icon" />,
+      onClick: (e) => { e.preventDefault(); localStorage.clear(); sessionStorage.clear(); window.location.href = '/login'; },
+    },
+  ]
+}
 
-
-]
-
-export default _nav
+export default getNav

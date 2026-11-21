@@ -1,258 +1,79 @@
-// AppSidebar.js
 import React from 'react'
-import { useSelector, useDispatch } from 'react-redux'
 import {
   CCloseButton,
   CSidebar,
-  CImage,
   CSidebarFooter,
   CSidebarHeader,
   CSidebarToggler,
+  CImage,
 } from '@coreui/react'
 import { AppSidebarNav } from './AppSidebarNav'
-import navigation from '../_nav'
+import getNav from '../_nav'
+import logo from '../assets/images/logo.png'
+import { useLanguage } from '../context/LanguageContext'
 
-const AppSidebar = () => {
-  const dispatch = useDispatch()
-  const unfoldable = useSelector((state) => state.sidebarUnfoldable)
-  const sidebarShow = useSelector((state) => state.sidebarShow)
-
-  // Ajout du style global dans le head
-  React.useEffect(() => {
-    const style = document.createElement('style')
-    style.innerHTML = `
-      /* Style pour le bouton toggler */
-      .custom-sidebar-toggler {
-        background-color: #007A3D !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 4px !important;
-        padding: 5px 10px !important;
-        transition: all 0.3s ease !important;
-        cursor: pointer !important;
-        font-weight: bold !important;
-        font-size: 0.875rem !important;
-      }
-
-      .custom-sidebar-toggler:hover {
-        background-color: #005a2c !important;
-        transform: scale(1.05) !important;
-      }
-
-      /* Style global pour la sidebar - PREND TOUTE LA HAUTEUR */
-      .cs-sidebar {
-        font-size: 16px !important;
-        width: 280px !important;
-        height: 100vh !important;
-        min-height: 100vh !important;
-        display: flex !important;
-        flex-direction: column !important;
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-      }
-
-      /* Structure interne de la sidebar */
-      .sidebar {
-        height: 100% !important;
-        display: flex !important;
-        flex-direction: column !important;
-      }
-
-      /* Le conteneur de navigation prend tout l'espace restant */
-      .sidebar-nav-container {
-        flex: 1 !important;
-        overflow-y: auto !important;
-      }
-
-      /* Header et footer fixes */
-      .sidebar-header {
-        flex-shrink: 0 !important;
-        padding: 20px 0 !important;
-      }
-
-      .sidebar-footer {
-        flex-shrink: 0 !important;
-        margin-top: auto !important;
-        padding: 15px !important;
-      }
-
-      /* Style des liens de navigation */
-      .cs-sidebar .nav-link {
-        font-size: 15px !important;
-        padding: 12px 20px !important;
-      }
-
-      .cs-sidebar .nav-title {
-        font-size: 14px !important;
-        padding: 15px 20px 5px !important;
-        font-weight: bold !important;
-        color: #6c757d !important;
-      }
-
-      .cs-sidebar .nav-icon {
-        font-size: 20px !important;
-        margin-right: 15px !important;
-      }
-
-      /* Style pour le header avec la date dans le contenu principal */
-      .main-header {
-        font-size: 18px;
-        padding: 20px;
-        background-color: #f8f9fa;
-        border-bottom: 1px solid #dee2e6;
-        font-weight: 500;
-        margin-bottom: 20px;
-      }
-
-      .user-info {
-        font-size: 16px;
-        font-weight: 500;
-        padding: 10px 20px;
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        display: inline-block;
-      }
-
-      /* Style pour les onglets */
-      .nav-tabs-custom {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-        border-bottom: 1px solid #dee2e6;
-        padding-bottom: 10px;
-      }
-
-      .nav-tab {
-        padding: 10px 20px;
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-      }
-
-      .nav-tab.active {
-        background-color: #007A3D;
-        color: white;
-        border-color: #007A3D;
-      }
-
-      .nav-tab:hover:not(.active) {
-        background-color: #e9ecef;
-      }
-
-      /* Style pour le contenu principal */
-      .main-content {
-        margin-left: 280px;
-        padding: 20px;
-        min-height: 100vh;
-        background-color: #f4f6f9;
-      }
-
-      /* Style pour le tableau de bord */
-      .dashboard-card {
-        background-color: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      }
-
-      .dashboard-title {
-        font-size: 24px;
-        font-weight: bold;
-        margin-bottom: 20px;
-        color: #333;
-      }
-
-      /* Style pour l'image logo */
-      .sidebar-logo {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-        padding: 10px;
-      }
-
-      /* Responsive */
-      @media screen and (max-width: 768px) {
-        .cs-sidebar {
-          font-size: 14px !important;
-          width: 240px !important;
-        }
-        
-        .cs-sidebar .nav-link {
-          padding: 10px 15px !important;
-        }
-
-        .main-content {
-          margin-left: 240px;
-        }
-      }
-
-      @media screen and (max-width: 576px) {
-        .main-content {
-          margin-left: 0;
-        }
-      }
-    `
-    
-    document.head.appendChild(style)
-    return () => {
-      document.head.removeChild(style)
-    }
-  }, [])
+const AppSidebar = ({ sidebarShow, setSidebarShow, sidebarUnfoldable, setSidebarUnfoldable }) => {
+  // 👇 LIGNE 16 CORRIGÉE : on ne déstructure plus directement, on protège
+  const langContext = useLanguage() || {}
+  const tFn = langContext.t
+  const t = typeof tFn === 'function' ? tFn : (key) => key
+  const navigation = typeof getNav === 'function' ? getNav(t) : getNav
 
   return (
-    <CSidebar
-      className="border-end sidebar"
-      colorScheme="light"
-      position="fixed"
-      unfoldable={unfoldable}
-      visible={sidebarShow}
-      onVisibleChange={(visible) => {
-        dispatch({ type: 'set', sidebarShow: visible })
-      }}
-      style={{
-        height: '100vh',
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column'
-      }}
-    >
-      <CSidebarHeader className="border-bottom sidebar-header">
-        <div className="sidebar-logo">
-          <CImage
-            src="https://media.licdn.com/dms/image/v2/D4E3DAQGM68xwSSCFCg/image-scale_127_750/image-scale_127_750/0/1715079332681/attm_s_a_cover?e=2147483647&v=beta&t=wY774xUWmaXWX_WHCJFkwrbVvaq2ScJ4eCFf-CEHxuc"
-            style={{
-              width: unfoldable ? '80px' : '250px',
-              height: unfoldable ? '200px' : 'auto',
-              maxHeight: '300px',
-              transition: 'all 0.3s ease',
-              objectFit: 'contain',
-              objectPosition: 'center'
-            }}
-            alt="ATTM"
-          />
+    <div dir="ltr" style={{ position: 'relative' }}>
+      <style>{`
+        .sidebar { background: #f8f9fa !important; border-right: 1px solid #e9ecef !important; border-left: none !important; height: 100vh; display: flex; flex-direction: column; left: 0 !important; right: auto !important; }
+        [dir="rtl"] .sidebar { left: 0 !important; right: auto !important; border-right: 1px solid #e9ecef !important; border-left: none !important; }
+        .sidebar-header { background: white !important; padding: 0 !important; overflow: hidden; display: flex !important; justify-content: center !important; align-items: center !important; min-height: 110px; }
+        .sidebar-brand { display: flex; justify-content: center; align-items: center; padding: 10px; background: white; width: 100%; box-sizing: border-box; flex-shrink: 0; }
+        .sidebar-nav-wrapper { overflow-y: auto; flex: 1; padding-top: 10px; }
+        .sidebar-nav .nav-link { color: #333 !important; font-size: 16px !important; font-weight: 500 !important; padding: 12px 18px !important; border-radius: 6px !important; margin: 2px 10px !important; display: flex !important; align-items: center !important; gap: 12px !important; white-space: nowrap !important; text-align: left !important; flex-direction: row !important; }
+        .sidebar-nav .nav-link:hover { background: #eef2f7 !important; color: #0d47a1 !important; }
+        .sidebar-nav .nav-link.active { background: #2196f3 !important; color: white !important; }
+        .sidebar-nav .nav-icon, .sidebar-nav .nav-link svg { color: #0d47a1 !important; fill: #0d47a1 !important; font-size: 19px !important; min-width: 24px; flex-shrink: 0; }
+        .sidebar-nav .nav-link.active .nav-icon, .sidebar-nav .nav-link.active svg { color: white !important; fill: white !important; }
+        .sidebar-nav .nav-group-items .nav-link { padding-left: 48px !important; padding-right: 18px !important; font-size: 15px !important; }
+        .sidebar-unfoldable:not(:hover) .sidebar-nav .nav-link { justify-content: center !important; padding: 12px 0 !important; margin: 2px 5px !important; }
+        .sidebar-unfoldable:not(:hover) .sidebar-nav .nav-link span, .sidebar-unfoldable:not(:hover) .sidebar-nav .badge { display: none !important; }
+        .sidebar-footer { padding: 12px 16px !important; }
+        .sidebar-toggler-btn { background: #007A3D !important; color: white !important; border: none !important; border-radius: 6px !important; width: 32px !important; height: 24px !important; cursor: pointer !important; }
+      `}</style>
+
+      <CSidebar
+        className="border-end sidebar"
+        colorScheme="light"
+        position="fixed"
+        unfoldable={sidebarUnfoldable}
+        visible={sidebarShow}
+        onVisibleChange={(visible) => setSidebarShow(visible)}
+        style={{ left: 0, right: 'auto' }}
+      >
+        <CSidebarHeader className="border-bottom sidebar-header">
+          <div className="sidebar-brand">
+            <CImage
+              src={logo}
+              style={{
+                width: sidebarUnfoldable ? '70px' : '200px',
+                height: 'auto',
+                maxHeight: '110px',
+                objectFit: 'contain',
+                transition: 'all 0.3s ease',
+              }}
+              alt="GestiStock"
+            />
+          </div>
+          <CCloseButton className="d-lg-none position-absolute top-0 end-0 m-2" onClick={() => setSidebarShow(false)} />
+        </CSidebarHeader>
+
+        <div className="sidebar-nav-wrapper">
+          <AppSidebarNav items={navigation} />
         </div>
-        <CCloseButton
-          className="d-lg-none position-absolute top-0 end-0 m-2"
-          dark
-          onClick={() => dispatch({ type: 'set', sidebarShow: false })}
-        />
-      </CSidebarHeader>
-      
-      <div className="sidebar-nav-container" style={{ overflowY: 'auto', flex: 1 }}>
-        <AppSidebarNav items={navigation} />
-      </div>
-      
-      <CSidebarFooter className="border-top sidebar-footer">
-        <CSidebarToggler
-          onClick={() => dispatch({ type: 'set', sidebarUnfoldable: !unfoldable })}
-          className="custom-sidebar-toggler"
-        />
-      </CSidebarFooter>
-    </CSidebar>
+
+        <CSidebarFooter className="border-top sidebar-footer">
+          <CSidebarToggler onClick={() => setSidebarUnfoldable(!sidebarUnfoldable)} className="sidebar-toggler-btn" />
+        </CSidebarFooter>
+      </CSidebar>
+    </div>
   )
 }
 

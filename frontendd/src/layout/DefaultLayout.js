@@ -1,26 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AppSidebar, AppHeader, AppContent, AppFooter } from '../components';
 
-const DefaultLayout = () => {
+const DefaultLayout = ({ routes, user, onLogout }) => {
+  const [sidebarShow, setSidebarShow] = useState(true);
+  const [sidebarUnfoldable, setSidebarUnfoldable] = useState(false);
+
   return (
-    <div>
-      {/* Sidebar */}
-      <AppSidebar />
-
-      {/* Conteneur principal */}
+    <div dir="ltr">
+      <AppSidebar
+        sidebarShow={sidebarShow}
+        setSidebarShow={setSidebarShow}
+        sidebarUnfoldable={sidebarUnfoldable}
+        setSidebarUnfoldable={setSidebarUnfoldable}
+      />
       <div className="wrapper d-flex flex-column min-vh-100">
-        
-        {/* En-tête */}
-        <AppHeader />
-
-        {/* Contenu principal (flexible) */}
-      <div className="body flex-grow-1 px-0">
-          <AppContent />
+        <AppHeader
+          sidebarShow={sidebarShow}
+          setSidebarShow={setSidebarShow}
+          user={user}
+          onLogout={onLogout}
+        />
+        <div className="body flex-grow-1 px-0">
+          <AppContent routes={routes} />
         </div>
-
-        {/* Pied de page */}
         <AppFooter />
-
       </div>
     </div>
   );

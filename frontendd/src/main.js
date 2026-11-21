@@ -6,12 +6,15 @@ import 'core-js';
 
 import App from './App';
 import store from './store';
+import { LanguageProvider } from './context/LanguageContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const root = createRoot(document.getElementById('root'));
 
 root.render(
   <Provider store={store}>
-    <App />
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
   </Provider>
 );

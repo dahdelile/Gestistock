@@ -5,9 +5,13 @@ import 'core-js'
 
 import App from './App'
 import store from './store'
+import { LanguageProvider } from './context/LanguageContext'
 import 'bootstrap/dist/css/bootstrap.min.css';
+
 createRoot(document.getElementById('root')).render(
   <Provider store={store}>
-    <App />
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
   </Provider>,
 )

@@ -5,9 +5,8 @@ const AdminDashboard = React.lazy(() => import('./views/admin/gestion/AdminDashb
 
 //const Dashboard = React.lazy(() => import('./views/dashboard/Dashboard'))
  
+const Caises = React.lazy(() => import('./views/caise/Caises'));
 
-
-const Caises = React.lazy(() => import('./views/caise/Caises'))
 
 const Accueil = React.lazy(() => import('./views/home/accueil/Accueil'))
 //stock

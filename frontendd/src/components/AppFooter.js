@@ -7,14 +7,14 @@ const AppFooter = () => {
 
       <div>
         <a href="" target="_blank" rel="noopener noreferrer">
-        IntraNet de ATTM
+       APPLIATION  GESTION DE STOCK
         </a>
         <span className="ms-1">  </span>
       </div>
       <div className="ms-auto">
         <span className="me-1">Creer par</span>
         <a href="" target="_blank" rel="noopener noreferrer">
-            Groupe informatique ATTM
+            Iginiers informatique DAh/deli 48614463
         </a>
       </div>
     </CFooter>

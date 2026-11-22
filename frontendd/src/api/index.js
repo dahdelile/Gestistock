@@ -651,56 +651,46 @@ export const purchasesApi = {
 };
 // ===== API Users (Utilisateurs) =====
 
+// ===== API Users (Utilisateurs) =====
+const callManageUsers = async (payload) => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    throw new Error('Session expirée. Reconnecte-toi.')
+  }
+
+  const { data, error } = await supabase.functions.invoke('manage-users', {
+    body: payload,
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
+  })
+
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
 export const usersApi = {
   getAll: async () => {
-    const { data, error } = await supabase.functions.invoke(
-      'manage-users',
-      { body: { action: 'list' } }
-    );
-
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-
-    return { data: data.data || [] };
+    const data = await callManageUsers({ action: 'list' })
+    return { data: data?.data ?? data?.users ?? data ?? [] }
   },
 
   create: async (userData) => {
-    const { data, error } = await supabase.functions.invoke(
-      'manage-users',
-      { body: { action: 'create', data: userData } }
-    );
-
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-
-    return { data: data.data };
+    const data = await callManageUsers({ action: 'create', data: userData })
+    return { data: data.data }
   },
 
   update: async (id, userData) => {
-    const { data, error } = await supabase.functions.invoke(
-      'manage-users',
-      { body: { action: 'update', id, data: userData } }
-    );
-
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-
-    return { data: data.data };
+    const data = await callManageUsers({ action: 'update', id, data: userData })
+    return { data: data.data }
   },
 
   delete: async (id) => {
-    const { data, error } = await supabase.functions.invoke(
-      'manage-users',
-      { body: { action: 'delete', id } }
-    );
-
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-
-    return { success: true };
-  }
-};
-
+    await callManageUsers({ action: 'delete', id })
+    return { success: true }
+  },
+}
 // ===== API Caisse (Registre) =====
 export const registerApi = {
     getCurrentSession: async () => {
@@ -1289,4 +1279,5 @@ export const returnsApi = {
         return { success: true };
     }
 };
+
 export default {}; 

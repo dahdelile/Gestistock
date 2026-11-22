@@ -6,8 +6,7 @@ const AdminDashboard = React.lazy(() => import('./views/admin/gestion/AdminDashb
 //const Dashboard = React.lazy(() => import('./views/dashboard/Dashboard'))
  
 
-
-
+//const caises = React.lazy(() => import('./views/caise/caises'))
 
 const Accueil = React.lazy(() => import('./views/home/accueil/Accueil'))
 //stock
@@ -19,18 +18,17 @@ const ExpenseList= React.lazy(() => import('./views/expenses/ExpenseList'))
 const CustomerList= React.lazy(() => import('./views/Customers/CustomerList'))
 const SupplierList= React.lazy(() => import('./views/Suppliers/SupplierList'))
 const Ventes= React.lazy(() => import('./views/ventes/Ventes'))
-//const NoteDGT= React.lazy(() => import('.views/noteDG/noteTable/NoteDGT'))
+const UsersPage= React.lazy(() => import('./views/admin/UsersPage'))
 //const NoteFile2025= React.lazy(() => import('./views/noteDG/noteFile2025/NoteFile2025"'))
 const routes = [
 
-/// admin
  { path: '/home/accueil', name: 'Accueil', element: Accueil},
 { path: '/admin/adminAc', name: 'AdminAc', element:   AdminAc },
   { path: '/admin/gestion', name: 'AdminDashboard', element:   AdminDashboard },
 
+{ path: '/admin', name: 'UsersPage', element:   UsersPage },
 
-
-
+//{ path: '/caises', name: 'caises', element:   caises },
 //stock
 { path: 'Products', name: 'produits', element:  ProductList},
 { path: 'Categories', name: 'Categories', element:  Categories},

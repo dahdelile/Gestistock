@@ -28,14 +28,10 @@ const getNav = (tFn) => {
         
       ],
     },
-    {
-      component: CNavGroup, name: t('stockEntrant'), icon: <CIcon icon={cilInbox} customClassName="nav-icon" />,
-      items: [
-        { component: CNavItem, name: t('achats'), to: '/achat' },
-        { component: CNavItem, name: t('receptions'), to: '/receptions' },
-        { component: CNavItem, name: t('retoursFournisseurs'), to: '/supplier-returns' },
-      ],
-    },
+    { component: CNavItem, name: t('achats'), to:  '/achat', icon: <CIcon icon={cilInbox} customClassName="nav-icon" /> },
+    
+    { component: CNavItem, name:t('ventes'), to:  '/ventes', icon: <CIcon icon={cilMoney} customClassName="nav-icon" /> },
+    /*
     {
       component: CNavGroup, name: t('stockSortant'), icon: <CIcon icon={cilMoney} customClassName="nav-icon" />,
       items: [
@@ -43,7 +39,7 @@ const getNav = (tFn) => {
         { component: CNavItem, name: t('sortiesInternes'), to: '/internal-outs' },
         { component: CNavItem, name: t('retoursClients'), to: '/customer-returns' },
       ],
-    },
+    },*/
     {
       component: CNavGroup, name: t('partenaires'), icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
       items: [
@@ -61,9 +57,9 @@ const getNav = (tFn) => {
     {
       component: CNavGroup, name: t('parametres'), icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
       items: [
-        { component: CNavItem, name: t('utilisateurs'), to: '/users' },
+        { component: CNavItem, name: t('utilisateurs'), to: '/admin' },
         { component: CNavItem, name: t('gestionUsers'), to: '/admin/gestion', badge: { color: 'danger', text: 'ADMIN' } },
-        { component: CNavItem, name: t('parametres'), to: '/settings' },
+       
       ],
     },
     {

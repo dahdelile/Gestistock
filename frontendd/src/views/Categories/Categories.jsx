@@ -7,7 +7,7 @@ import { useLanguage } from '../../context/LanguageContext';
 /* =========================================================
    TRADUCTIONS / الترجمة
 ========================================================= */
-
+import { supabase } from '../../supabaseClient';
 const I18N = {
   fr: {
     dir: 'ltr',
@@ -79,6 +79,12 @@ const I18N = {
     close: 'Fermer',
     retry: 'Réessayer',
     switch_title: 'Changer de langue',
+    role_admin: 'Admin',
+    role_manager: 'Gérant',
+    role_stock: 'Stock',
+    role_user: 'Lecture',
+    err_forbidden: 'Action réservée à l’administrateur.',
+    err_forbidden_add: 'Vous n’avez pas le droit d’ajouter.',
   },
   ar: {
     dir: 'rtl',
@@ -150,6 +156,12 @@ const I18N = {
     close: 'إغلاق',
     retry: 'إعادة المحاولة',
     switch_title: 'تغيير اللغة',
+    role_admin: 'مدير',
+    role_manager: 'مدير',
+    role_stock: 'مخزن',
+    role_user: 'قراءة',
+    err_forbidden: 'هذا الإجراء مخصص لمدير النظام فقط.',
+    err_forbidden_add: 'ليس لديك صلاحية الإضافة.',
   },
 };
 
@@ -170,10 +182,16 @@ const toneFor = (name = '') => {
 };
 
 /* =========================================================
+   PERMISSIONS — Admin tout, Gérant voir+ajouter+modifier, PAS supprimer
+========================================================= */
+const normalizeRole = (r) => String(r || '').trim().toLowerCase();
+const isAdminRole = (role) => ['admin', 'administrateur', 'administrator'].includes(normalizeRole(role));
+
+/* =========================================================
    COMPOSANT
 ========================================================= */
 
-const CategoriesPage = () => {
+const CategoriesPage = ({ user: userProp }) => {
   const [lang, setLang] = useState(() => {
     try {
       return localStorage.getItem(LANG_KEY) === 'ar' ? 'ar' : 'fr';
@@ -190,6 +208,49 @@ const CategoriesPage = () => {
       /* stockage indisponible */
     }
   }, [lang]);
+
+  // ✅ Vrai utilisateur : prop App.js OU Supabase (plus jamais localStorage 'user')
+  const [loggedUser, setLoggedUser] = useState(userProp || null);
+  const [userLoading, setUserLoading] = useState(!userProp);
+
+  useEffect(() => {
+    if (userProp) {
+      setLoggedUser(userProp);
+      setUserLoading(false);
+      return;
+    }
+    let alive = true;
+    const load = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) { if (alive) setUserLoading(false); return; }
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, status, name')
+          .eq('id', session.user.id)
+          .single();
+        if (!alive) return;
+        setLoggedUser({
+          id: session.user.id,
+          email: session.user.email,
+          name: profile?.name || session.user.user_metadata?.name || session.user.email,
+          role: normalizeRole(profile?.role || session.user.user_metadata?.role || 'cashier'),
+          status: profile?.status || 'active',
+        });
+      } catch { /* on reste en lecture */ }
+      if (alive) setUserLoading(false);
+    };
+    load();
+    return () => { alive = false; };
+  }, [userProp]);
+
+  // ✅ RÈGLES CATÉGORIES
+  const userRole = normalizeRole(loggedUser?.role);
+  const isAdmin = isAdminRole(userRole);
+  const canAdd = isAdmin || userRole === 'manager' || userRole === 'stock';
+  const canEdit = isAdmin || userRole === 'manager' || userRole === 'stock';
+  const canDelete = isAdmin; // SEUL ADMIN supprime
+  const roleBadgeLabel = isAdmin ? t.role_admin : userRole === 'manager' ? t.role_manager : userRole === 'stock' ? t.role_stock : t.role_user;
 
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -255,6 +316,7 @@ const CategoriesPage = () => {
 
   /* ---------- Ouverture des modales ---------- */
   const handleOpenCreateCategory = () => {
+    if (!canAdd) { setErrorKey('err_forbidden_add'); return; }
     setModalType('category');
     setCurrentCategory(null);
     setCurrentSub(null);
@@ -264,6 +326,7 @@ const CategoriesPage = () => {
   };
 
   const handleOpenEditCategory = (cat) => {
+    if (!canEdit) { setErrorKey('err_forbidden'); return; }
     setModalType('category');
     setCurrentCategory(cat);
     setCurrentSub(null);
@@ -274,6 +337,7 @@ const CategoriesPage = () => {
 
   // categoryId optionnel : présélectionne la catégorie parente
   const handleAddSubCategory = (categoryId = '') => {
+    if (!canAdd) { setErrorKey('err_forbidden_add'); return; }
     setModalType('subcategory');
     setCurrentCategory(null);
     setCurrentSub(null);
@@ -283,6 +347,7 @@ const CategoriesPage = () => {
   };
 
   const handleOpenEditSub = (sub) => {
+    if (!canEdit) { setErrorKey('err_forbidden'); return; }
     setModalType('subcategory');
     setCurrentSub(sub);
     setCurrentCategory(null);
@@ -295,6 +360,7 @@ const CategoriesPage = () => {
     setShowForm(true);
   };
   const handleDeleteCategory = (cat) => {
+    if (!canDelete) { setErrorKey('err_forbidden'); return; }
     setModalType('category');
     setCurrentCategory(cat);
     setCurrentSub(null);
@@ -303,6 +369,7 @@ const CategoriesPage = () => {
   };
 
   const handleDeleteSub = (sub) => {
+    if (!canDelete) { setErrorKey('err_forbidden'); return; }
     setModalType('subcategory');
     setCurrentSub(sub);
     setCurrentCategory(null);
@@ -312,6 +379,10 @@ const CategoriesPage = () => {
   /* ---------- Soumission ---------- */
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // ✅ Garde : Gérant peut ajouter + modifier, Caissier ne peut pas
+    if (currentSub || currentCategory) {
+      if (!canEdit) { setFormErrorKey('err_forbidden'); return; }
+    } else if (!canAdd) { setFormErrorKey('err_forbidden_add'); return; }
     setSaving(true);
     setFormErrorKey('');
     try {
@@ -345,6 +416,7 @@ const CategoriesPage = () => {
 
   /* ---------- Suppression ---------- */
   const handleDeleteConfirm = async () => {
+    if (!canDelete) { setFormErrorKey('err_forbidden'); return; }
     setSaving(true);
     setFormErrorKey('');
     try {
@@ -366,6 +438,7 @@ const CategoriesPage = () => {
 
   /* ---------- Changement de statut ---------- */
   const handleToggleStatus = async (item, type = 'category') => {
+    if (!canEdit) { setErrorKey('err_forbidden'); return; }
     const newStatus = item.status === 'active' ? 'inactive' : 'active';
     try {
       if (type === 'subcategory') await categoriesApi.updateSubStatus(item.id, newStatus);
@@ -460,7 +533,7 @@ const CategoriesPage = () => {
 
   const renderActions = (item, type) => (
     <div className="ep-actions">
-      {type === 'category' && (
+      {type === 'category' && canAdd && (
         <button
           type="button"
           className="btn-icon btn-add-sub"
@@ -471,33 +544,42 @@ const CategoriesPage = () => {
           <i className="fas fa-plus" />
         </button>
       )}
-      <button
-        type="button"
-        className={`btn-icon ${item.status === 'inactive' ? 'btn-toggle-on' : 'btn-toggle-off'}`}
-        onClick={() => handleToggleStatus(item, type)}
-        title={item.status === 'inactive' ? t.toggle_on : t.toggle_off}
-        aria-label={item.status === 'inactive' ? t.toggle_on : t.toggle_off}
-      >
-        <i className={`fas fa-${item.status === 'inactive' ? 'play' : 'pause'}`} />
-      </button>
-      <button
-        type="button"
-        className="btn-icon btn-edit"
-        onClick={() => (type === 'category' ? handleOpenEditCategory(item) : handleOpenEditSub(item))}
-        title={t.edit}
-        aria-label={t.edit}
-      >
-        <i className="fas fa-edit" />
-      </button>
-      <button
-        type="button"
-        className="btn-icon btn-delete"
-        onClick={() => (type === 'category' ? handleDeleteCategory(item) : handleDeleteSub(item))}
-        title={t.delete}
-        aria-label={t.delete}
-      >
-        <i className="fas fa-trash-alt" />
-      </button>
+      {canEdit && (
+        <button
+          type="button"
+          className={`btn-icon ${item.status === 'inactive' ? 'btn-toggle-on' : 'btn-toggle-off'}`}
+          onClick={() => handleToggleStatus(item, type)}
+          title={item.status === 'inactive' ? t.toggle_on : t.toggle_off}
+          aria-label={item.status === 'inactive' ? t.toggle_on : t.toggle_off}
+        >
+          <i className={`fas fa-${item.status === 'inactive' ? 'play' : 'pause'}`} />
+        </button>
+      )}
+      {canEdit && (
+        <button
+          type="button"
+          className="btn-icon btn-edit"
+          onClick={() => (type === 'category' ? handleOpenEditCategory(item) : handleOpenEditSub(item))}
+          title={t.edit}
+          aria-label={t.edit}
+        >
+          <i className="fas fa-edit" />
+        </button>
+      )}
+      {canDelete && (
+        <button
+          type="button"
+          className="btn-icon btn-delete"
+          onClick={() => (type === 'category' ? handleDeleteCategory(item) : handleDeleteSub(item))}
+          title={t.delete}
+          aria-label={t.delete}
+        >
+          <i className="fas fa-trash-alt" />
+        </button>
+      )}
+      {!canEdit && !canDelete && (
+        <span style={{ color: '#98a6ba', fontSize: 'var(--fs-xs)' }}>—</span>
+      )}
     </div>
   );
 
@@ -507,6 +589,14 @@ const CategoriesPage = () => {
       {status === 'inactive' ? t.inactive : t.active}
     </span>
   );
+
+  if (userLoading) {
+    return (
+      <div className="expenses-page" dir={t.dir} lang={lang} style={{ textAlign: 'center', paddingTop: 60 }}>
+        <span className="ep-spinner" /> {t.loading}
+      </div>
+    );
+  }
 
   return (
     <div className="expenses-page" dir={t.dir} lang={lang}>
@@ -737,7 +827,7 @@ button.ep-badge:hover { filter: brightness(.95); }
             <span className="ep-title-icon"><i className="fas fa-tags" /></span>
             {t.title}
           </h1>
-          <p>{t.subtitle}</p>
+          <p>{t.subtitle} — <strong>{roleBadgeLabel}</strong></p>
         </div>
 
         <div className="ep-hero-actions">
@@ -745,19 +835,23 @@ button.ep-badge:hover { filter: brightness(.95); }
             <button type="button" className={lang === 'fr' ? 'on' : ''} onClick={() => setLang('fr')} aria-pressed={lang === 'fr'}>FR</button>
             <button type="button" className={lang === 'ar' ? 'on' : ''} onClick={() => setLang('ar')} aria-pressed={lang === 'ar'}>عربية</button>
           </div>
-          <button className="ep-btn-add alt" type="button" onClick={() => handleAddSubCategory(filterCategory !== 'all' ? filterCategory : '')}>
-            <i className="fas fa-sitemap" /> {t.add_sub}
-          </button>
-          <button className="ep-btn-add" type="button" onClick={handleOpenCreateCategory}>
-            <i className="fas fa-plus" /> {t.add}
-          </button>
+          {canAdd && (
+            <button className="ep-btn-add alt" type="button" onClick={() => handleAddSubCategory(filterCategory !== 'all' ? filterCategory : '')}>
+              <i className="fas fa-sitemap" /> {t.add_sub}
+            </button>
+          )}
+          {canAdd && (
+            <button className="ep-btn-add" type="button" onClick={handleOpenCreateCategory}>
+              <i className="fas fa-plus" /> {t.add}
+            </button>
+          )}
         </div>
       </header>
 
       {errorKey && (
         <div className="ep-alert" role="alert">
           <span><i className="fas fa-exclamation-circle" /> &nbsp;{t[errorKey]}</span>
-          <button type="button" onClick={fetchCategories}>{t.retry}</button>
+          <button type="button" onClick={() => { setErrorKey(''); fetchCategories(); }}>{t.retry}</button>
         </div>
       )}
 
@@ -1077,7 +1171,7 @@ button.ep-badge:hover { filter: brightness(.95); }
         </div>
       )}
 
-      {/* Modale suppression */}
+      {/* Modale suppression — SEUL ADMIN y arrive, mais on garde la garde */}
       {showDeleteModal && (
         <div className="ep-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && closeModals()}>
           <div className="ep-modal" style={{ maxWidth: 400 }} role="alertdialog" aria-modal="true" aria-labelledby="ep-delete-title">
@@ -1097,7 +1191,7 @@ button.ep-badge:hover { filter: brightness(.95); }
             </div>
             <div className="ep-modal-footer center">
               <button type="button" className="ep-btn ep-btn-cancel" onClick={closeModals}>{t.cancel}</button>
-              <button type="button" className="ep-btn ep-btn-danger" onClick={handleDeleteConfirm} disabled={saving}>
+              <button type="button" className="ep-btn ep-btn-danger" onClick={handleDeleteConfirm} disabled={saving || !canDelete}>
                 {saving ? t.deleting : t.delete_confirm}
               </button>
             </div>

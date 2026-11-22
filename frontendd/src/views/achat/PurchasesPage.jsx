@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { purchasesApi, suppliersApi, productsApi, categoriesApi } from '../../api';
 // ✅ BON
 import { useLanguage } from '../../context/LanguageContext';
+import { supabase } from '../../supabaseClient';
 import {
   Table, Button, Card, Spinner, Badge, Form, Modal,
   Toast, ToastContainer, Alert, Row, Col, InputGroup
@@ -58,7 +59,9 @@ const I18N = {
     warn_no_product: 'Veuillez sélectionner un produit.', warn_qty: 'La quantité doit être supérieure à zéro.',
     warn_price: 'Veuillez saisir un prix unitaire valide.', warn_cart_empty: 'Ajoutez au moins un produit à cet achat.',
     warn_popup: 'Autorisez les fenêtres pop-up pour imprimer.', supplier_none: 'Fournisseur non renseigné', product_unknown: 'Produit',
-    role_admin: 'Admin', role_user: 'Lecture',
+    role_admin: 'Admin', role_manager: 'Gérant', role_stock: 'Stock', role_user: 'Lecture',
+    err_forbidden: 'Action réservée à l’administrateur.',
+    err_forbidden_add: 'Vous n’avez pas le droit d’ajouter un achat.',
   },
   ar: {
     dir: 'rtl', locale: 'ar-u-nu-latn', currency: 'أوقية',
@@ -101,7 +104,9 @@ const I18N = {
     warn_no_product: 'الرجاء اختيار منتج.', warn_qty: 'يجب أن تكون الكمية أكبر من صفر.',
     warn_price: 'أدخل سعر وحدة صالحًا.', warn_cart_empty: 'أضف منتجًا واحدًا على الأقل.',
     warn_popup: 'اسمح بالنوافذ المنبثقة للطباعة.', supplier_none: 'مورد غير محدد', product_unknown: 'منتج',
-    role_admin: 'مدير', role_user: 'قراءة',
+    role_admin: 'مدير', role_manager: 'مدير', role_stock: 'مخزن', role_user: 'قراءة',
+    err_forbidden: 'هذا الإجراء مخصص لمدير النظام فقط.',
+    err_forbidden_add: 'ليس لديك صلاحية إضافة عملية شراء.',
   },
 };
 
@@ -140,37 +145,69 @@ const getSupplierName = (purchase, suppliers = [], fallback = 'Fournisseur non r
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
 
 /* =========================================================
+   PERMISSIONS — Admin tout, Gérant voir+ajouter+modifier, PAS supprimer
+========================================================= */
+const normalizeRole = (r) => String(r || '').trim().toLowerCase();
+const isAdminRole = (role) => ['admin', 'administrateur', 'administrator'].includes(normalizeRole(role));
+
+/* =========================================================
    COMPOSANT PRINCIPAL
 ========================================================= */
-const PurchasesPage = () => {
+const PurchasesPage = ({ user: userProp }) => {
   const { lang } = useLanguage();
   const t = I18N[lang];
   const cur = t.currency;
 
-  // Rôles (comme ChauffeurManager)
-  const [userRole, setUserRole] = useState(null);
-  const [userLoading, setUserLoading] = useState(true);
-  const isAdmin = () => userRole === 'admin' || userRole === 'administrateur';
-  const canEdit = () => isAdmin();
+  // ✅ Vrai utilisateur : prop App.js OU Supabase (plus jamais localStorage 'user')
+ // ✅ Rôle fiable : 1. prop App.js  2. profiles  3. user_metadata
+const [loggedUser, setLoggedUser] = useState(userProp || null);
+const [userLoading, setUserLoading] = useState(!userProp);
 
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      try {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          const userData = JSON.parse(storedUser);
-          setUserRole(userData.role || userData.roles?.[0] || 'user');
-        } else {
-          setUserRole('user');
-        }
-      } catch (err) {
-        setUserRole('user');
-      } finally {
-        setUserLoading(false);
-      }
-    };
-    fetchUserRole();
-  }, []);
+useEffect(() => {
+  if (userProp?.role) {
+    setLoggedUser(userProp);
+    setUserLoading(false);
+    return;
+  }
+  let alive = true;
+  const load = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) { if (alive) setUserLoading(false); return; }
+
+      // 1. On essaie profiles
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, status, name')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      // 2. Si profiles est vide, on prend user_metadata (celui de PageConnection)
+      const metaRole = session.user.user_metadata?.role;
+
+      if (!alive) return;
+      setLoggedUser({
+        id: session.user.id,
+        email: session.user.email,
+        name: profile?.name || session.user.user_metadata?.name || session.user.email,
+        role: normalizeRole(profile?.role || metaRole || 'cashier'),
+        status: profile?.status || 'active',
+      });
+    } catch (e) {
+      console.error(e);
+    }
+    if (alive) setUserLoading(false);
+  };
+  load();
+  return () => { alive = false; };
+}, [userProp]);
+  // ✅ RÈGLES ACHATS
+  const userRole = normalizeRole(loggedUser?.role);
+  const isAdmin = isAdminRole(userRole);
+  const canAdd = isAdmin || userRole === 'manager' || userRole === 'stock'; // Gérant + Stock peuvent ajouter
+  const canEdit = isAdmin || userRole === 'manager' || userRole === 'stock'; // Gérant + Stock peuvent modifier
+  const canDelete = isAdmin; // SEUL ADMIN supprime
+  const canView = !!loggedUser || true; // tout le monde connecté peut consulter
 
   const [purchases, setPurchases] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -274,7 +311,10 @@ const PurchasesPage = () => {
   const resetFilters = () => { setSearch(''); setStatusFilter('all'); setStartDateFilter(''); setEndDateFilter(''); };
 
   const resetForm = () => { setForm(emptyForm()); setCurrentItem(emptyItem()); setCart([]); setEditingPurchase(null); };
-  const openCreateForm = () => { resetForm(); setShowForm(true); };
+  const openCreateForm = () => {
+    if (!canAdd) { showToast(t.err_forbidden_add, 'danger'); return; }
+    resetForm(); setShowForm(true);
+  };
   const closeForm = () => { if (saving) return; setShowForm(false); resetForm(); };
   const updateForm = (e) => { const { name, value } = e.target; setForm((prev) => ({ ...prev, [name]: value })); };
 
@@ -318,6 +358,7 @@ const PurchasesPage = () => {
   const removeCartItem = (key) => setCart((prev) => prev.filter((item) => `${item.category_id}-${item.subcategory_id}` !== String(key)));
 
   const openEditForm = (purchase) => {
+    if (!canEdit) { showToast(t.err_forbidden, 'danger'); return; }
     setEditingPurchase(purchase);
     setForm({ purchase_number: purchase.purchase_number || '', supplier_id: purchase.supplier_id || '', notes: purchase.notes || '' });
     const items = getPurchaseItems(purchase);
@@ -334,6 +375,9 @@ const PurchasesPage = () => {
   };
 
   const savePurchase = async () => {
+    // ✅ Garde : Gérant peut ajouter + modifier, Caissier ne peut pas
+    if (editingPurchase && !canEdit) { showToast(t.err_forbidden, 'danger'); return; }
+    if (!editingPurchase && !canAdd) { showToast(t.err_forbidden_add, 'danger'); return; }
     if (cart.length === 0) return showToast(t.warn_cart_empty, 'warning');
     setSaving(true);
     const payload = {
@@ -362,9 +406,13 @@ const PurchasesPage = () => {
     } finally { setSaving(false); }
   };
 
-  const confirmDelete = (purchase) => { setPurchaseToDelete(purchase); setShowDelete(true); };
+  const confirmDelete = (purchase) => {
+    if (!canDelete) { showToast(t.err_forbidden, 'danger'); return; }
+    setPurchaseToDelete(purchase); setShowDelete(true);
+  };
   const deletePurchase = async () => {
     if (!purchaseToDelete) return;
+    if (!canDelete) { showToast(t.err_forbidden, 'danger'); return; }
     setDeleting(true);
     try {
       await purchasesApi.deletePurchase(purchaseToDelete.id, purchaseToDelete.purchase_items || purchaseToDelete.items);
@@ -455,6 +503,8 @@ const PurchasesPage = () => {
     return [...new Set(names)].join(', ') || '—';
   };
 
+  const roleBadgeLabel = isAdmin ? t.role_admin : userRole === 'manager' ? t.role_manager : userRole === 'stock' ? t.role_stock : t.role_user;
+
   if (userLoading) {
     return (
       <div className="container-fluid py-4 text-center">
@@ -517,9 +567,9 @@ const PurchasesPage = () => {
             <h3 className="mb-0 d-flex align-items-center">
               <FaShoppingCart className="me-2" />
               {t.title}
-              <Badge bg={canEdit() ? 'success' : 'secondary'} className="ms-2" style={{ fontSize: '0.6em' }}>
-                {canEdit() ? <FaUserShield className="me-1" /> : <FaUser className="me-1" />}
-                {canEdit() ? t.role_admin : t.role_user}
+              <Badge bg={isAdmin ? 'success' : canAdd ? 'warning' : 'secondary'} className="ms-2" style={{ fontSize: '0.6em' }}>
+                {isAdmin ? <FaUserShield className="me-1" /> : <FaUser className="me-1" />}
+                {roleBadgeLabel}
               </Badge>
             </h3>
             <div className="d-flex align-items-center gap-2">
@@ -529,7 +579,7 @@ const PurchasesPage = () => {
               <Button variant="light" onClick={loadData} disabled={loading}>
                 <FaSyncAlt className={loading ? "spin" : ""} /> <span className="ms-2">{t.refresh}</span>
               </Button>
-              {canEdit() && (
+              {canAdd && (
                 <Button variant="success" onClick={openCreateForm} disabled={loading}>
                   <FaPlus className="me-1" /> {t.add}
                 </Button>
@@ -593,7 +643,7 @@ const PurchasesPage = () => {
               <FaInfoCircle className="text-muted mb-2" size={32} />
               <h5 className="text-muted">{purchases.length === 0 ? t.none_title : t.none_search}</h5>
               <p className="text-muted small">{purchases.length === 0 ? t.none_sub : t.none_search_sub}</p>
-              {purchases.length === 0 && canEdit() && (
+              {purchases.length === 0 && canAdd && (
                 <Button variant="primary" onClick={openCreateForm}><FaPlus className="me-2" />{t.none_add}</Button>
               )}
             </div>
@@ -641,13 +691,13 @@ const PurchasesPage = () => {
                         <td className="text-end">
                           <div className="d-flex gap-1 justify-content-end">
                             <Button variant="outline-info" size="sm" onClick={() => openPurchaseDetails(purchase)} title={t.view}><FaEye /></Button>
-                            {canEdit() && (
-                              <>
-                                <Button variant="outline-success" size="sm" onClick={() => openEditForm(purchase)} title={t.edit}><FaEdit /></Button>
-                                <Button variant="outline-danger" size="sm" onClick={() => confirmDelete(purchase)} title={t.delete}><FaTrash /></Button>
-                              </>
+                            {canEdit && (
+                              <Button variant="outline-success" size="sm" onClick={() => openEditForm(purchase)} title={t.edit}><FaEdit /></Button>
                             )}
-                            {!canEdit() && <Button variant="outline-secondary" size="sm" disabled title="Actions réservées"><FaUserShield /></Button>}
+                            {canDelete && (
+                              <Button variant="outline-danger" size="sm" onClick={() => confirmDelete(purchase)} title={t.delete}><FaTrash /></Button>
+                            )}
+                            {!canEdit && !canDelete && <Button variant="outline-secondary" size="sm" disabled title="Actions réservées"><FaUserShield /></Button>}
                           </div>
                         </td>
                       </tr>
@@ -850,7 +900,7 @@ const PurchasesPage = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* ====== MODAL SUPPRESSION ====== */}
+      {/* ====== MODAL SUPPRESSION — SEUL ADMIN ====== */}
       <Modal show={showDelete} onHide={() => !deleting && (setShowDelete(false), setPurchaseToDelete(null))}>
         <Modal.Header closeButton>
           <Modal.Title><FaTrash className="me-2 text-danger" />{t.delete_title}</Modal.Title>
@@ -869,7 +919,7 @@ const PurchasesPage = () => {
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => { setShowDelete(false); setPurchaseToDelete(null); }} disabled={deleting}>{t.cancel}</Button>
-          <Button variant="danger" onClick={deletePurchase} disabled={deleting}>
+          <Button variant="danger" onClick={deletePurchase} disabled={deleting || !canDelete}>
             {deleting ? <Spinner size="sm" className="me-2" /> : <FaTrash className="me-2" />}
             {t.delete_confirm}
           </Button>

@@ -190,15 +190,22 @@ const Accueil = ({ userName }) => {
     { text: t('categories'), img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/categories" },
     { text: t('rapports'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/rapportss" },
     { text: t('customers'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/Customers" },
+     { text: t('caises'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/caise" },
   ], [t, lang]);
 
   const quickLinks = useMemo(() => [
-    { label: t('vente'), path: "/sales" },
-    { label: t('achat'), path: "/purchases" },
-    { label: t('produit'), path: "/products" },
-    { label: t('expense'), path: "/expenses" },
-    { label: t('rapports'), path: "/reports/stock" },
-  ], [t, lang]);
+  { label: t('caisse'), path: "/caisse" },
+  { label: t('vente'), path: "/ventes" },
+  { label: t('achat'), path: "/achat" },
+  { label: t('produit'), path: "/products" },
+  { label: t('fournisseur'), path: "/suppliers" },
+  { label: t('client'), path: "/customers" },
+  { label: t('categorie'), path: "/categories" },
+  { label: t('expense'), path: "/expenses" },
+  { label: t('stock'), path: "/stock" },
+  { label: t('utilisateur'), path: "/users" },
+  { label: t('rapports'), path: "/rapportss" },
+], [t, lang]);
 
   const filteredDocs = useMemo(() => {
     return documents.filter(doc =>
@@ -287,7 +294,7 @@ const Accueil = ({ userName }) => {
       </Container>
 
       <footer className="bg-dark text-white py-3 text-center mt-4">
-        © {new Date().getFullYear()} Tous droits réservés dah delil
+        © {new Date().getFullYear()} Tous droits réservés
       </footer>
 
     </PageContainer>

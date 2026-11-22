@@ -1,6 +1,7 @@
 // src/pages/CustomersPage.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { customersApi } from '../../api';
+import { supabase } from '../../supabaseClient';
 import { useLanguage } from '../../context/LanguageContext';
 import {
   Table, Button, Card, Spinner, Badge, Form, Modal,
@@ -8,7 +9,7 @@ import {
 } from 'react-bootstrap';
 import {
   FaUsers, FaCoins, FaExclamationTriangle, FaPlus,
-  FaEdit, FaTrash, FaSearch, FaTimes
+  FaEdit, FaTrash, FaSearch, FaTimes, FaLock
 } from 'react-icons/fa';
 
 /* =========================================================
@@ -39,6 +40,10 @@ const I18N = {
     err_load: 'Impossible de charger les clients.', err_save: "Erreur lors de l'enregistrement.",
     err_delete: 'Erreur lors de la suppression.', close: 'Fermer', retry: 'Réessayer',
     no_debt: 'Aucune dette',
+    role_admin: 'Admin', role_manager: 'Gérant', role_stock: 'Stock', role_cashier: 'Caissier', role_read: 'Lecture',
+    no_perm_add: 'Vous n’avez pas le droit d’ajouter un client.',
+    no_perm_edit: 'Vous n’avez pas le droit de modifier un client.',
+    no_perm_delete: 'Seul l’admin peut supprimer un client.',
   },
   ar: {
     dir: 'rtl', locale: 'ar-u-nu-latn', currency: 'أوقية',
@@ -64,21 +69,31 @@ const I18N = {
     err_load: 'تعذّر تحميل العملاء.', err_save: 'حدث خطأ أثناء الحفظ.',
     err_delete: 'حدث خطأ أثناء الحذف.', close: 'إغلاق', retry: 'إعادة المحاولة',
     no_debt: 'لا توجد ديون',
+    role_admin: 'مسؤول', role_manager: 'مدير', role_stock: 'مخزون', role_cashier: 'أمين صندوق', role_read: 'قراءة فقط',
+    no_perm_add: 'ليس لديك صلاحية إضافة عميل.',
+    no_perm_edit: 'ليس لديك صلاحية تعديل عميل.',
+    no_perm_delete: 'المسؤول فقط يمكنه حذف عميل.',
   },
 };
 
 /* =========================================================
-   UTILITAIRES
+   UTILITAIRES + RÔLES
 ========================================================= */
 const formatMoney = (value) =>
   new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value) || 0);
 
 const emptyForm = () => ({ name: '', phone: '', email: '', address: '', balance: 0 });
 
+const normalizeRole = (r) => String(r || '').trim().toLowerCase();
+const isAdminRole = (r) => {
+  const v = normalizeRole(r);
+  return v === 'admin' || v === 'administrateur' || v === 'administrator';
+};
+
 /* =========================================================
    COMPOSANT PRINCIPAL
 ========================================================= */
-const CustomersPage = () => {
+const CustomersPage = ({ user: userProp }) => {
   const { lang } = useLanguage();
   const t = I18N[lang];
 
@@ -95,6 +110,63 @@ const CustomersPage = () => {
   const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState('');
+
+  // ===== RÔLE — depuis App.js (profiles), sinon Supabase session + profiles =====
+  const [loggedUser, setLoggedUser] = useState(userProp || null);
+  const [userLoading, setUserLoading] = useState(!userProp?.role);
+
+  useEffect(() => {
+    if (userProp?.role) {
+      setLoggedUser(userProp);
+      setUserLoading(false);
+      return;
+    }
+    let alive = true;
+    const load = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) { if (alive) setUserLoading(false); return; }
+        let role = normalizeRole(session.user.user_metadata?.role);
+        let name = session.user.user_metadata?.name || session.user.email;
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role, status, name')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          if (profile?.role) role = normalizeRole(profile.role);
+          if (profile?.name) name = profile.name;
+        } catch (e) { console.log('profiles non lisible', e); }
+        if (!role && session.user.email === '') role = 'admin';
+        if (!role && session.user.email === '') role = 'manager';
+        if (!alive) return;
+        setLoggedUser({
+          id: session.user.id,
+          email: session.user.email,
+          name,
+          role: role || 'cashier',
+          status: 'active',
+        });
+      } catch (e) { console.log(e); }
+      if (alive) setUserLoading(false);
+    };
+    load();
+    return () => { alive = false; };
+  }, [userProp]);
+
+  // ===== PERMISSIONS — même règle que Achats / Catégories =====
+  const userRole = normalizeRole(loggedUser?.role);
+  const isAdmin = isAdminRole(userRole);
+  const canAdd = isAdmin || userRole === 'manager' || userRole === 'stock';
+  const canEdit = isAdmin || userRole === 'manager' || userRole === 'stock';
+  const canDelete = isAdmin; // SEUL ADMIN
+
+  const roleLabel = isAdmin ? t.role_admin
+    : userRole === 'manager' ? t.role_manager
+    : userRole === 'stock' ? t.role_stock
+    : userRole === 'cashier' ? t.role_cashier
+    : t.role_read;
+  const roleBadgeBg = isAdmin ? 'danger' : userRole === 'manager' ? 'warning' : userRole === 'stock' ? 'info' : 'secondary';
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -131,6 +203,7 @@ const CustomersPage = () => {
   }, [showForm, showDeleteModal]);
 
   const handleOpenCreate = () => {
+    if (!canAdd) { setFormErrorKey('no_perm_add'); setShowForm(false); return; }
     setCurrentCustomer(null);
     setFormData(emptyForm());
     setFormErrorKey('');
@@ -138,6 +211,7 @@ const CustomersPage = () => {
   };
 
   const handleOpenEdit = (customer) => {
+    if (!canEdit) { alert(t.no_perm_edit); return; }
     setCurrentCustomer(customer);
     setFormData({
       name: customer.name || '',
@@ -151,6 +225,7 @@ const CustomersPage = () => {
   };
 
   const handleDeleteClick = (customer) => {
+    if (!canDelete) { alert(t.no_perm_delete); return; }
     setCurrentCustomer(customer);
     setFormErrorKey('');
     setShowDeleteModal(true);
@@ -158,6 +233,8 @@ const CustomersPage = () => {
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
+    if (currentCustomer && !canEdit) { setFormErrorKey('no_perm_edit'); return; }
+    if (!currentCustomer && !canAdd) { setFormErrorKey('no_perm_add'); return; }
     setSaving(true);
     setFormErrorKey('');
     try {
@@ -178,6 +255,7 @@ const CustomersPage = () => {
   };
 
   const handleDeleteConfirm = async () => {
+    if (!canDelete) { setFormErrorKey('no_perm_delete'); return; }
     if (!currentCustomer) return;
     setSaving(true);
     setFormErrorKey('');
@@ -263,9 +341,21 @@ const CustomersPage = () => {
               {t.title}
             </h3>
             <div className="d-flex align-items-center gap-2">
-              <Button variant="success" onClick={handleOpenCreate}>
-                <FaPlus className="me-1" /> {t.add}
-              </Button>
+              {!userLoading && (
+                <Badge bg={roleBadgeBg} style={{ fontSize: '0.8rem' }}>
+                  {loggedUser?.email} — {roleLabel}
+                </Badge>
+              )}
+              {canAdd && (
+                <Button variant="success" onClick={handleOpenCreate}>
+                  <FaPlus className="me-1" /> {t.add}
+                </Button>
+              )}
+              {!canAdd && !userLoading && (
+                <Badge bg="light" text="dark" style={{ fontSize: '0.8rem' }}>
+                  <FaLock className="me-1" /> {roleLabel}
+                </Badge>
+              )}
             </div>
           </div>
         </Card.Header>
@@ -284,11 +374,11 @@ const CustomersPage = () => {
               <Form.Group>
                 <Form.Label className="fw-bold"><FaSearch className="me-2" />Recherche</Form.Label>
                 <InputGroup>
-                  <Form.Control 
-                    type="search" 
-                    placeholder={t.search_ph} 
-                    value={search} 
-                    onChange={(e) => setSearch(e.target.value)} 
+                  <Form.Control
+                    type="search"
+                    placeholder={t.search_ph}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                   />
                   {search && (
                     <Button variant="outline-secondary" onClick={() => setSearch('')}>
@@ -317,7 +407,7 @@ const CustomersPage = () => {
                   <th>{t.th_email}</th>
                   <th>{t.th_address}</th>
                   <th className="text-end">{t.th_balance}</th>
-                  <th className="text-center">{t.th_actions}</th>
+                  {(canEdit || canDelete) && <th className="text-center">{t.th_actions}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -347,16 +437,22 @@ const CustomersPage = () => {
                           {Number(c.balance) > 0 ? formatMoney(c.balance) : t.no_debt}
                         </Badge>
                       </td>
-                      <td className="text-center">
-                        <div className="d-flex gap-1 justify-content-center">
-                          <Button variant="outline-primary" size="sm" onClick={() => handleOpenEdit(c)} title={t.edit}>
-                            <FaEdit />
-                          </Button>
-                          <Button variant="outline-danger" size="sm" onClick={() => handleDeleteClick(c)} title={t.delete}>
-                            <FaTrash />
-                          </Button>
-                        </div>
-                      </td>
+                      {(canEdit || canDelete) && (
+                        <td className="text-center">
+                          <div className="d-flex gap-1 justify-content-center">
+                            {canEdit && (
+                              <Button variant="outline-primary" size="sm" onClick={() => handleOpenEdit(c)} title={t.edit}>
+                                <FaEdit />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button variant="outline-danger" size="sm" onClick={() => handleDeleteClick(c)} title={t.delete}>
+                                <FaTrash />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -409,34 +505,36 @@ const CustomersPage = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* ====== MODAL SUPPRESSION ====== */}
-      <Modal show={showDeleteModal} onHide={closeModals}>
-        <Modal.Header closeButton>
-          <Modal.Title>
-            <FaTrash className="me-2 text-danger" />
-            {t.delete_title}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>{t.delete_warn}</p>
-          {formErrorKey && <Alert variant="danger">{t[formErrorKey]}</Alert>}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeModals} disabled={saving}>{t.cancel}</Button>
-          <Button variant="danger" onClick={handleDeleteConfirm} disabled={saving}>
-            {saving ? <Spinner size="sm" className="me-2" /> : <FaTrash className="me-2" />}
-            {t.delete_confirm}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      {/* ====== MODAL SUPPRESSION — SEUL ADMIN ====== */}
+      {canDelete && (
+        <Modal show={showDeleteModal} onHide={closeModals}>
+          <Modal.Header closeButton>
+            <Modal.Title>
+              <FaTrash className="me-2 text-danger" />
+              {t.delete_title}
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <p>{t.delete_warn}</p>
+            {formErrorKey && <Alert variant="danger">{t[formErrorKey]}</Alert>}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={closeModals} disabled={saving}>{t.cancel}</Button>
+            <Button variant="danger" onClick={handleDeleteConfirm} disabled={saving}>
+              {saving ? <Spinner size="sm" className="me-2" /> : <FaTrash className="me-2" />}
+              {t.delete_confirm}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
 
       {/* ====== STYLE COMPACT POUR RÉDUIRE LA TAILLE DU TEXTE ====== */}
       <style>{`
-        .customers-compact .card.bg-primary h6, .customers-compact .card.bg-warning h6, .customers-compact .card.bg-info h6 { 
-          font-size: 0.75rem !important; 
+        .customers-compact .card.bg-primary h6, .customers-compact .card.bg-warning h6, .customers-compact .card.bg-info h6 {
+          font-size: 0.75rem !important;
         }
-        .customers-compact .card.bg-primary h2, .customers-compact .card.bg-warning h2, .customers-compact .card.bg-info h2 { 
-          font-size: 1.25rem !important; 
+        .customers-compact .card.bg-primary h2, .customers-compact .card.bg-warning h2, .customers-compact .card.bg-info h2 {
+          font-size: 1.25rem !important;
         }
         .customers-compact .card-header h3 { font-size: 1.1rem !important; }
         .customers-compact .form-label { font-size: 0.8rem !important; margin-bottom: 0.25rem !important; }

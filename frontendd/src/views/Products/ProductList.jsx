@@ -5,6 +5,7 @@ import {
   Alert, Row, Col, InputGroup
 } from 'react-bootstrap';
 import { useLanguage } from '../../context/LanguageContext';
+import { supabase } from '../../supabaseClient';
 import { productsApi, categoriesApi, suppliersApi, salesApi } from '../../api';
 
 /* =========================================================
@@ -57,6 +58,10 @@ const I18N = {
     err_delete: 'Impossible de supprimer ce produit.', ok_save: 'Produit enregistré avec succès.',
     ok_delete: 'Produit supprimé avec succès.', ok_archive: 'Produit archivé avec succès.',
     close: 'Fermer', retry: 'Réessayer',
+    role_admin: 'Admin', role_manager: 'Gérant', role_stock: 'Stock', role_cashier: 'Caissier', role_read: 'Lecture',
+    no_perm_add: 'Vous n’avez pas le droit d’ajouter un produit.',
+    no_perm_edit: 'Vous n’avez pas le droit de modifier un produit.',
+    no_perm_delete: 'Seul l’admin peut supprimer un produit.',
   },
   ar: {
     dir: 'rtl', locale: 'ar-u-nu-latn', currency: 'أوقية',
@@ -104,11 +109,15 @@ const I18N = {
     err_delete: 'تعذّر حذف هذا المنتج.', ok_save: 'تم حفظ المنتج بنجاح.',
     ok_delete: 'تم حذف المنتج بنجاح.', ok_archive: 'تمت أرشفة المنتج بنجاح.',
     close: 'إغلاق', retry: 'إعادة المحاولة',
+    role_admin: 'مسؤول', role_manager: 'مدير', role_stock: 'مخزون', role_cashier: 'أمين صندوق', role_read: 'قراءة فقط',
+    no_perm_add: 'ليس لديك صلاحية إضافة منتج.',
+    no_perm_edit: 'ليس لديك صلاحية تعديل منتج.',
+    no_perm_delete: 'المسؤول فقط يمكنه حذف منتج.',
   },
 };
 
 /* =========================================================
-   UTILITAIRES
+   UTILITAIRES + RÔLES
 ========================================================= */
 const emptyForm = () => ({
   name: '', category: '', subcategory: '', barcode: '', status: 'neuf',
@@ -157,6 +166,11 @@ const toneFor = (name = '') => {
 };
 
 const normalizeName = (v) => String(v || '').trim().toLowerCase();
+const normalizeRole = (r) => String(r || '').trim().toLowerCase();
+const isAdminRole = (r) => {
+  const v = normalizeRole(r);
+  return v === 'admin' || v === 'administrateur' || v === 'administrator';
+};
 
 const buildSalesAgg = (sales) => {
   const byId = {};
@@ -209,7 +223,7 @@ const getAggForProduct = (product, salesAgg) => {
 /* =========================================================
    COMPOSANT PRINCIPAL
 ========================================================= */
-const ProductsPage = () => {
+const ProductsPage = ({ user: userProp }) => {
   const { lang } = useLanguage();
   const t = I18N[lang] || I18N.fr;
   const cur = t.currency;
@@ -245,6 +259,57 @@ const ProductsPage = () => {
 
   const [sortBy, setSortBy] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
+
+  // ===== RÔLE — depuis App.js (profiles), sinon Supabase session + profiles =====
+  // Rôle utilisé UNIQUEMENT pour les permissions, JAMAIS affiché.
+  const [loggedUser, setLoggedUser] = useState(userProp || null);
+  const [userLoading, setUserLoading] = useState(!userProp?.role);
+
+  useEffect(() => {
+    if (userProp?.role) {
+      setLoggedUser(userProp);
+      setUserLoading(false);
+      return;
+    }
+    let alive = true;
+    const load = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) { if (alive) setUserLoading(false); return; }
+        let role = normalizeRole(session.user.user_metadata?.role);
+        let name = session.user.user_metadata?.name || session.user.email;
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role, status, name')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          if (profile?.role) role = normalizeRole(profile.role);
+          if (profile?.name) name = profile.name;
+        } catch (e) { console.log('profiles non lisible', e); }
+        if (!role && session.user.email === 'meddelile@gmail.com') role = 'admin';
+        if (!role && session.user.email === 'sidati@gmail.com') role = 'manager';
+        if (!alive) return;
+        setLoggedUser({
+          id: session.user.id,
+          email: session.user.email,
+          name,
+          role: role || 'cashier',
+          status: 'active',
+        });
+      } catch (e) { console.log(e); }
+      if (alive) setUserLoading(false);
+    };
+    load();
+    return () => { alive = false; };
+  }, [userProp]);
+
+  // ===== PERMISSIONS — même règle que Clients / Dépenses / Achats =====
+  const userRole = normalizeRole(loggedUser?.role);
+  const isAdmin = isAdminRole(userRole);
+  const canAdd = isAdmin || userRole === 'manager' || userRole === 'stock';
+  const canEdit = isAdmin || userRole === 'manager' || userRole === 'stock';
+  const canDelete = isAdmin; // SEUL ADMIN
 
   const mainCategories = useMemo(() => categoriesFull.filter((c) => !c.parent_id), [categoriesFull]);
   const categories = useMemo(() => mainCategories.map((c) => c.name), [mainCategories]);
@@ -338,11 +403,13 @@ const ProductsPage = () => {
   }, [showForm, showDeleteModal]);
 
   const handleOpenCreate = () => {
+    if (!canAdd) { setFormErrorKey('no_perm_add'); return; }
     setSelectedProduct(null); setFormData(emptyForm());
     setFormErrorKey(''); setShowForm(true);
   };
 
   const handleOpenEdit = (product) => {
+    if (!canEdit) { alert(t.no_perm_edit); return; }
     setSelectedProduct(product);
     setFormData({
       name: product.name || '', category: getCategoryName(product),
@@ -356,11 +423,15 @@ const ProductsPage = () => {
   };
 
   const handleDeleteClick = (product) => {
+    if (!canDelete) { alert(t.no_perm_delete); return; }
     setProductToDelete(product); setFormErrorKey(''); setShowDeleteModal(true);
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); setSaving(true); setFormErrorKey('');
+    e.preventDefault();
+    if (selectedProduct && !canEdit) { setFormErrorKey('no_perm_edit'); return; }
+    if (!selectedProduct && !canAdd) { setFormErrorKey('no_perm_add'); return; }
+    setSaving(true); setFormErrorKey('');
     try {
       const productName = formData.subcategory.trim();
       if (!productName) { setFormErrorKey('err_save'); setSaving(false); return; }
@@ -384,6 +455,7 @@ const ProductsPage = () => {
   };
 
   const handleDeleteConfirm = async () => {
+    if (!canDelete) { setFormErrorKey('no_perm_delete'); return; }
     if (!productToDelete || deleting) return;
     setDeleting(true); setFormErrorKey('');
     try {
@@ -453,6 +525,15 @@ const ProductsPage = () => {
     return { totalPurchase: quantity * purchase, soldQty: agg.qty, totalSales: agg.total };
   }, [formData.quantity, formData.purchase_price, selectedProduct, salesAgg]);
 
+  if (userLoading) {
+    return (
+      <div className="container-fluid py-4 text-center">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-3">Vérification des permissions...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="container-fluid py-4 products-compact" dir={t.dir} lang={lang}>
       {/* ====== STATISTIQUES ====== */}
@@ -502,9 +583,11 @@ const ProductsPage = () => {
               <Button variant="light" onClick={refreshData} disabled={loading}>
                 <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i> <span className="ms-2">{t.refresh}</span>
               </Button>
-              <Button variant="success" onClick={handleOpenCreate}>
-                <i className="fas fa-plus me-1"></i> {t.add}
-              </Button>
+              {canAdd && (
+                <Button variant="success" onClick={handleOpenCreate}>
+                  <i className="fas fa-plus me-1"></i> {t.add}
+                </Button>
+              )}
             </div>
           </div>
         </Card.Header>
@@ -623,7 +706,7 @@ const ProductsPage = () => {
                     </button>
                   </th>
                   <th>{t.th_stock}</th>
-                  <th className="text-center">{t.th_actions}</th>
+                  {(canEdit || canDelete) && <th className="text-center">{t.th_actions}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -634,7 +717,7 @@ const ProductsPage = () => {
                     <i className="fas fa-box-open fa-3x mb-3"></i>
                     <h5>{t.none_title}</h5>
                     <p>{t.none_sub}</p>
-                    <Button variant="primary" onClick={handleOpenCreate}><i className="fas fa-plus me-2"></i>{t.none_add}</Button>
+                    {canAdd && <Button variant="primary" onClick={handleOpenCreate}><i className="fas fa-plus me-2"></i>{t.none_add}</Button>}
                   </td></tr>
                 ) : (
                   filteredProducts.map((product, index) => {
@@ -678,16 +761,22 @@ const ProductsPage = () => {
                             {t[stock.key]}
                           </Badge>
                         </td>
-                        <td className="text-center">
-                          <div className="d-flex gap-1 justify-content-center">
-                            <Button variant="outline-primary" size="sm" onClick={() => handleOpenEdit(product)} title={t.edit}>
-                              <i className="fas fa-pen"></i>
-                            </Button>
-                            <Button variant="outline-danger" size="sm" onClick={() => handleDeleteClick(product)} title={t.delete}>
-                              <i className="fas fa-trash-alt"></i>
-                            </Button>
-                          </div>
-                        </td>
+                        {(canEdit || canDelete) && (
+                          <td className="text-center">
+                            <div className="d-flex gap-1 justify-content-center">
+                              {canEdit && (
+                                <Button variant="outline-primary" size="sm" onClick={() => handleOpenEdit(product)} title={t.edit}>
+                                  <i className="fas fa-pen"></i>
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button variant="outline-danger" size="sm" onClick={() => handleDeleteClick(product)} title={t.delete}>
+                                  <i className="fas fa-trash-alt"></i>
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     );
                   })
@@ -826,26 +915,51 @@ const ProductsPage = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* ====== MODAL SUPPRESSION - CORRIGÉ : div bien fermé ====== */}
-      <Modal show={showDeleteModal} onHide={closeModals}>
-        <Modal.Header closeButton>
-          <Modal.Title><i className="fas fa-trash-alt text-danger me-2"></i>{t.delete_title}</Modal.Title>
-        </Modal.Header>
+      {/* ====== MODAL SUPPRESSION - SEUL ADMIN ====== */}
+      {canDelete && (
+        <Modal show={showDeleteModal} onHide={closeModals}>
+          <Modal.Header closeButton>
+            <Modal.Title><i className="fas fa-trash-alt text-danger me-2"></i>{t.delete_title}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {productToDelete && (
+              <div>
+                <p>{t.delete_sub}</p>
+                <div className="p-3 bg-light rounded fw-bold text-center mb-3">{productToDelete.name}</div>
+                <p className="text-muted small">{t.delete_warn}</p>
+                {formErrorKey && <Alert variant="danger">{t[formErrorKey]}</Alert>}
+              </div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={closeModals} disabled={deleting}>{t.cancel}</Button>
+            <Button variant="danger" onClick={handleDeleteConfirm} disabled={deleting}>
+              {deleting ? <><Spinner size="sm" className="me-2" />{t.deleting}</> : <><i className="fas fa-trash-alt me-2"></i>{t.delete_confirm}</>}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* ====== MODALS SCANNER (manquants dans ton fichier) ====== */}
+      <Modal show={showScanner} onHide={() => setShowScanner(false)} centered>
+        <Modal.Header closeButton><Modal.Title><i className="fas fa-barcode me-2"></i>{t.scan}</Modal.Title></Modal.Header>
         <Modal.Body>
-          {productToDelete && (
-            <div>
-              <p>{t.delete_sub}</p>
-              <div className="p-3 bg-light rounded fw-bold text-center mb-3">{productToDelete.name}</div>
-              <p className="text-muted small">{t.delete_warn}</p>
-              {formErrorKey && <Alert variant="danger">{t[formErrorKey]}</Alert>}
-            </div>
-          )}
+          <Form.Control autoFocus placeholder={t.f_barcode_ph} value={formData.barcode} onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') setShowScanner(false); }} />
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={closeModals} disabled={deleting}>{t.cancel}</Button>
-          <Button variant="danger" onClick={handleDeleteConfirm} disabled={deleting}>
-            {deleting ? <><Spinner size="sm" className="me-2" />{t.deleting}</> : <><i className="fas fa-trash-alt me-2"></i>{t.delete_confirm}</>}
-          </Button>
+          <Button variant="secondary" onClick={() => setShowScanner(false)}>{t.cancel}</Button>
+          <Button variant="primary" onClick={() => setShowScanner(false)}>{t.save}</Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={showSearchScanner} onHide={() => setShowSearchScanner(false)} centered>
+        <Modal.Header closeButton><Modal.Title><i className="fas fa-barcode me-2"></i>{t.scan}</Modal.Title></Modal.Header>
+        <Modal.Body>
+          <Form.Control autoFocus placeholder={t.search_ph} value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') setShowSearchScanner(false); }} />
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowSearchScanner(false)}>{t.cancel}</Button>
+          <Button variant="primary" onClick={() => setShowSearchScanner(false)}>{t.save}</Button>
         </Modal.Footer>
       </Modal>
 

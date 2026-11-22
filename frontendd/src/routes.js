@@ -6,7 +6,8 @@ const AdminDashboard = React.lazy(() => import('./views/admin/gestion/AdminDashb
 //const Dashboard = React.lazy(() => import('./views/dashboard/Dashboard'))
  
 
-//const caises = React.lazy(() => import('./views/caise/caises'))
+
+const Caises = React.lazy(() => import('./views/caise/Caises'))
 
 const Accueil = React.lazy(() => import('./views/home/accueil/Accueil'))
 //stock
@@ -28,7 +29,7 @@ const routes = [
 
 { path: '/admin', name: 'UsersPage', element:   UsersPage },
 
-//{ path: '/caises', name: 'caises', element:   caises },
+{ path: '/caise', name: 'Caises', element:   Caises },
 //stock
 { path: 'Products', name: 'produits', element:  ProductList},
 { path: 'Categories', name: 'Categories', element:  Categories},

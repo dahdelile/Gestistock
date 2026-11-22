@@ -1,7 +1,6 @@
 // src/pages/PurchasesPage.jsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { purchasesApi, suppliersApi, productsApi, categoriesApi } from '../../api';
-// ✅ BON
 import { useLanguage } from '../../context/LanguageContext';
 import { supabase } from '../../supabaseClient';
 import {
@@ -158,56 +157,49 @@ const PurchasesPage = ({ user: userProp }) => {
   const t = I18N[lang];
   const cur = t.currency;
 
-  // ✅ Vrai utilisateur : prop App.js OU Supabase (plus jamais localStorage 'user')
- // ✅ Rôle fiable : 1. prop App.js  2. profiles  3. user_metadata
-const [loggedUser, setLoggedUser] = useState(userProp || null);
-const [userLoading, setUserLoading] = useState(!userProp);
+  const [loggedUser, setLoggedUser] = useState(userProp || null);
+  const [userLoading, setUserLoading] = useState(!userProp);
 
-useEffect(() => {
-  if (userProp?.role) {
-    setLoggedUser(userProp);
-    setUserLoading(false);
-    return;
-  }
-  let alive = true;
-  const load = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) { if (alive) setUserLoading(false); return; }
-
-      // 1. On essaie profiles
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, status, name')
-        .eq('id', session.user.id)
-        .maybeSingle();
-
-      // 2. Si profiles est vide, on prend user_metadata (celui de PageConnection)
-      const metaRole = session.user.user_metadata?.role;
-
-      if (!alive) return;
-      setLoggedUser({
-        id: session.user.id,
-        email: session.user.email,
-        name: profile?.name || session.user.user_metadata?.name || session.user.email,
-        role: normalizeRole(profile?.role || metaRole || 'cashier'),
-        status: profile?.status || 'active',
-      });
-    } catch (e) {
-      console.error(e);
+  useEffect(() => {
+    if (userProp?.role) {
+      setLoggedUser(userProp);
+      setUserLoading(false);
+      return;
     }
-    if (alive) setUserLoading(false);
-  };
-  load();
-  return () => { alive = false; };
-}, [userProp]);
-  // ✅ RÈGLES ACHATS
+    let alive = true;
+    const load = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) { if (alive) setUserLoading(false); return; }
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, status, name')
+          .eq('id', session.user.id)
+          .maybeSingle();
+        const metaRole = session.user.user_metadata?.role;
+        if (!alive) return;
+        setLoggedUser({
+          id: session.user.id,
+          email: session.user.email,
+          name: profile?.name || session.user.user_metadata?.name || session.user.email,
+          role: normalizeRole(profile?.role || metaRole || 'cashier'),
+          status: profile?.status || 'active',
+        });
+      } catch (e) {
+        console.error(e);
+      }
+      if (alive) setUserLoading(false);
+    };
+    load();
+    return () => { alive = false; };
+  }, [userProp]);
+
   const userRole = normalizeRole(loggedUser?.role);
   const isAdmin = isAdminRole(userRole);
-  const canAdd = isAdmin || userRole === 'manager' || userRole === 'stock'; // Gérant + Stock peuvent ajouter
-  const canEdit = isAdmin || userRole === 'manager' || userRole === 'stock'; // Gérant + Stock peuvent modifier
-  const canDelete = isAdmin; // SEUL ADMIN supprime
-  const canView = !!loggedUser || true; // tout le monde connecté peut consulter
+  const canAdd = isAdmin || userRole === 'manager' || userRole === 'stock';
+  const canEdit = isAdmin || userRole === 'manager' || userRole === 'stock';
+  const canDelete = isAdmin;
+  const canView = !!loggedUser || true;
 
   const [purchases, setPurchases] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -318,8 +310,33 @@ useEffect(() => {
   const closeForm = () => { if (saving) return; setShowForm(false); resetForm(); };
   const updateForm = (e) => { const { name, value } = e.target; setForm((prev) => ({ ...prev, [name]: value })); };
 
+  // ===== ✅ FIX CATÉGORIE → SOUS-CATÉGORIE =====
+  // Catégories parentes = celles sans parent
+  const parentCategories = useMemo(() => {
+    return categories.filter((c) => {
+      const parentId = c.parent_id ?? c.category_id ?? c.parent_category_id ?? c.parentId;
+      return !parentId;
+    });
+  }, [categories]);
+
   const selectedCategory = categories.find((c) => String(c.id) === String(currentItem.category_id));
-  const availableSubcategories = (selectedCategory?.sous_categories || []).filter((sub) => !sub.status || sub.status === 'active');
+
+  const availableSubcategories = useMemo(() => {
+    if (!currentItem.category_id) return [];
+    // Cas A : imbriquées dans la catégorie
+    const nested = selectedCategory?.sous_categories
+      || selectedCategory?.subcategories
+      || selectedCategory?.sub_categories
+      || selectedCategory?.children
+      || [];
+    if (nested.length > 0) {
+      return nested.filter((sub) => !sub.status || sub.status === 'active');
+    }
+    // Cas B : même table categories avec parent_id
+    return categories.filter((c) =>
+      String(c.parent_id ?? c.category_id ?? c.parent_category_id ?? c.parentId) === String(currentItem.category_id)
+    ).filter((sub) => !sub.status || sub.status === 'active');
+  }, [currentItem.category_id, selectedCategory, categories]);
 
   const updateCurrentItem = (e) => {
     const { name, value } = e.target;
@@ -332,7 +349,7 @@ useEffect(() => {
 
   const addItemToCart = () => {
     const category = categories.find((c) => String(c.id) === String(currentItem.category_id));
-    const subcategory = category?.sous_categories?.find((s) => String(s.id) === String(currentItem.subcategory_id));
+    const subcategory = availableSubcategories.find((s) => String(s.id) === String(currentItem.subcategory_id));
     if (!category || !subcategory) return showToast(t.warn_no_product, 'warning');
     const quantity = Number(currentItem.quantity);
     const unitPrice = Number(currentItem.unit_price);
@@ -375,7 +392,6 @@ useEffect(() => {
   };
 
   const savePurchase = async () => {
-    // ✅ Garde : Gérant peut ajouter + modifier, Caissier ne peut pas
     if (editingPurchase && !canEdit) { showToast(t.err_forbidden, 'danger'); return; }
     if (!editingPurchase && !canAdd) { showToast(t.err_forbidden_add, 'danger'); return; }
     if (cart.length === 0) return showToast(t.warn_cart_empty, 'warning');
@@ -524,7 +540,6 @@ useEffect(() => {
         ))}
       </ToastContainer>
 
-      {/* ====== STATISTIQUES : 4 en ligne horizontale sur mobile ====== */}
       <Row className="mb-4">
         <Col xs={3} md={3}>
           <Card className="bg-warning text-white shadow-sm">
@@ -560,7 +575,6 @@ useEffect(() => {
         </Col>
       </Row>
 
-      {/* ====== CARTE PRINCIPALE ====== */}
       <Card className="shadow-sm">
         <Card.Header className="bg-primary text-white">
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -589,7 +603,6 @@ useEffect(() => {
         </Card.Header>
 
         <Card.Body>
-          {/* Filtres */}
           <Row className="mb-3">
             <Col md={3}>
               <Form.Group>
@@ -632,7 +645,6 @@ useEffect(() => {
             </Col>
           </Row>
 
-          {/* Tableau */}
           {loading ? (
             <div className="text-center py-5">
               <Spinner animation="border" variant="primary" />
@@ -753,16 +765,16 @@ useEffect(() => {
             <Col md={3}>
               <Form.Group>
                 <Form.Label>{t.f_category}</Form.Label>
-                <Form.Select value={currentItem.category_id} onChange={updateCurrentItem}>
+                <Form.Select name="category_id" value={currentItem.category_id} onChange={updateCurrentItem}>
                   <option value="">{t.f_category_ph}</option>
-                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {parentCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Form.Select>
               </Form.Group>
             </Col>
             <Col md={3}>
               <Form.Group>
                 <Form.Label>{t.f_subcategory}</Form.Label>
-                <Form.Select value={currentItem.subcategory_id} onChange={updateCurrentItem} disabled={!currentItem.category_id}>
+                <Form.Select name="subcategory_id" value={currentItem.subcategory_id} onChange={updateCurrentItem} disabled={!currentItem.category_id}>
                   <option value="">{t.f_subcategory_ph}</option>
                   {availableSubcategories.map((sub) => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
                 </Form.Select>
@@ -771,13 +783,13 @@ useEffect(() => {
             <Col md={2}>
               <Form.Group>
                 <Form.Label>{t.f_qty}</Form.Label>
-                <Form.Control type="number" min="1" value={currentItem.quantity} onChange={updateCurrentItem} />
+                <Form.Control name="quantity" type="number" min="1" value={currentItem.quantity} onChange={updateCurrentItem} />
               </Form.Group>
             </Col>
             <Col md={2}>
               <Form.Group>
                 <Form.Label>{t.f_price}</Form.Label>
-                <Form.Control type="number" min="0" step="0.01" value={currentItem.unit_price} onChange={updateCurrentItem} />
+                <Form.Control name="unit_price" type="number" min="0" step="0.01" value={currentItem.unit_price} onChange={updateCurrentItem} />
               </Form.Group>
             </Col>
             <Col md={2}>
@@ -926,7 +938,6 @@ useEffect(() => {
         </Modal.Footer>
       </Modal>
 
-      {/* ====== STYLE COMPACT POUR RÉDUIRE LA TAILLE DU TEXTE ====== */}
       <style>{`
         .purchases-compact .card.bg-warning h6, 
         .purchases-compact .card.bg-primary h6,

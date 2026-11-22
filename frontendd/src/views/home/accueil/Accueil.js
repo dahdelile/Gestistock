@@ -182,30 +182,32 @@ const Accueil = ({ userName }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState("grid");
 
+  // ✅ TOUTES les clés existent dans LanguageContext (voir en bas)
+  // ✅ Routes corrigées : /caisse, /rapports, /customers
   const documents = useMemo(() => [
     { text: t('ventes'), img: "https://cdn-icons-png.flaticon.com/128/5442/5442020.png", path: "/ventes" },
     { text: t('achat'), img: "https://cdn-icons-png.flaticon.com/128/2821/2821739.png", path: "/achat" },
-    { text: t('produit'), img: "https://cdn-icons-png.flaticon.com/128/4408/4408296.png", path: "/products" },
+    { text: t('stock'), img: "https://cdn-icons-png.flaticon.com/128/4408/4408296.png", path: "/products" },
     { text: t('expense'), img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/expenses" },
     { text: t('categories'), img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/categories" },
-    { text: t('rapports'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/rapportss" },
-    { text: t('customers'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/Customers" },
-     { text: t('caises'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/caise" },
+    { text: t('rapports'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/rapports" },
+    { text: t('customers'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/customers" },
+    { text: t('caisse'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/caisse" },
   ], [t, lang]);
 
   const quickLinks = useMemo(() => [
-  { label: t('caisse'), path: "/caisse" },
-  { label: t('vente'), path: "/ventes" },
-  { label: t('achat'), path: "/achat" },
-  { label: t('produit'), path: "/products" },
-  { label: t('fournisseur'), path: "/suppliers" },
-  { label: t('client'), path: "/customers" },
-  { label: t('categorie'), path: "/categories" },
-  { label: t('expense'), path: "/expenses" },
-  { label: t('stock'), path: "/stock" },
-  { label: t('utilisateur'), path: "/users" },
-  { label: t('rapports'), path: "/rapportss" },
-], [t, lang]);
+    { label: t('caisse'), path: "/caisse" },
+    { label: t('vente'), path: "/ventes" },
+    { label: t('achat'), path: "/achat" },
+    { label: t('produit'), path: "/products" },
+    { label: t('fournisseurs'), path: "/suppliers" },
+    { label: t('clients'), path: "/customers" },
+    { label: t('categories'), path: "/categories" },
+    { label: t('expense'), path: "/expenses" },
+    { label: t('stock'), path: "/stock" },
+    { label: t('utilisateurs'), path: "/users" },
+    { label: t('rapports'), path: "/rapports" },
+  ], [t, lang]);
 
   const filteredDocs = useMemo(() => {
     return documents.filter(doc =>
@@ -294,7 +296,7 @@ const Accueil = ({ userName }) => {
       </Container>
 
       <footer className="bg-dark text-white py-3 text-center mt-4">
-        © {new Date().getFullYear()} Tous droits réservés
+        © {new Date().getFullYear()} {lang === 'ar' ? 'جميع الحقوق محفوظة' : 'Tous droits réservés'}
       </footer>
 
     </PageContainer>

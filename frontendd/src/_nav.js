@@ -21,7 +21,7 @@ const getNav = (tFn) => {
   return [
     { component: CNavItem, name: t('accueil'), to: '/home/accueil', icon: <CIcon icon={cilHome} customClassName="nav-icon" />, badge: { color: 'info', text: 'NEW' } },
     {
-      component: CNavGroup, name: t('produits'), icon: <CIcon icon={cilCart} customClassName="nav-icon" />,
+      component: CNavGroup, name: t('stock'), icon: <CIcon icon={cilCart} customClassName="nav-icon" />,
       items: [
         { component: CNavItem, name: t('produits'), to: '/products' },
         { component: CNavItem, name: t('categories'), to: '/categories' },

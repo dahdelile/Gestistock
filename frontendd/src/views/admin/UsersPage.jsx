@@ -44,6 +44,7 @@ const I18N = {
     delete_warn: "Cette action est irréversible. L'utilisateur perdra immédiatement accès au système.",
     delete_confirm: 'Oui, supprimer',
     ok_saved: 'Utilisateur enregistré avec succès.',
+    ok_updated: 'Rôle mis à jour. L’utilisateur doit se déconnecter / reconnecter pour voir le changement.',
     ok_deleted: 'Utilisateur supprimé.',
     err_save: "Erreur lors de l'enregistrement.",
     err_delete: 'Erreur lors de la suppression.',
@@ -90,6 +91,7 @@ const I18N = {
     delete_warn: 'هذا الإجراء لا يمكن التراجع عنه. سيفقد المستخدم الوصول إلى النظام فوراً.',
     delete_confirm: 'نعم، احذف',
     ok_saved: 'تم حفظ المستخدم بنجاح.',
+    ok_updated: 'تم تحديث الدور. يجب على المستخدم تسجيل الخروج ثم الدخول مجددًا.',
     ok_deleted: 'تم حذف المستخدم.',
     err_save: 'حدث خطأ أثناء الحفظ.',
     err_delete: 'حدث خطأ أثناء الحذف.',
@@ -123,7 +125,6 @@ const UsersPage = ({ user: userProp }) => {
   const { lang } = useLanguage();
   const t = I18N[lang] || I18N.fr;
 
-  // ✅ Vrai utilisateur connecté : prop App.js OU Supabase (plus jamais localStorage 'user')
   const [loggedUser, setLoggedUser] = useState(userProp || null);
 
   useEffect(() => {
@@ -153,7 +154,6 @@ const UsersPage = ({ user: userProp }) => {
     return () => { alive = false; };
   }, [userProp]);
 
-  // ✅ ADMIN = tout faire, les autres = lecture seule ici
   const canManage =
     ['admin', 'administrateur', 'administrator'].includes(normalizeRole(loggedUser?.role)) &&
     normalizeRole(loggedUser?.status || 'active') === 'active';
@@ -213,8 +213,6 @@ const UsersPage = ({ user: userProp }) => {
           : res?.data?.data || [];
       setUsers(data);
 
-      // ✅ FIX ADMIN : le vrai rôle = celui de la liste (Auth / manage-users)
-      // Si profiles dit autre chose, on corrige avec la liste
       if (loggedUser?.email) {
         const meInList = data.find(
           (u) => u.email && u.email.toLowerCase() === loggedUser.email.toLowerCase()
@@ -276,29 +274,41 @@ const UsersPage = ({ user: userProp }) => {
     setShowDelete(true);
   };
 
+    // La synchronisation de users et profiles est centralisée
+  // dans la fonction Supabase sécurisée manage-users.
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!canManage) {
       showToast(t.err_forbidden, 'danger');
       return;
     }
+
     setSaving(true);
+
     try {
       const payload = { ...formData };
+
+      // En modification, conserver le mot de passe actuel si le champ est vide.
       if (currentUser && !payload.password) {
         delete payload.password;
       }
+
       if (currentUser) {
         await usersApi.update(currentUser.id, payload);
+        showToast(t.ok_updated);
       } else {
         await usersApi.create(payload);
+        showToast(t.ok_saved);
       }
-      showToast(t.ok_saved);
+
       setShowForm(false);
+      setCurrentUser(null);
+      setFormData(emptyForm());
       await fetchUsers();
     } catch (err) {
-      console.error(err);
-      showToast(t.err_save, 'danger');
+      console.error('Erreur sauvegarde utilisateur :', err);
+      showToast(err.message || t.err_save, 'danger');
     } finally {
       setSaving(false);
     }
@@ -306,15 +316,20 @@ const UsersPage = ({ user: userProp }) => {
 
   const handleDeleteConfirm = async () => {
     if (!canManage || !currentUser || isSelf(currentUser)) return;
+
     setSaving(true);
+
     try {
+      // manage-users supprime Auth et profiles côté serveur avec le vrai auth_user_id.
       await usersApi.delete(currentUser.id);
+
       setShowDelete(false);
+      setCurrentUser(null);
       showToast(t.ok_deleted);
       await fetchUsers();
     } catch (err) {
-      console.error(err);
-      showToast(t.err_delete, 'danger');
+      console.error('Erreur suppression utilisateur :', err);
+      showToast(err.message || t.err_delete, 'danger');
     } finally {
       setSaving(false);
     }
@@ -378,33 +393,24 @@ const UsersPage = ({ user: userProp }) => {
           --line: #e3e9f2;
           --bg: #f8fafc;
           --card: #ffffff;
-
           --primary: #1f5eea;
           --primary-soft: #e8efff;
-
           --green: #0f9d74;
           --green-soft: #def7ee;
-
           --violet: #6a4de0;
           --violet-soft: #ece8fd;
-
           --amber: #e08a0b;
           --amber-soft: #fff0d6;
-
           --red: #d63c4a;
           --red-soft: #fde8ea;
-
           --rose: #c2417c;
           --rose-soft: #fbe6f0;
-
-          /* Responsive typography */
           --fs-xs: clamp(12px, 0.75vw + 9px, 14px);
           --fs-sm: clamp(13px, 0.80vw + 10px, 15px);
           --fs-md: clamp(14px, 0.85vw + 11px, 16px);
           --fs-lg: clamp(16px, 1vw + 12px, 20px);
           --fs-xl: clamp(19px, 1.2vw + 13px, 24px);
           --fs-2xl: clamp(23px, 1.6vw + 15px, 32px);
-
           width: 100%;
           min-height: 100vh;
           padding: clamp(10px, 2vw, 22px);
@@ -414,36 +420,29 @@ const UsersPage = ({ user: userProp }) => {
           font-size: var(--fs-md);
           -webkit-text-size-adjust: 100%;
         }
-
         .ep-page[lang="ar"] {
           font-family: Cairo, 'Segoe UI', Tahoma, sans-serif;
           line-height: 1.7;
         }
-
         .ep-page *,
         .ep-page *::before,
         .ep-page *::after {
           box-sizing: border-box;
         }
-
         .ep-page button,
         .ep-page input,
         .ep-page select {
           font: inherit;
         }
-
         .ep-page button {
           touch-action: manipulation;
         }
-
         .ep-page button:focus-visible,
         .ep-page input:focus-visible,
         .ep-page select:focus-visible {
           outline: 3px solid rgba(31, 94, 234, .3);
           outline-offset: 2px;
         }
-
-        /* Header */
         .ep-header {
           display: flex;
           justify-content: space-between;
@@ -452,12 +451,10 @@ const UsersPage = ({ user: userProp }) => {
           gap: 14px;
           margin-bottom: 20px;
         }
-
         .ep-title {
           min-width: 0;
           flex: 1;
         }
-
         .ep-title h1 {
           display: flex;
           align-items: center;
@@ -469,14 +466,12 @@ const UsersPage = ({ user: userProp }) => {
           line-height: 1.35;
           overflow-wrap: anywhere;
         }
-
         .ep-title p {
           margin: 0;
           color: var(--muted);
           font-size: var(--fs-md);
           line-height: 1.7;
         }
-
         .ep-btn-add {
           display: flex;
           align-items: center;
@@ -494,13 +489,10 @@ const UsersPage = ({ user: userProp }) => {
           box-shadow: 0 4px 12px rgba(31, 94, 234, .2);
           transition: .2s;
         }
-
         .ep-btn-add:hover {
           transform: translateY(-2px);
           filter: brightness(.95);
         }
-
-        /* Read-only notice */
         .ep-notice {
           display: flex;
           align-items: flex-start;
@@ -514,13 +506,10 @@ const UsersPage = ({ user: userProp }) => {
           font-size: var(--fs-sm);
           line-height: 1.7;
         }
-
         .ep-notice i {
           margin-top: 5px;
           flex-shrink: 0;
         }
-
-        /* Main card */
         .ep-card {
           width: 100%;
           overflow: hidden;
@@ -529,8 +518,6 @@ const UsersPage = ({ user: userProp }) => {
           background: var(--card);
           box-shadow: 0 4px 14px rgba(20, 33, 61, .04);
         }
-
-        /* Filters */
         .ep-filters {
           display: flex;
           flex-wrap: wrap;
@@ -538,7 +525,6 @@ const UsersPage = ({ user: userProp }) => {
           padding: 15px clamp(12px, 2vw, 20px);
           border-bottom: 1px solid var(--line);
         }
-
         .ep-input {
           width: 100%;
           min-width: 0;
@@ -552,22 +538,18 @@ const UsersPage = ({ user: userProp }) => {
           outline: none;
           transition: .2s;
         }
-
         .ep-input:focus {
           border-color: var(--primary);
           box-shadow: 0 0 0 3px var(--primary-soft);
         }
-
         .ep-search-group {
           position: relative;
           flex: 1 1 260px;
           min-width: 0;
         }
-
         .ep-search-group .ep-input {
           padding-inline-start: 42px;
         }
-
         .ep-search-group i {
           position: absolute;
           top: 50%;
@@ -576,25 +558,20 @@ const UsersPage = ({ user: userProp }) => {
           color: var(--muted);
           pointer-events: none;
         }
-
         .ep-filters select.ep-input {
           flex: 0 1 240px;
           min-width: 160px;
         }
-
-        /* Table */
         .ep-table-wrap {
           width: 100%;
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
         }
-
         .ep-table {
           width: 100%;
           min-width: 720px;
           border-collapse: collapse;
         }
-
         .ep-table th {
           padding: 15px 18px;
           border-bottom: 1px solid var(--line);
@@ -605,34 +582,27 @@ const UsersPage = ({ user: userProp }) => {
           font-weight: 800;
           white-space: nowrap;
         }
-
         .ep-table td {
           padding: 15px 18px;
           border-bottom: 1px solid var(--line);
           font-size: var(--fs-sm);
           vertical-align: middle;
         }
-
         .ep-table tr:last-child td {
           border-bottom: none;
         }
-
         .ep-table tbody tr:hover td {
           background: #fbfcff;
         }
-
         .ep-col-end {
           text-align: end !important;
         }
-
-        /* User details */
         .user-cell {
           display: flex;
           align-items: center;
           gap: 12px;
           min-width: 0;
         }
-
         .user-avatar {
           display: flex;
           flex: 0 0 auto;
@@ -646,7 +616,6 @@ const UsersPage = ({ user: userProp }) => {
           font-size: var(--fs-lg);
           font-weight: 800;
         }
-
         .user-name {
           display: flex;
           align-items: center;
@@ -657,14 +626,12 @@ const UsersPage = ({ user: userProp }) => {
           font-weight: 700;
           overflow-wrap: anywhere;
         }
-
         .user-email {
           margin-top: 3px;
           color: var(--muted);
           font-size: var(--fs-xs);
           overflow-wrap: anywhere;
         }
-
         .self-tag {
           padding: 3px 8px;
           border-radius: 99px;
@@ -673,8 +640,6 @@ const UsersPage = ({ user: userProp }) => {
           font-size: var(--fs-xs);
           font-weight: 800;
         }
-
-        /* Badges */
         .ep-badge {
           display: inline-flex;
           align-items: center;
@@ -684,37 +649,30 @@ const UsersPage = ({ user: userProp }) => {
           font-weight: 700;
           white-space: nowrap;
         }
-
         .badge-blue {
           background: var(--primary-soft);
           color: var(--primary);
         }
-
         .badge-green {
           background: var(--green-soft);
           color: var(--green);
         }
-
         .badge-rose {
           background: var(--rose-soft);
           color: var(--rose);
         }
-
         .badge-violet {
           background: var(--violet-soft);
           color: var(--violet);
         }
-
         .badge-amber {
           background: var(--amber-soft);
           color: #94590a;
         }
-
         .badge-gray {
           background: #f1f5f9;
           color: #64748b;
         }
-
         .status-dot {
           display: inline-block;
           width: 8px;
@@ -722,22 +680,17 @@ const UsersPage = ({ user: userProp }) => {
           margin-inline-end: 6px;
           border-radius: 50%;
         }
-
         .dot-green {
           background: var(--green);
         }
-
         .dot-gray {
           background: #94a3b8;
         }
-
-        /* Action buttons */
         .ep-actions {
           display: flex;
           justify-content: flex-end;
           gap: 8px;
         }
-
         .btn-icon {
           display: flex;
           align-items: center;
@@ -752,35 +705,28 @@ const UsersPage = ({ user: userProp }) => {
           cursor: pointer;
           transition: .2s;
         }
-
         .btn-edit {
           border-color: #c9daff;
           background: var(--primary-soft);
           color: var(--primary);
         }
-
         .btn-edit:hover {
           background: var(--primary);
           color: white;
         }
-
         .btn-delete {
           border-color: #f6c8cd;
           background: var(--red-soft);
           color: var(--red);
         }
-
         .btn-delete:hover {
           background: var(--red);
           color: white;
         }
-
         .btn-delete:disabled {
           opacity: .35;
           cursor: not-allowed;
         }
-
-        /* Modal */
         .ep-modal-overlay {
           position: fixed;
           z-index: 1050;
@@ -792,7 +738,6 @@ const UsersPage = ({ user: userProp }) => {
           background: rgba(15, 23, 42, .6);
           backdrop-filter: blur(4px);
         }
-
         .ep-modal {
           display: flex;
           flex-direction: column;
@@ -805,7 +750,6 @@ const UsersPage = ({ user: userProp }) => {
           box-shadow: 0 20px 40px rgba(0, 0, 0, .2);
           animation: modalIn .2s ease;
         }
-
         @keyframes modalIn {
           from {
             opacity: 0;
@@ -816,7 +760,6 @@ const UsersPage = ({ user: userProp }) => {
             transform: translateY(0);
           }
         }
-
         .ep-modal-header {
           display: flex;
           align-items: center;
@@ -826,13 +769,11 @@ const UsersPage = ({ user: userProp }) => {
           border-bottom: 1px solid var(--line);
           background: #f8fafc;
         }
-
         .ep-modal-header h3 {
           margin: 0;
           font-size: var(--fs-lg);
           font-weight: 800;
         }
-
         .btn-close {
           display: flex;
           align-items: center;
@@ -847,22 +788,18 @@ const UsersPage = ({ user: userProp }) => {
           font-size: var(--fs-lg);
           cursor: pointer;
         }
-
         .btn-close:hover {
           background: #eef2f8;
         }
-
         .ep-modal-body {
           padding: clamp(15px, 2.5vw, 22px);
           overflow-y: auto;
           overscroll-behavior: contain;
         }
-
         .form-group {
           margin-bottom: 17px;
           min-width: 0;
         }
-
         .form-group label {
           display: block;
           margin-bottom: 7px;
@@ -870,7 +807,6 @@ const UsersPage = ({ user: userProp }) => {
           font-size: var(--fs-sm);
           font-weight: 700;
         }
-
         .form-control {
           width: 100%;
           min-width: 0;
@@ -884,13 +820,11 @@ const UsersPage = ({ user: userProp }) => {
           outline: none;
           transition: .2s;
         }
-
         .form-control:focus {
           border-color: var(--primary);
           background: white;
           box-shadow: 0 0 0 3px var(--primary-soft);
         }
-
         .form-hint {
           display: block;
           margin-top: 5px;
@@ -898,13 +832,11 @@ const UsersPage = ({ user: userProp }) => {
           font-size: var(--fs-xs);
           line-height: 1.6;
         }
-
         .form-grid2 {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 16px;
         }
-
         .ep-modal-footer {
           display: flex;
           justify-content: flex-end;
@@ -914,7 +846,6 @@ const UsersPage = ({ user: userProp }) => {
           border-top: 1px solid var(--line);
           background: #f8fafc;
         }
-
         .btn-cancel,
         .btn-save,
         .btn-danger {
@@ -926,43 +857,35 @@ const UsersPage = ({ user: userProp }) => {
           cursor: pointer;
           transition: .2s;
         }
-
         .btn-cancel {
           border: 1px solid var(--line);
           background: white;
           color: var(--ink);
         }
-
         .btn-save {
           border: none;
           background: var(--primary);
           color: white;
         }
-
         .btn-danger {
           border: none;
           background: var(--red);
           color: white;
         }
-
         .btn-save:disabled,
         .btn-danger:disabled {
           opacity: .6;
           cursor: not-allowed;
         }
-
-        /* Empty state and loading */
         .empty-state {
           padding: 50px 20px !important;
           color: var(--muted);
           text-align: center;
           font-size: var(--fs-sm);
         }
-
         .empty-state h4 {
           font-size: var(--fs-lg);
         }
-
         .empty-icon {
           display: flex;
           align-items: center;
@@ -975,7 +898,6 @@ const UsersPage = ({ user: userProp }) => {
           color: var(--primary);
           font-size: var(--fs-xl);
         }
-
         .ep-spinner {
           display: inline-block;
           width: 25px;
@@ -985,14 +907,11 @@ const UsersPage = ({ user: userProp }) => {
           border-radius: 50%;
           animation: ep-spin .75s linear infinite;
         }
-
         @keyframes ep-spin {
           to {
             transform: rotate(360deg);
           }
         }
-
-        /* Toast */
         .toast-container {
           position: fixed;
           z-index: 1100;
@@ -1004,7 +923,6 @@ const UsersPage = ({ user: userProp }) => {
           width: max-content;
           max-width: calc(100vw - 32px);
         }
-
         .toast {
           display: flex;
           align-items: center;
@@ -1019,15 +937,12 @@ const UsersPage = ({ user: userProp }) => {
           overflow-wrap: anywhere;
           animation: slideIn .3s ease;
         }
-
         .toast.success {
           border-inline-start-color: var(--green);
         }
-
         .toast.danger {
           border-inline-start-color: var(--red);
         }
-
         @keyframes slideIn {
           from {
             transform: translateY(-12px);
@@ -1038,159 +953,125 @@ const UsersPage = ({ user: userProp }) => {
             opacity: 1;
           }
         }
-
-        /* Tablet */
         @media (max-width: 992px) {
           .ep-page {
             padding: 16px;
           }
-
           .ep-table th,
           .ep-table td {
             padding: 13px 14px;
           }
         }
-
-        /* Mobile */
         @media (max-width: 560px) {
           .ep-page {
             padding: 12px;
             font-size: 15px;
           }
-
           .ep-header {
             flex-direction: column;
             align-items: stretch;
             gap: 12px;
           }
-
           .ep-title h1 {
             font-size: clamp(22px, 6vw, 27px);
             gap: 9px;
           }
-
           .ep-title p {
             font-size: 14px;
             line-height: 1.8;
           }
-
           .ep-btn-add {
             width: 100%;
             min-height: 47px;
             font-size: 15px;
           }
-
           .ep-filters {
             flex-direction: column;
             padding: 12px;
           }
-
           .ep-search-group,
           .ep-filters select.ep-input {
             flex: 1 1 auto;
             width: 100%;
             min-width: 0;
           }
-
           .ep-input,
           .form-control {
             min-height: 46px;
             font-size: 16px;
           }
-
           .ep-table {
             min-width: 720px;
           }
-
           .ep-table th {
             font-size: 12px;
           }
-
           .ep-table td {
             font-size: 14px;
           }
-
           .user-name {
             font-size: 14px;
           }
-
           .user-email {
             font-size: 12px;
           }
-
           .ep-badge {
             font-size: 12px;
           }
-
           .form-grid2 {
             grid-template-columns: 1fr;
             gap: 0;
           }
-
           .ep-modal-overlay {
             align-items: flex-end;
             padding: 0;
           }
-
           .ep-modal {
             max-width: none;
             max-height: 90dvh;
             border-radius: 18px 18px 0 0;
           }
-
           .ep-modal-header {
             padding: 14px 16px;
           }
-
           .ep-modal-body {
             padding: 16px;
           }
-
           .ep-modal-footer {
             padding: 12px;
           }
-
           .ep-modal-footer .btn-cancel,
           .ep-modal-footer .btn-save,
           .ep-modal-footer .btn-danger {
             flex: 1;
           }
-
           .toast-container {
             top: 10px;
             inset-inline: 10px;
             width: auto;
             max-width: none;
           }
-
           .toast {
             font-size: 13px;
           }
         }
-
-        /* Small mobile */
         @media (max-width: 380px) {
           .ep-page {
             padding: 8px;
           }
-
           .ep-title h1 {
             font-size: 21px;
           }
-
           .ep-title p {
             font-size: 13px;
           }
-
           .ep-table {
             min-width: 680px;
           }
-
           .ep-modal-footer {
             gap: 7px;
             padding: 10px;
           }
-
           .btn-cancel,
           .btn-save,
           .btn-danger {
@@ -1198,17 +1079,14 @@ const UsersPage = ({ user: userProp }) => {
             font-size: 13px;
           }
         }
-
         @media (prefers-reduced-motion: reduce) {
           .ep-spinner {
             animation-duration: 2s;
           }
-
           .ep-modal,
           .toast {
             animation: none;
           }
-
           .ep-btn-add,
           .btn-icon {
             transition: none;
@@ -1216,25 +1094,16 @@ const UsersPage = ({ user: userProp }) => {
         }
       `}</style>
 
-      {/* Header */}
       <div className="ep-header">
         <div className="ep-title">
           <h1>
-            <i
-              className="fas fa-users"
-              style={{ color: 'var(--primary)' }}
-            />
+            <i className="fas fa-users" style={{ color: 'var(--primary)' }} />
             {t.title}
           </h1>
           <p>{t.subtitle}</p>
         </div>
-
         {canManage && (
-          <button
-            type="button"
-            className="ep-btn-add"
-            onClick={handleOpenCreate}
-          >
+          <button type="button" className="ep-btn-add" onClick={handleOpenCreate}>
             <i className="fas fa-user-plus" />
             {t.add}
           </button>
@@ -1249,11 +1118,7 @@ const UsersPage = ({ user: userProp }) => {
       )}
 
       {error && (
-        <div
-          className="toast danger"
-          style={{ marginBottom: 20 }}
-          role="alert"
-        >
+        <div className="toast danger" style={{ marginBottom: 20 }} role="alert">
           <i className="fas fa-exclamation-circle" />
           {error}
         </div>
@@ -1272,13 +1137,7 @@ const UsersPage = ({ user: userProp }) => {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-
-          <select
-            className="ep-input"
-            aria-label={t.th_role}
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value)}
-          >
+          <select className="ep-input" aria-label={t.th_role} value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
             <option value="all">{t.all_roles}</option>
             <option value="admin">{t.role_admin}</option>
             <option value="manager">{t.role_manager}</option>
@@ -1295,21 +1154,14 @@ const UsersPage = ({ user: userProp }) => {
                 <th>{t.th_role}</th>
                 <th>{t.th_status}</th>
                 <th>{t.th_date}</th>
-                {canManage && (
-                  <th className="ep-col-end">{t.th_actions}</th>
-                )}
+                {canManage && <th className="ep-col-end">{t.th_actions}</th>}
               </tr>
             </thead>
-
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={colCount} className="empty-state">
-                    <span
-                      className="ep-spinner"
-                      role="status"
-                      aria-label={t.loading}
-                    />
+                    <span className="ep-spinner" role="status" aria-label={t.loading} />
                     <p style={{ marginTop: 10 }}>{t.loading}</p>
                   </td>
                 </tr>
@@ -1319,21 +1171,9 @@ const UsersPage = ({ user: userProp }) => {
                     <div className="empty-icon">
                       <i className="fas fa-user-slash" />
                     </div>
-                    <h4
-                      style={{
-                        margin: '0 0 8px',
-                        color: 'var(--ink)',
-                      }}
-                    >
-                      {t.none}
-                    </h4>
-
+                    <h4 style={{ margin: '0 0 8px', color: 'var(--ink)' }}>{t.none}</h4>
                     {canManage && (
-                      <button
-                        className="btn-save"
-                        onClick={handleOpenCreate}
-                        style={{ marginTop: 10 }}
-                      >
+                      <button className="btn-save" onClick={handleOpenCreate} style={{ marginTop: 10 }}>
                         {t.add}
                       </button>
                     )}
@@ -1342,98 +1182,40 @@ const UsersPage = ({ user: userProp }) => {
               ) : (
                 filteredUsers.map((user) => {
                   const self = isSelf(user);
-
                   return (
                     <tr key={user.id}>
                       <td>
                         <div className="user-cell">
-                          <div className="user-avatar">
-                            {user.name
-                              ? user.name.charAt(0).toUpperCase()
-                              : 'U'}
-                          </div>
-
+                          <div className="user-avatar">{user.name ? user.name.charAt(0).toUpperCase() : 'U'}</div>
                           <div>
                             <div className="user-name">
                               {user.name}
-                              {self && (
-                                <span className="self-tag">
-                                  {t.you}
-                                </span>
-                              )}
+                              {self && <span className="self-tag">{t.you}</span>}
                             </div>
-
                             <div className="user-email">
-                              <i
-                                className="fas fa-envelope"
-                                style={{
-                                  fontSize: 11,
-                                  marginInlineEnd: 4,
-                                }}
-                              />
+                              <i className="fas fa-envelope" style={{ fontSize: 11, marginInlineEnd: 4 }} />
                               {user.email}
                             </div>
                           </div>
                         </div>
                       </td>
-
                       <td>
-                        <span
-                          className={`ep-badge ${getRoleColor(user.role)}`}
-                        >
-                          {getRoleLabel(user.role)}
+                        <span className={`ep-badge ${getRoleColor(user.role)}`}>{getRoleLabel(user.role)}</span>
+                      </td>
+                      <td>
+                        <span className={`ep-badge ${user.status === 'active' ? 'badge-green' : 'badge-gray'}`}>
+                          <span className={`status-dot ${user.status === 'active' ? 'dot-green' : 'dot-gray'}`} />
+                          {user.status === 'active' ? t.active : t.inactive}
                         </span>
                       </td>
-
-                      <td>
-                        <span
-                          className={`ep-badge ${
-                            user.status === 'active'
-                              ? 'badge-green'
-                              : 'badge-gray'
-                          }`}
-                        >
-                          <span
-                            className={`status-dot ${
-                              user.status === 'active'
-                                ? 'dot-green'
-                                : 'dot-gray'
-                            }`}
-                          />
-                          {user.status === 'active'
-                            ? t.active
-                            : t.inactive}
-                        </span>
-                      </td>
-
-                      <td style={{ color: 'var(--muted)' }}>
-                        {formatDate(
-                          user.created_at,
-                          lang === 'ar' ? 'ar-EG' : 'fr-FR'
-                        )}
-                      </td>
-
+                      <td style={{ color: 'var(--muted)' }}>{formatDate(user.created_at, lang === 'ar' ? 'ar-EG' : 'fr-FR')}</td>
                       {canManage && (
                         <td>
                           <div className="ep-actions">
-                            <button
-                              type="button"
-                              className="btn-icon btn-edit"
-                              onClick={() => handleOpenEdit(user)}
-                              title={t.edit}
-                              aria-label={t.edit}
-                            >
+                            <button type="button" className="btn-icon btn-edit" onClick={() => handleOpenEdit(user)} title={t.edit} aria-label={t.edit}>
                               <i className="fas fa-pen" />
                             </button>
-
-                            <button
-                              type="button"
-                              className="btn-icon btn-delete"
-                              onClick={() => handleDeleteClick(user)}
-                              disabled={self}
-                              title={t.delete}
-                              aria-label={t.delete}
-                            >
+                            <button type="button" className="btn-icon btn-delete" onClick={() => handleDeleteClick(user)} disabled={self} title={t.delete} aria-label={t.delete}>
                               <i className="fas fa-trash-alt" />
                             </button>
                           </div>
@@ -1448,172 +1230,53 @@ const UsersPage = ({ user: userProp }) => {
         </div>
       </div>
 
-      {/* Create / Edit modal */}
       {canManage && showForm && (
-        <div
-          className="ep-modal-overlay"
-          onMouseDown={(e) =>
-            e.target === e.currentTarget && closeModals()
-          }
-        >
-          <div
-            className="ep-modal"
-            dir={t.dir}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="up-form-title"
-          >
+        <div className="ep-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && closeModals()}>
+          <div className="ep-modal" dir={t.dir} role="dialog" aria-modal="true" aria-labelledby="up-form-title">
             <div className="ep-modal-header">
-              <h3 id="up-form-title">
-                {currentUser ? t.modal_edit : t.modal_new}
-              </h3>
-
-              <button
-                type="button"
-                className="btn-close"
-                onClick={closeModals}
-                aria-label={t.close}
-              >
+              <h3 id="up-form-title">{currentUser ? t.modal_edit : t.modal_new}</h3>
+              <button type="button" className="btn-close" onClick={closeModals} aria-label={t.close}>
                 <i className="fas fa-times" />
               </button>
             </div>
-
-            <form
-              onSubmit={handleSubmit}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                minHeight: 0,
-              }}
-            >
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div className="ep-modal-body">
                 <div className="form-group">
                   <label htmlFor="up-name">{t.f_name}</label>
-                  <input
-                    id="up-name"
-                    type="text"
-                    className="form-control"
-                    required
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        name: e.target.value,
-                      })
-                    }
-                  />
+                  <input id="up-name" type="text" className="form-control" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                 </div>
-
                 <div className="form-group">
                   <label htmlFor="up-email">{t.f_email}</label>
-                  <input
-                    id="up-email"
-                    type="email"
-                    className="form-control"
-                    required
-                    value={formData.email}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        email: e.target.value,
-                      })
-                    }
-                    dir="ltr"
-                    style={{
-                      textAlign: t.dir === 'rtl' ? 'right' : 'left',
-                    }}
-                  />
+                  <input id="up-email" type="email" className="form-control" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} dir="ltr" style={{ textAlign: t.dir === 'rtl' ? 'right' : 'left' }} />
                 </div>
-
                 <div className="form-group">
                   <label htmlFor="up-password">{t.f_password}</label>
-                  <input
-                    id="up-password"
-                    type="password"
-                    className="form-control"
-                    required={!currentUser}
-                    value={formData.password}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        password: e.target.value,
-                      })
-                    }
-                    dir="ltr"
-                    autoComplete="new-password"
-                  />
-
-                  {currentUser && (
-                    <span className="form-hint">
-                      {t.f_password_hint}
-                    </span>
-                  )}
+                  <input id="up-password" type="password" className="form-control" required={!currentUser} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} dir="ltr" autoComplete="new-password" />
+                  {currentUser && <span className="form-hint">{t.f_password_hint}</span>}
                 </div>
-
                 <div className="form-grid2">
                   <div className="form-group">
                     <label htmlFor="up-role">{t.f_role}</label>
-                    <select
-                      id="up-role"
-                      className="form-control"
-                      value={formData.role}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          role: e.target.value,
-                        })
-                      }
-                    >
+                    <select id="up-role" className="form-control" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
                       <option value="admin">{t.role_admin}</option>
                       <option value="manager">{t.role_manager}</option>
                       <option value="cashier">{t.role_cashier}</option>
                       <option value="stock">{t.role_stock}</option>
                     </select>
                   </div>
-
                   <div className="form-group">
                     <label htmlFor="up-status">{t.f_status}</label>
-                    <select
-                      id="up-status"
-                      className="form-control"
-                      value={formData.status}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          status: e.target.value,
-                        })
-                      }
-                    >
+                    <select id="up-status" className="form-control" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
                       <option value="active">{t.active}</option>
                       <option value="inactive">{t.inactive}</option>
                     </select>
                   </div>
                 </div>
               </div>
-
               <div className="ep-modal-footer">
-                <button
-                  type="button"
-                  className="btn-cancel"
-                  onClick={closeModals}
-                >
-                  {t.cancel}
-                </button>
-
-                <button
-                  type="submit"
-                  className="btn-save"
-                  disabled={saving}
-                >
-                  {saving ? (
-                    <>
-                      <i className="fas fa-spinner fa-spin" />
-                      {' '}
-                      {t.saving}
-                    </>
-                  ) : (
-                    t.save
-                  )}
+                <button type="button" className="btn-cancel" onClick={closeModals}>{t.cancel}</button>
+                <button type="submit" className="btn-save" disabled={saving}>
+                  {saving ? (<><i className="fas fa-spinner fa-spin" /> {' '} {t.saving}</>) : (t.save)}
                 </button>
               </div>
             </form>
@@ -1621,129 +1284,35 @@ const UsersPage = ({ user: userProp }) => {
         </div>
       )}
 
-      {/* Delete modal */}
       {canManage && showDelete && currentUser && (
-        <div
-          className="ep-modal-overlay"
-          onMouseDown={(e) =>
-            e.target === e.currentTarget && closeModals()
-          }
-        >
-          <div
-            className="ep-modal"
-            dir={t.dir}
-            style={{ maxWidth: 420 }}
-            role="alertdialog"
-            aria-modal="true"
-          >
-            <div
-              className="ep-modal-body"
-              style={{
-                textAlign: 'center',
-                paddingTop: 30,
-              }}
-            >
-              <div
-                className="empty-icon"
-                style={{
-                  background: 'var(--red-soft)',
-                  color: 'var(--red)',
-                }}
-              >
+        <div className="ep-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && closeModals()}>
+          <div className="ep-modal" dir={t.dir} style={{ maxWidth: 420 }} role="alertdialog" aria-modal="true">
+            <div className="ep-modal-body" style={{ textAlign: 'center', paddingTop: 30 }}>
+              <div className="empty-icon" style={{ background: 'var(--red-soft)', color: 'var(--red)' }}>
                 <i className="fas fa-exclamation-triangle" />
               </div>
-
-              <h3
-                style={{
-                  margin: '0 0 10px',
-                  fontSize: 'var(--fs-xl)',
-                }}
-              >
-                {t.delete_title}
-              </h3>
-
-              <p
-                style={{
-                  color: 'var(--muted)',
-                  margin: '0 0 16px',
-                  fontSize: 'var(--fs-sm)',
-                  lineHeight: 1.7,
-                }}
-              >
-                {t.delete_warn}
-              </p>
-
-              <div
-                style={{
-                  background: '#f8fafc',
-                  padding: 12,
-                  borderRadius: 8,
-                  fontWeight: 700,
-                  marginBottom: 20,
-                  fontSize: 'var(--fs-md)',
-                  overflowWrap: 'anywhere',
-                }}
-              >
+              <h3 style={{ margin: '0 0 10px', fontSize: 'var(--fs-xl)' }}>{t.delete_title}</h3>
+              <p style={{ color: 'var(--muted)', margin: '0 0 16px', fontSize: 'var(--fs-sm)', lineHeight: 1.7 }}>{t.delete_warn}</p>
+              <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, fontWeight: 700, marginBottom: 20, fontSize: 'var(--fs-md)', overflowWrap: 'anywhere' }}>
                 {currentUser.name}
                 <br />
-                <span
-                  style={{
-                    fontWeight: 400,
-                    fontSize: 'var(--fs-xs)',
-                    color: 'var(--muted)',
-                  }}
-                >
-                  {currentUser.email}
-                </span>
+                <span style={{ fontWeight: 400, fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}>{currentUser.email}</span>
               </div>
             </div>
-
-            <div
-              className="ep-modal-footer"
-              style={{ justifyContent: 'center' }}
-            >
-              <button
-                type="button"
-                className="btn-cancel"
-                onClick={closeModals}
-              >
-                {t.cancel}
-              </button>
-
-              <button
-                type="button"
-                className="btn-danger"
-                onClick={handleDeleteConfirm}
-                disabled={saving}
-              >
-                {saving ? (
-                  <i className="fas fa-spinner fa-spin" />
-                ) : (
-                  t.delete_confirm
-                )}
+            <div className="ep-modal-footer" style={{ justifyContent: 'center' }}>
+              <button type="button" className="btn-cancel" onClick={closeModals}>{t.cancel}</button>
+              <button type="button" className="btn-danger" onClick={handleDeleteConfirm} disabled={saving}>
+                {saving ? (<i className="fas fa-spinner fa-spin" />) : (t.delete_confirm)}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Notifications */}
       {toast.show && (
         <div className="toast-container" role="status">
           <div className={`toast ${toast.type}`}>
-            <i
-              className={`fas ${
-                toast.type === 'success'
-                  ? 'fa-check-circle'
-                  : 'fa-exclamation-circle'
-              }`}
-              style={{
-                color:
-                  toast.type === 'success'
-                    ? 'var(--green)'
-                    : 'var(--red)',
-              }}
-            />
+            <i className={`fas ${toast.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}`} style={{ color: toast.type === 'success' ? 'var(--green)' : 'var(--red)' }} />
             {toast.message}
           </div>
         </div>

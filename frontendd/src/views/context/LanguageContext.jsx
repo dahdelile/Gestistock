@@ -60,8 +60,16 @@ const translations = {
     subtitle: 'Votre portail unique pour accéder à toutes les ressources',
     applications: 'Les applications',
     noModule: 'Aucun module trouvé',
+caisse: 'Caisse',
+utilisateurs: 'Utilisateurs',
+
+ fournisseurs: 'Fournisseurs',
+
   },
   ar: {
+    fournisseurs: 'الموردون',
+    utilisateurs: 'المستخدمون',
+     caisse: 'الصندوق',
     accueil: 'الرئيسية',
     produits: 'المنتجات',
     produit: 'المنتج',

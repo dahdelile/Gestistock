@@ -44,8 +44,7 @@ const I18N = {
     f_category: 'Catégorie', f_category_ph: 'Sélectionner',
     f_subcategory: 'Sous-catégorie', f_subcategory_ph: 'Sélectionner',
     f_barcode: 'Code-barres', f_barcode_ph: 'Référence', f_status: 'État du produit',
-    f_purchase: "Prix d'achat (UM)", f_sale: 'Prix de vente par défaut (UM)',
-    f_sale_hint: 'Conservé en base pour la vente, non affiché dans le tableau.',
+    f_purchase: "Prix d'achat (UM)",
     f_quantity: 'Quantité', f_min: 'Stock minimum', f_min_hint: "Seuil d'alerte.",
     f_supplier: 'Fournisseur', no_supplier: 'Aucun fournisseur',
     summary: 'Aperçu', summary_purchase: "Valeur d'achat (stock)",
@@ -95,8 +94,7 @@ const I18N = {
     f_category: 'الفئة', f_category_ph: 'اختر',
     f_subcategory: 'الفئة الفرعية', f_subcategory_ph: 'اختر',
     f_barcode: 'الباركود', f_barcode_ph: 'المرجع', f_status: 'حالة المنتج',
-    f_purchase: 'سعر الشراء (أوقية)', f_sale: 'سعر البيع الافتراضي (أوقية)',
-    f_sale_hint: 'محفوظ في قاعدة البيانات للبيع، ولا يظهر في الجدول.',
+    f_purchase: 'سعر الشراء (أوقية)',
     f_quantity: 'الكمية', f_min: 'الحد الأدنى للمخزون', f_min_hint: 'عتبة التنبيه.',
     f_supplier: 'المورد', no_supplier: 'بدون مورد',
     summary: 'نظرة عامة', summary_purchase: 'قيمة الشراء (المخزون)',
@@ -121,7 +119,7 @@ const I18N = {
 ========================================================= */
 const emptyForm = () => ({
   name: '', category: '', subcategory: '', barcode: '', status: 'neuf',
-  purchase_price: '', sale_price: '', quantity: '', min_quantity: 5, supplier_id: '',
+  purchase_price: '', quantity: '', min_quantity: 5, supplier_id: '',
 });
 
 const formatMoney = (value, cur = 'UM') => {
@@ -129,7 +127,6 @@ const formatMoney = (value, cur = 'UM') => {
   return `${n} ${cur}`;
 };
 const formatNumber = (value) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(Number(value) || 0);
-const hasSalePrice = (value) => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
 
 const getRows = (response) => {
   const data = response?.data;
@@ -261,7 +258,6 @@ const ProductsPage = ({ user: userProp }) => {
   const [sortDir, setSortDir] = useState('asc');
 
   // ===== RÔLE — depuis App.js (profiles), sinon Supabase session + profiles =====
-  // Rôle utilisé UNIQUEMENT pour les permissions, JAMAIS affiché.
   const [loggedUser, setLoggedUser] = useState(userProp || null);
   const [userLoading, setUserLoading] = useState(!userProp?.role);
 
@@ -304,12 +300,12 @@ const ProductsPage = ({ user: userProp }) => {
     return () => { alive = false; };
   }, [userProp]);
 
-  // ===== PERMISSIONS — même règle que Clients / Dépenses / Achats =====
+  // ===== PERMISSIONS =====
   const userRole = normalizeRole(loggedUser?.role);
   const isAdmin = isAdminRole(userRole);
   const canAdd = isAdmin || userRole === 'manager' || userRole === 'stock';
   const canEdit = isAdmin || userRole === 'manager' || userRole === 'stock';
-  const canDelete = isAdmin; // SEUL ADMIN
+  const canDelete = isAdmin;
 
   const mainCategories = useMemo(() => categoriesFull.filter((c) => !c.parent_id), [categoriesFull]);
   const categories = useMemo(() => mainCategories.map((c) => c.name), [mainCategories]);
@@ -415,7 +411,6 @@ const ProductsPage = ({ user: userProp }) => {
       name: product.name || '', category: getCategoryName(product),
       subcategory: getSubcategoryName(product), barcode: product.barcode || '',
       status: product.status || 'neuf', purchase_price: product.purchase_price ?? '',
-      sale_price: hasSalePrice(product.sale_price) ? String(product.sale_price) : '',
       quantity: product.quantity ?? '', min_quantity: product.min_quantity ?? 5,
       supplier_id: product.supplier_id ?? '',
     });
@@ -440,7 +435,6 @@ const ProductsPage = ({ user: userProp }) => {
         ...restOfFormData, name: productName,
         barcode: formData.barcode?.trim() || null,
         purchase_price: Number(formData.purchase_price) || 0,
-        sale_price: formData.sale_price === '' || formData.sale_price === null || formData.sale_price === undefined ? null : Number(formData.sale_price),
         quantity: Number.parseInt(formData.quantity, 10) || 0,
         min_quantity: Number.parseInt(formData.min_quantity, 10) || 0,
         supplier_id: formData.supplier_id || null,
@@ -679,7 +673,7 @@ const ProductsPage = ({ user: userProp }) => {
                   <th style={{ width: 40 }}>#</th>
                   <th>
                     <button className="btn btn-link text-white text-decoration-none p-0 fw-bold" onClick={() => handleSort('name')}>
-                      {t.th_product} <i className={`fas ${sortIcon('name')} ${sortBy === 'name' ? 'text-info' : ''}`}></i>
+                      {t.th_product} <i className={`fas ${sortIcon('name')}  'text-info' : ''}`}></i>
                     </button>
                   </th>
                   <th>{t.th_category}</th>
@@ -737,7 +731,6 @@ const ProductsPage = ({ user: userProp }) => {
                             </div>
                             <div>
                               <div className="fw-bold">{product.name}</div>
-                              <small className="text-muted"><i className="fas fa-barcode me-1"></i>{product.barcode || t.no_barcode}</small>
                             </div>
                           </div>
                         </td>
@@ -838,7 +831,7 @@ const ProductsPage = ({ user: userProp }) => {
               </Col>
             </Row>
             <Row>
-              <Col md={3}>
+              <Col md={4}>
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-bold">{t.f_status}</Form.Label>
                   <Form.Select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
@@ -847,20 +840,13 @@ const ProductsPage = ({ user: userProp }) => {
                   </Form.Select>
                 </Form.Group>
               </Col>
-              <Col md={3}>
+              <Col md={4}>
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-bold">{t.f_purchase} <span className="text-danger">*</span></Form.Label>
                   <Form.Control type="number" min="0" step="0.01" value={formData.purchase_price} onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })} required />
                 </Form.Group>
               </Col>
-              <Col md={3}>
-                <Form.Group className="mb-3">
-                  <Form.Label className="fw-bold">{t.f_sale}</Form.Label>
-                  <Form.Control type="number" min="0" step="0.01" value={formData.sale_price} onChange={(e) => setFormData({ ...formData, sale_price: e.target.value })} placeholder="Ex : 800" />
-                  <Form.Text className="text-muted">{t.f_sale_hint}</Form.Text>
-                </Form.Group>
-              </Col>
-              <Col md={3}>
+              <Col md={4}>
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-bold">{t.f_quantity} <span className="text-danger">*</span></Form.Label>
                   <Form.Control type="number" min="0" step="1" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} required />
@@ -940,7 +926,7 @@ const ProductsPage = ({ user: userProp }) => {
         </Modal>
       )}
 
-      {/* ====== MODALS SCANNER (manquants dans ton fichier) ====== */}
+      {/* ====== MODALS SCANNER ====== */}
       <Modal show={showScanner} onHide={() => setShowScanner(false)} centered>
         <Modal.Header closeButton><Modal.Title><i className="fas fa-barcode me-2"></i>{t.scan}</Modal.Title></Modal.Header>
         <Modal.Body>

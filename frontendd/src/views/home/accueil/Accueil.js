@@ -192,11 +192,11 @@ const Accueil = ({ userName }) => {
     { text: t('categories'), img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/categories" },
     { text: t('rapports'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/rapports" },
     { text: t('customers'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/customers" },
-    { text: t('caisse'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/caisse" },
+    { text: t('caisse'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/gestionC" },
   ], [t, lang]);
 
   const quickLinks = useMemo(() => [
-    { label: t('caisse'), path: "/caisse" },
+    
     { label: t('vente'), path: "/ventes" },
     { label: t('achat'), path: "/achat" },
     { label: t('produit'), path: "/products" },
@@ -207,6 +207,7 @@ const Accueil = ({ userName }) => {
     { label: t('stock'), path: "/stock" },
     { label: t('utilisateurs'), path: "/users" },
     { label: t('rapports'), path: "/rapports" },
+    { label: t('caisse'), path: "/gestionC" },
   ], [t, lang]);
 
   const filteredDocs = useMemo(() => {

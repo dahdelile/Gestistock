@@ -232,21 +232,71 @@ const Caises = ({ user: userProp }) => {
   }, [moves, search, filterType]);
 
   // ✅ OUVRIR CAISSE
-  const handleOpenCaisse = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const payload = { open_amount: Number(openAmount || 0), status: 'open', opened_by: loggedUser?.email || '', opened_at: new Date().toISOString() };
-      const { data, error } = await supabase.from('caisse').insert(payload).select().single();
-      if (error) throw error;
-      setCaisse(data);
-      setShowOpen(false);
-      setOpenAmount('');
-      showToast(t.ok_opened);
-      await fetchData();
-    } catch (err) { console.error(err); showToast(err.message || t.err_save); }
-    finally { setSaving(false); }
-  };
+
+const handleOpenCaisse = async (e) => {
+  e.preventDefault();
+
+  console.log('1. Clic sur ouverture caisse');
+
+  if (saving) return;
+
+  setSaving(true);
+
+  try {
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    if (!sessionData.session?.user) {
+      throw new Error('Utilisateur non connecté');
+    }
+
+    const montant = Number(openAmount);
+
+    if (openAmount === '' || !Number.isFinite(montant) || montant < 0) {
+      throw new Error('Montant invalide');
+    }
+
+    console.log('2. Session valide, montant:', montant);
+
+    const payload = {
+      open_amount: montant,
+      status: 'open',
+      opened_by: sessionData.session.user.email || 'Utilisateur',
+      opened_at: new Date().toISOString()
+    };
+
+    console.log('3. Envoi Supabase:', payload);
+
+    const { data, error } = await supabase
+      .from('caisse')
+      .insert([payload])
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Erreur Supabase:', error);
+      throw error;
+    }
+
+    console.log('4. Caisse créée:', data);
+
+    setCaisse(data);
+    setShowOpen(false);
+    setOpenAmount('');
+
+    showToast('Caisse ouverte avec succès !');
+
+    await fetchData();
+
+  } catch (error) {
+    console.error('ERREUR OUVERTURE:', error);
+    showToast(error.message || 'Erreur ouverture caisse');
+  } finally {
+    setSaving(false);
+  }
+};
 
   const handleCloseCaisse = async (e) => {
     e.preventDefault();
@@ -419,13 +469,25 @@ const Caises = ({ user: userProp }) => {
             </div><div className="modal-f"><button type="button" className="btn-cancel" onClick={() => setShowForm(false)}>{t.cancel}</button><button type="submit" className="btn-primary" disabled={saving}>{saving ? t.saving : t.save}</button></div></form>
           </div>
         </div>
+
+
+
       )}
 
       {showOpen && (
         <div className="overlay" onMouseDown={e => e.target === e.currentTarget && setShowOpen(false)}>
           <div className="modal"><div className="modal-h"><h3>{t.modal_open}</h3><button type="button" className="icon-btn" onClick={() => setShowOpen(false)}><i className="fas fa-times" /></button></div>
             <form onSubmit={handleOpenCaisse}><div className="modal-b"><div className="form-group"><label>{t.open_amount}</label><input className="input" type="number" min="0" step="0.01" required autoFocus value={openAmount} onChange={e => setOpenAmount(e.target.value)} /></div></div>
-              <div className="modal-f"><button type="button" className="btn-cancel" onClick={() => setShowOpen(false)}>{t.cancel}</button><button type="submit" className="btn-success" disabled={saving}>{t.open}</button></div></form>
+              <div className="modal-f"><button type="button" className="btn-cancel" onClick={() => setShowOpen(false)}>{t.cancel}</button>
+              
+              <button
+  type="submit"
+  className="btn-success"
+  disabled={saving}
+>
+  {saving ? t.saving : t.open}
+</button>
+              </div></form>
           </div>
         </div>
       )}
@@ -454,5 +516,6 @@ const Caises = ({ user: userProp }) => {
     </div>
   );
 };
+
 
 export default Caises;

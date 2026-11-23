@@ -466,6 +466,7 @@ const Caises = ({ user: userProp }) => {
         </div>
       )}
     </div>
+    
   );
 };
 

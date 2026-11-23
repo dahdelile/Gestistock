@@ -67,6 +67,7 @@ utilisateurs: 'Utilisateurs',
 
   },
   ar: {
+    deposits:'الوديعة',
     fournisseurs: 'الموردون',
     utilisateurs: 'المستخدمون',
      caisse: 'الصندوق',

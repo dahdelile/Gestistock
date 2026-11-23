@@ -31,6 +31,8 @@ const getNav = (tFn) => {
     { component: CNavItem, name: t('achats'), to:  '/achat', icon: <CIcon icon={cilInbox} customClassName="nav-icon" /> },
     
     { component: CNavItem, name:t('ventes'), to:  '/ventes', icon: <CIcon icon={cilMoney} customClassName="nav-icon" /> },
+   
+   
     /*
     {
       component: CNavGroup, name: t('stockSortant'), icon: <CIcon icon={cilMoney} customClassName="nav-icon" />,
@@ -52,7 +54,7 @@ const getNav = (tFn) => {
     { component: CNavItem, name: t('caisse'), to: '/gestionC', icon: <CIcon icon={cilSpeedometer} customClassName="nav-icon" /> },
     
     { component: CNavItem, name: t('rapports'), to: '/rapportss', icon: <CIcon icon={cilChart} customClassName="nav-icon" /> },
-
+{ component: CNavItem, name:t('deposits'), to:  '/depo', icon: <CIcon icon={cilMoney} customClassName="nav-icon" /> },
 
     {
       component: CNavGroup, name: t('parametres'), icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,

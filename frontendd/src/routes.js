@@ -5,7 +5,7 @@ const AdminDashboard = React.lazy(() => import('./views/admin/gestion/AdminDashb
 
 
 const Caises = React.lazy(() => import('./views/gestionC/Caises'));
-
+const DepositsPage = React.lazy(() => import('./views/depo/DepositsPage'));
 const Accueil = React.lazy(() => import('./views/home/accueil/Accueil'))
 //stock
 const Categories= React.lazy(() => import('./views/Categories/Categories'))
@@ -27,6 +27,8 @@ const routes = [
 { path: '/admin', name: 'UsersPage', element:   UsersPage },
 
 { path: '/gestionC', name: 'Caises', element:   Caises },
+
+{ path: '/depo', name: 'DepositsPage', element:  DepositsPage },
 //stock
 { path: 'Products', name: 'produits', element:  ProductList},
 { path: 'Categories', name: 'Categories', element:  Categories},

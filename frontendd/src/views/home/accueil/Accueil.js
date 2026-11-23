@@ -190,7 +190,7 @@ const Accueil = ({ userName }) => {
     { text: t('stock'), img: "https://cdn-icons-png.flaticon.com/128/4408/4408296.png", path: "/products" },
     { text: t('expense'), img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/expenses" },
     { text: t('categories'), img: "https://cdn-icons-png.flaticon.com/128/2041/2041643.png", path: "/categories" },
-    { text: t('rapports'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/rapports" },
+    { text: t('rapports'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/rapportss" },
     { text: t('customers'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/customers" },
     { text: t('caisse'), img: "https://cdn-icons-png.flaticon.com/128/18220/18220264.png", path: "/gestionC" },
   ], [t, lang]);
@@ -206,7 +206,7 @@ const Accueil = ({ userName }) => {
     { label: t('expense'), path: "/expenses" },
     { label: t('stock'), path: "/stock" },
     { label: t('utilisateurs'), path: "/users" },
-    { label: t('rapports'), path: "/rapports" },
+    { label: t('rapports'), path: "/rapportss" },
     { label: t('caisse'), path: "/gestionC" },
   ], [t, lang]);
 

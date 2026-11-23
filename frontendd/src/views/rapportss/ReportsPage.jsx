@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import { salesApi, purchasesApi, expensesApi, productsApi } from '../../api';
 import { useLanguage } from '../../context/LanguageContext';
 import {
-  Table, Button, Card, Spinner, Badge, Form, 
+  Table, Button, Card, Spinner, Badge, Form,
   Alert, Row, Col, InputGroup, Tabs, Tab
 } from 'react-bootstrap';
 
@@ -15,7 +15,7 @@ import {
 const I18N = {
   fr: {
     dir: 'ltr', locale: 'fr-FR', currency: 'MRU', sheet: 'Rapport',
-    title_stock: 'Stock actuel', title_history: 'Historique', title_inventory: 'Inventaire',
+    title_stock: 'Stock actuel', title_history: 'Historique',
     title_profits: 'Bénéfices', title_movements: 'Mouvements',
     subtitle: 'Tableau de bord et analyse de votre gestion commerciale',
     refresh: 'Actualiser', excel: 'Excel', print: 'PDF',
@@ -32,11 +32,9 @@ const I18N = {
     stock_state: 'État actuel du stock', products_count: (n) => `${n} produit(s)`,
     ref: 'Référence', product: 'Produit', cat: 'Catégorie', qty: 'Quantité',
     buy_price: 'Prix achat', sell_price: 'Prix vente', buy_value: 'Valeur achat',
-    status: 'Statut', none_products: 'Aucun produit trouvé.',
+    sell_value: 'Valeur vente', status: 'Statut', none_products: 'Aucun produit trouvé.',
     st_ok: 'Disponible', st_low: 'Faible', st_out: 'Rupture',
-    inv_title: 'Inventaire physique', reset: 'Réinitialiser',
-    inv_hint: 'Saisissez les quantités réellement comptées. Les écarts sont calculés automatiquement.',
-    theoretical: 'Stock théorique', physical: 'Stock physique', gap: 'Écart',
+    total_row: 'Total',
     profits_calc: 'Détail du calcul des bénéfices', revenue: 'Chiffre d’affaires',
     cogs: 'Coût des produits vendus', gross: 'Bénéfice brut', expenses: 'Dépenses',
     net_upper: 'BÉNÉFICE NET ESTIMÉ', profit_note: "Le bénéfice est estimé à partir des coûts d'achat disponibles.",
@@ -54,7 +52,7 @@ const I18N = {
   },
   ar: {
     dir: 'rtl', locale: 'ar-u-nu-latn', currency: 'أوقية', sheet: 'تقرير',
-    title_stock: 'المخزون الحالي', title_history: 'سجل المعاملات', title_inventory: 'جرد المنتجات',
+    title_stock: 'المخزون الحالي', title_history: 'سجل المعاملات',
     title_profits: 'تحليل الأرباح', title_movements: 'حركة المخزون',
     subtitle: 'لوحة متابعة وتحليل لإدارة تجارتك',
     refresh: 'تحديث', excel: 'Excel', print: 'PDF',
@@ -71,11 +69,9 @@ const I18N = {
     stock_state: 'حالة المخزون الحالية', products_count: (n) => `${n} منتج`,
     ref: 'المرجع', product: 'المنتج', cat: 'الفئة', qty: 'الكمية',
     buy_price: 'سعر الشراء', sell_price: 'سعر البيع', buy_value: 'قيمة الشراء',
-    status: 'الحالة', none_products: 'لا توجد منتجات.',
+    sell_value: 'قيمة البيع', status: 'الحالة', none_products: 'لا توجد منتجات.',
     st_ok: 'متوفر', st_low: 'منخفض', st_out: 'نفد',
-    inv_title: 'الجرد الفعلي', reset: 'إعادة تعيين',
-    inv_hint: 'أدخل الكميات المعدودة فعلياً، وسيُحسب الفرق تلقائياً.',
-    theoretical: 'المخزون النظري', physical: 'المخزون الفعلي', gap: 'الفرق',
+    total_row: 'الإجمالي',
     profits_calc: 'تفاصيل حساب الأرباح', revenue: 'رقم المبيعات',
     cogs: 'تكلفة المنتجات المباعة', gross: 'الربح الإجمالي', expenses: 'المصروفات',
     net_upper: 'الربح الصافي التقديري', profit_note: 'يُقدَّر الربح اعتماداً على تكاليف الشراء المتوفرة.',
@@ -153,9 +149,8 @@ const getSaleTotal = (sale) => number(sale.grand_total ?? sale.total ?? sale.amo
 const getPurchaseTotal = (purchase) => number(purchase.grand_total ?? purchase.total ?? purchase.amount);
 const isCancelled = (record) => ['cancelled', 'canceled', 'annule', 'annulee', 'annulée', 'rejected'].includes(String(record.status || '').toLowerCase());
 
-const REPORT_KEYS = ['stock', 'history', 'inventory', 'profits', 'movements'];
 const REPORT_ICONS = {
-  stock: 'fa-boxes-stacked', history: 'fa-clock-rotate-left', inventory: 'fa-clipboard-list',
+  stock: 'fa-boxes-stacked', history: 'fa-clock-rotate-left',
   profits: 'fa-chart-line', movements: 'fa-right-left',
 };
 
@@ -176,7 +171,7 @@ const getBgClass = (tone) => {
 const ReportsPage = () => {
   const location = useLocation();
   const { lang } = useLanguage();
-  const t = I18N[lang];
+  const t = I18N[lang] || I18N.fr;
 
   const [reportType, setReportType] = useState('stock');
   const [sales, setSales] = useState([]);
@@ -193,12 +188,10 @@ const ReportsPage = () => {
   const [search, setSearch] = useState('');
   const [movementType, setMovementType] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [physicalCounts, setPhysicalCounts] = useState({});
 
   useEffect(() => {
     const path = location.pathname.toLowerCase();
     if (path.includes('history')) setReportType('history');
-    else if (path.includes('inventory')) setReportType('inventory');
     else if (path.includes('profits')) setReportType('profits');
     else if (path.includes('movements')) setReportType('movements');
     else setReportType('stock');
@@ -244,18 +237,23 @@ const ReportsPage = () => {
     const totalSaleStockValue = products.reduce((sum, p) => sum + number(p.quantity) * number(p.sale_price), 0);
     const needle = search.toLowerCase();
 
+    // --- AMÉLIORÉ : Stock avec totaux ---
     const stockData = products.map((p) => {
       const quantity = number(p.quantity); const purchasePrice = number(p.purchase_price || p.cost_price);
-      const salePrice = number(p.sale_price); const raw = physicalCounts[p.id];
-      const physicalQuantity = raw !== undefined && raw !== '' ? number(raw) : quantity;
-      return { ...p, statusKey: getStatusKey(p), physicalQuantity, physicalInput: raw !== undefined ? raw : quantity,
-        difference: physicalQuantity - quantity, purchaseValue: quantity * purchasePrice, saleValue: quantity * salePrice };
+      const salePrice = number(p.sale_price);
+      return { ...p, statusKey: getStatusKey(p), purchaseValue: quantity * purchasePrice, saleValue: quantity * salePrice };
     }).filter((p) => {
       const matchesSearch = !search || String(p.name || '').toLowerCase().includes(needle) || String(p.reference || p.code || '').toLowerCase().includes(needle);
       const categoryName = p.categories?.name || p.category?.name || '';
       const matchesCategory = categoryFilter === 'all' || String(p.category_id) === String(categoryFilter) || categoryName === categoryFilter;
       return matchesSearch && matchesCategory;
     });
+
+    const stockTotals = {
+      qty: stockData.reduce((s, p) => s + number(p.quantity), 0),
+      buyValue: stockData.reduce((s, p) => s + p.purchaseValue, 0),
+      saleValue: stockData.reduce((s, p) => s + p.saleValue, 0),
+    };
 
     const productSales = {};
     validSales.forEach((sale) => {
@@ -291,6 +289,14 @@ const ReportsPage = () => {
       return true;
     });
 
+    const movementsTotals = {
+      count: filteredMovements.length,
+      qty: filteredMovements.reduce((s, m) => s + m.quantity, 0),
+      amount: filteredMovements.reduce((s, m) => s + m.amount, 0),
+      entries: filteredMovements.filter((m) => m.direction === 'entree').reduce((s, m) => s + m.amount, 0),
+      exits: filteredMovements.filter((m) => m.direction === 'sortie').reduce((s, m) => s + m.amount, 0),
+    };
+
     const dailyStats = {};
     const addDaily = (date, key, value) => {
       const day = getDateKey(date); if (!day) return;
@@ -302,15 +308,15 @@ const ReportsPage = () => {
     validExpenses.forEach((e) => addDaily(e.date || e.created_at, 'expenses', number(e.amount)));
     const chartData = Object.values(dailyStats).sort((a, b) => a.date.localeCompare(b.date)).slice(-15);
 
-    return { totalSales, totalPurchases, totalExpenses, totalStockValue, totalSaleStockValue, stockData, costOfGoods, grossProfit, netProfit, bestSelling, bestProfitable, movements: filteredMovements, chartData, lowStock: products.filter((p) => getStatusKey(p) === 'low'), outOfStock: products.filter((p) => getStatusKey(p) === 'out') };
-  }, [sales, purchases, expenses, products, dateFrom, dateTo, search, movementType, categoryFilter, physicalCounts, nameOf]);
+    return { totalSales, totalPurchases, totalExpenses, totalStockValue, totalSaleStockValue, stockData, stockTotals, costOfGoods, grossProfit, netProfit, bestSelling, bestProfitable, movements: filteredMovements, movementsTotals, chartData, lowStock: products.filter((p) => getStatusKey(p) === 'low'), outOfStock: products.filter((p) => getStatusKey(p) === 'out') };
+  }, [sales, purchases, expenses, products, dateFrom, dateTo, search, movementType, categoryFilter, nameOf]);
 
   const exportExcel = () => {
     let rows = []; let fileName = 'Rapport_Gestistock';
     const statusLabel = (key) => t[`st_${key}`];
-    if (reportType === 'stock' || reportType === 'inventory') {
-      rows = reportData.stockData.map((p) => ({ [t.ref]: p.reference || p.code || '', [t.product]: p.name, [t.cat]: p.categories?.name || p.category?.name || '', [t.theoretical]: p.quantity, [t.physical]: p.physicalQuantity, [t.gap]: p.difference, [t.buy_price]: p.purchase_price || p.cost_price || 0, [t.sell_price]: p.sale_price || 0, [t.buy_value]: p.purchaseValue, [t.sell_value]: p.saleValue, [t.status]: statusLabel(p.statusKey) }));
-      fileName = reportType === 'stock' ? 'Stock_Actuel' : 'Inventaire';
+    if (reportType === 'stock') {
+      rows = reportData.stockData.map((p) => ({ [t.ref]: p.reference || p.code || '', [t.product]: p.name, [t.cat]: p.categories?.name || p.category?.name || '', [t.qty]: p.quantity, [t.buy_price]: p.purchase_price || p.cost_price || 0, [t.sell_price]: p.sale_price || 0, [t.buy_value]: p.purchaseValue, [t.sell_value]: p.saleValue, [t.status]: statusLabel(p.statusKey) }));
+      fileName = 'Stock_Actuel';
     }
     if (reportType === 'history' || reportType === 'movements') {
       rows = reportData.movements.map((m) => ({ [t.type]: m.kind === 'sale' ? t.t_sale : t.t_purchase, [t.ref]: m.reference, [t.date]: formatDate(m.date, t.locale), [t.time]: formatTime(m.date, t.locale), [t.products]: m.items.map(nameOf).join(', '), [t.qty]: m.quantity, [t.amount]: m.amount }));
@@ -329,8 +335,6 @@ const ReportsPage = () => {
   };
 
   const printPage = () => window.print();
-  const updatePhysicalCount = (id, value) => setPhysicalCounts((prev) => ({ ...prev, [id]: value }));
-  const resetInventory = () => setPhysicalCounts({});
 
   const categories = useMemo(() => {
     const map = new Map();
@@ -338,7 +342,7 @@ const ReportsPage = () => {
     return Array.from(map.values());
   }, [products]);
 
-  const isStockView = reportType === 'stock' || reportType === 'inventory';
+  const isStockView = reportType === 'stock';
   const stats = isStockView
     ? [
         { label: t.stat_products, value: products.length, icon: 'fa-boxes-stacked', tone: 'blue' },
@@ -355,9 +359,18 @@ const ReportsPage = () => {
 
   const showChart = reportType === 'history' || reportType === 'profits';
 
+  if (loading) {
+    return (
+      <div className="container-fluid py-5 text-center">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-3">{t.loading}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="container-fluid py-4 reports-compact" dir={t.dir} lang={lang}>
-      {/* ====== STATISTIQUES : 4 en ligne horizontale sur mobile ====== */}
+      {/* ====== STATISTIQUES ====== */}
       <Row className="mb-4">
         {stats.map((stat, index) => (
           <Col xs={3} md={3} key={index}>
@@ -402,6 +415,8 @@ const ReportsPage = () => {
         </Card.Header>
 
         <Card.Body>
+          {(errorKey || errorText) && <Alert variant="danger">{errorText || t[errorKey]}</Alert>}
+
           {/* Filtres Globaux */}
           <Row className="mb-3">
             <Col md={2}>
@@ -441,7 +456,8 @@ const ReportsPage = () => {
           </Row>
 
           <Tabs activeKey={reportType} onSelect={(k) => setReportType(k)} className="mb-3" fill>
-            <Tab eventKey="stock" title={<span><i className="fas fa-boxes-stacked me-2"></i>{t.title_stock}</span>}>
+            {/* ===== ONGLET 1 : STOCK AMÉLIORÉ ===== */}
+            <Tab eventKey="stock" title={<span><i className="fas fa-boxes-stacked me-2"></i>{t.title_stock} ({reportData.stockData.length})</span>}>
               <Row className="mb-3">
                 <Col md={4}>
                   <Form.Group>
@@ -452,6 +468,9 @@ const ReportsPage = () => {
                     </Form.Select>
                   </Form.Group>
                 </Col>
+                <Col md={8} className="d-flex align-items-end justify-content-end">
+                  <Badge bg="primary" className="p-2">{t.products_count(reportData.stockData.length)} • {t.qty}: {money(reportData.stockTotals.qty)} • {t.buy_value}: {money(reportData.stockTotals.buyValue)} {t.currency}</Badge>
+                </Col>
               </Row>
               <div className="table-responsive">
                 <Table striped bordered hover className="mb-0">
@@ -459,13 +478,13 @@ const ReportsPage = () => {
                     <tr>
                       <th>{t.ref}</th><th>{t.product}</th><th>{t.cat}</th>
                       <th className="text-center">{t.qty}</th><th className="text-end">{t.buy_price}</th>
-                      <th className="text-end">{t.sell_price}</th><th className="text-end">{t.buy_value}</th>
+                      <th className="text-end">{t.sell_price}</th><th className="text-end">{t.buy_value}</th><th className="text-end">{t.sell_value}</th>
                       <th className="text-center">{t.status}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reportData.stockData.length === 0 ? (
-                      <tr><td colSpan="8" className="text-center py-4 text-muted">{t.none_products}</td></tr>
+                      <tr><td colSpan="9" className="text-center py-4 text-muted">{t.none_products}</td></tr>
                     ) : reportData.stockData.map((p) => (
                       <tr key={p.id}>
                         <td>{p.reference || p.code || '—'}</td>
@@ -475,6 +494,7 @@ const ReportsPage = () => {
                         <td className="text-end">{money(p.purchase_price || p.cost_price)}</td>
                         <td className="text-end">{money(p.sale_price)}</td>
                         <td className="text-end fw-bold">{money(p.purchaseValue)}</td>
+                        <td className="text-end fw-bold text-success">{money(p.saleValue)}</td>
                         <td className="text-center">
                           <Badge bg={p.statusKey === 'ok' ? 'success' : p.statusKey === 'low' ? 'warning' : 'danger'}>
                             {t[`st_${p.statusKey}`]}
@@ -483,47 +503,23 @@ const ReportsPage = () => {
                       </tr>
                     ))}
                   </tbody>
-                </Table>
-              </div>
-            </Tab>
-
-            <Tab eventKey="inventory" title={<span><i className="fas fa-clipboard-list me-2"></i>{t.title_inventory}</span>}>
-              <div className="d-flex justify-content-end mb-3">
-                <Button variant="outline-secondary" onClick={resetInventory}>
-                  <i className="fas fa-undo me-1"></i> {t.reset}
-                </Button>
-              </div>
-              <Alert variant="info" className="mb-3"><i className="fas fa-info-circle me-2"></i> {t.inv_hint}</Alert>
-              <div className="table-responsive">
-                <Table striped bordered hover className="mb-0">
-                  <thead className="table-dark">
-                    <tr>
-                      <th>{t.ref}</th><th>{t.product}</th><th className="text-center">{t.theoretical}</th>
-                      <th className="text-center">{t.physical}</th><th className="text-center">{t.gap}</th>
-                      <th className="text-end">{t.buy_value}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.stockData.map((p) => (
-                      <tr key={p.id}>
-                        <td>{p.reference || p.code || '—'}</td>
-                        <td className="fw-bold">{p.name}</td>
-                        <td className="text-center">{number(p.quantity)}</td>
-                        <td className="text-center">
-                          <Form.Control type="number" min="0" style={{ width: '80px', display: 'inline-block', textAlign: 'center' }} value={p.physicalInput} onChange={(e) => updatePhysicalCount(p.id, e.target.value)} />
-                        </td>
-                        <td className={`text-center fw-bold ${p.difference < 0 ? 'text-danger' : p.difference > 0 ? 'text-success' : ''}`}>
-                          {p.difference > 0 ? '+' : ''}{p.difference}
-                        </td>
-                        <td className="text-end">{money(p.purchaseValue)}</td>
+                  {reportData.stockData.length > 0 && (
+                    <tfoot className="table-light fw-bold">
+                      <tr>
+                        <td colSpan="3">{t.total_row}</td>
+                        <td className="text-center">{money(reportData.stockTotals.qty)}</td>
+                        <td></td><td></td>
+                        <td className="text-end">{money(reportData.stockTotals.buyValue)}</td>
+                        <td className="text-end">{money(reportData.stockTotals.saleValue)}</td>
+                        <td></td>
                       </tr>
-                    ))}
-                    {reportData.stockData.length === 0 && <tr><td colSpan="6" className="text-center py-4 text-muted">{t.none_products}</td></tr>}
-                  </tbody>
+                    </tfoot>
+                  )}
                 </Table>
               </div>
             </Tab>
 
+            {/* ===== ONGLET 2 : BÉNÉFICES AMÉLIORÉ ===== */}
             <Tab eventKey="profits" title={<span><i className="fas fa-chart-line me-2"></i>{t.title_profits}</span>}>
               <Row>
                 <Col md={6}>
@@ -541,28 +537,6 @@ const ReportsPage = () => {
                       <small className="text-muted d-block mt-3">{t.profit_note}</small>
                     </Card.Body>
                   </Card>
-                </Col>
-                <Col md={6}>
-                  <Card className="mb-3">
-                    <Card.Header className="fw-bold"><i className="fas fa-trophy me-2"></i>{t.best_selling}</Card.Header>
-                    <Card.Body>
-                      {reportData.bestSelling.slice(0, 8).map((p, i) => {
-                        const max = reportData.bestSelling[0]?.quantity || 1;
-                        return (
-                          <div key={p.id} className="mb-2">
-                            <div className="d-flex justify-content-between small mb-1">
-                              <span className="text-truncate" title={p.name}>{i + 1}. {p.name}</span>
-                              <span className="fw-bold">{money(p.quantity)}</span>
-                            </div>
-                            <div className="progress" style={{ height: '8px' }}>
-                              <div className="progress-bar bg-primary" role="progressbar" style={{ width: `${(p.quantity / max) * 100}%` }}></div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {reportData.bestSelling.length === 0 && <div className="text-center text-muted py-4">{t.no_sales}</div>}
-                    </Card.Body>
-                  </Card>
                   <Card>
                     <Card.Header className="fw-bold"><i className="fas fa-sack-dollar me-2"></i>{t.best_profit}</Card.Header>
                     <Card.Body>
@@ -572,7 +546,7 @@ const ReportsPage = () => {
                           <div key={p.id} className="mb-2">
                             <div className="d-flex justify-content-between small mb-1">
                               <span className="text-truncate" title={p.name}>{i + 1}. {p.name}</span>
-                              <span className="fw-bold">{money(p.profit)}</span>
+                              <span className="fw-bold">{money(p.profit)} {t.currency}</span>
                             </div>
                             <div className="progress" style={{ height: '8px' }}>
                               <div className="progress-bar bg-success" role="progressbar" style={{ width: `${(Math.max(0, p.profit) / max) * 100}%` }}></div>
@@ -584,10 +558,38 @@ const ReportsPage = () => {
                     </Card.Body>
                   </Card>
                 </Col>
+                <Col md={6}>
+                  <Card className="mb-3">
+                    <Card.Header className="fw-bold"><i className="fas fa-trophy me-2"></i>{t.best_selling}</Card.Header>
+                    <Card.Body>
+                      {reportData.bestSelling.slice(0, 10).map((p, i) => {
+                        const max = reportData.bestSelling[0]?.quantity || 1;
+                        return (
+                          <div key={p.id} className="mb-2">
+                            <div className="d-flex justify-content-between small mb-1">
+                              <span className="text-truncate" title={p.name}>{i + 1}. {p.name}</span>
+                              <span className="fw-bold">{money(p.quantity)} • {money(p.revenue)} {t.currency}</span>
+                            </div>
+                            <div className="progress" style={{ height: '8px' }}>
+                              <div className="progress-bar bg-primary" role="progressbar" style={{ width: `${(p.quantity / max) * 100}%` }}></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {reportData.bestSelling.length === 0 && <div className="text-center text-muted py-4">{t.no_sales}</div>}
+                    </Card.Body>
+                  </Card>
+                </Col>
               </Row>
             </Tab>
 
-            <Tab eventKey="history" title={<span><i className="fas fa-clock-rotate-left me-2"></i>{t.title_history}</span>}>
+            {/* ===== ONGLET 3 : HISTORIQUE AMÉLIORÉ ===== */}
+            <Tab eventKey="history" title={<span><i className="fas fa-clock-rotate-left me-2"></i>{t.title_history} ({reportData.movements.length})</span>}>
+              <div className="d-flex gap-2 mb-3 flex-wrap">
+                <Badge bg="success" className="p-2">{t.t_sale}: {money(reportData.movementsTotals.exits)} {t.currency}</Badge>
+                <Badge bg="info" className="p-2">{t.t_purchase}: {money(reportData.movementsTotals.entries)} {t.currency}</Badge>
+                <Badge bg="secondary" className="p-2">{t.ops_count(reportData.movements.length)}</Badge>
+              </div>
               <div className="table-responsive">
                 <Table striped bordered hover className="mb-0">
                   <thead className="table-dark">
@@ -610,10 +612,16 @@ const ReportsPage = () => {
                     ))}
                     {reportData.movements.length === 0 && <tr><td colSpan="7" className="text-center py-4 text-muted">{t.none_history}</td></tr>}
                   </tbody>
+                  {reportData.movements.length > 0 && (
+                    <tfoot className="table-light fw-bold">
+                      <tr><td colSpan="5">{t.total_row}</td><td className="text-center">{money(reportData.movementsTotals.qty)}</td><td className="text-end">{money(reportData.movementsTotals.amount)} {t.currency}</td></tr>
+                    </tfoot>
+                  )}
                 </Table>
               </div>
             </Tab>
 
+            {/* ===== ONGLET 4 : MOUVEMENTS AMÉLIORÉ ===== */}
             <Tab eventKey="movements" title={<span><i className="fas fa-right-left me-2"></i>{t.title_movements}</span>}>
               <Row className="mb-3">
                 <Col md={4}>
@@ -625,6 +633,10 @@ const ReportsPage = () => {
                       <option value="sortie">{t.exits}</option>
                     </Form.Select>
                   </Form.Group>
+                </Col>
+                <Col md={8} className="d-flex align-items-end justify-content-end gap-2">
+                  <Badge bg="info" className="p-2">{t.entries}: {money(reportData.movementsTotals.entries)} {t.currency}</Badge>
+                  <Badge bg="success" className="p-2">{t.exits}: {money(reportData.movementsTotals.exits)} {t.currency}</Badge>
                 </Col>
               </Row>
               <div className="table-responsive">
@@ -693,7 +705,6 @@ const ReportsPage = () => {
         </Card>
       )}
 
-      {/* ====== STYLE COMPACT POUR RÉDUIRE LA TAILLE DU TEXTE ====== */}
       <style>{`
         .reports-compact .card.bg-primary h6, .reports-compact .card.bg-success h6,
         .reports-compact .card.bg-info h6, .reports-compact .card.bg-warning h6,

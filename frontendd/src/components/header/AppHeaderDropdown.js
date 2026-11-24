@@ -22,7 +22,7 @@ import {
 } from '@coreui/icons'
 import CIcon from '@coreui/icons-react'
 
-import avatar8 from './../../assets/images/avatars/A.jpg'
+import avatar8 from './../../assets/images/avatars/A.png'
 
 const AppHeaderDropdown = () => {
   return (

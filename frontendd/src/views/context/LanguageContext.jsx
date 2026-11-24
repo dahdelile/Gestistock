@@ -11,7 +11,6 @@ const readLang = () => {
     return 'fr';
   }
 };
-
 const translations = {
   fr: {
     accueil: 'Accueil',
@@ -20,6 +19,7 @@ const translations = {
     categories: 'Catégories',
     marques: 'Marques',
     unites: 'Unités',
+    stock: 'Stock',
     stockEntrant: 'Stock entrant',
     achats: 'Achats',
     achat: 'Achat',
@@ -33,11 +33,12 @@ const translations = {
     partenaires: 'Partenaires',
     fournisseurs: 'Fournisseurs',
     clients: 'Clients',
-    customers: 'Custommers',
+    customers: 'Clients',
     personnel: 'Personnel',
     depenses: 'Dépenses',
-    expense: 'Expense',
+    expense: 'Dépense',
     caisse: 'Caisse',
+    Dépôts: 'Dépôts',
     rapports: 'Rapports',
     rapport: 'Les rapports',
     stockActuel: 'Stock actuel',
@@ -60,22 +61,15 @@ const translations = {
     subtitle: 'Votre portail unique pour accéder à toutes les ressources',
     applications: 'Les applications',
     noModule: 'Aucun module trouvé',
-caisse: 'Caisse',
-utilisateurs: 'Utilisateurs',
-
- fournisseurs: 'Fournisseurs',
-
   },
   ar: {
-    fournisseurs: 'الموردون',
-    utilisateurs: 'المستخدمون',
-     caisse: 'الصندوق',
     accueil: 'الرئيسية',
     produits: 'المنتجات',
     produit: 'المنتج',
     categories: 'الفئات',
     marques: 'العلامات',
     unites: 'الوحدات',
+    stock: 'المخزون',
     stockEntrant: 'المخزون الوارد',
     achats: 'المشتريات',
     achat: 'الشراء',
@@ -94,6 +88,8 @@ utilisateurs: 'Utilisateurs',
     depenses: 'المصاريف',
     expense: 'المصاريف',
     caisse: 'الصندوق',
+    deposits: 'الوديعة',
+    Dépôts: 'الوديعة',
     rapports: 'التقارير',
     rapport: 'التقارير',
     stockActuel: 'المخزون الحالي',

@@ -53,7 +53,7 @@ const getNav = (tFn) => {
     
     { component: CNavItem, name: t('rapports'), to: '/rapportss', icon: <CIcon icon={cilChart} customClassName="nav-icon" /> },
 
-
+  { component: CNavItem, name: t('Dépôts'), to:  '/depo', icon: <CIcon icon={cilInbox} customClassName="nav-icon" /> },
     {
       component: CNavGroup, name: t('parametres'), icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
       items: [

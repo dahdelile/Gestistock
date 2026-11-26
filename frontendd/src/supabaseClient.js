@@ -1,9 +1,13 @@
 //swdat
 import { createClient } from '@supabase/supabase-js';
+//s3dn
+const supabaseUrl = 'dxfukwpvcenbrpfdkqgb.supabase.co';
+const supabaseAnonKey = 'sb_publishable_KZFRKV4F1J1iTY1FUyB_Ag_QocYkg8B';
 
 
-const supabaseUrl = 'https://dbcfhnkmuxfhllihomyt.supabase.co';
-const supabaseAnonKey = 'sb_publishable_vz4cwlm243FfLJo6d8Mf5w_xSszd24a';
+//swdt
+//const supabaseUrl = 'https://dbcfhnkmuxfhllihomyt.supabase.co';
+//const supabaseAnonKey = 'sb_publishable_vz4cwlm243FfLJo6d8Mf5w_xSszd24a';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

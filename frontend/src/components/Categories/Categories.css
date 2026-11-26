@@ -1,0 +1,114 @@
+/* src/components/Categories/Categories.css */
+
+.categories-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Hover effect on cards */
+.hover-shadow {
+    transition: all 0.3s ease;
+}
+
+.hover-shadow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Category row transitions */
+.category-row {
+    transition: background-color 0.2s ease;
+}
+
+.subcategory-row {
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Toggle button for expand/collapse */
+.category-toggle {
+    transition: transform 0.2s ease;
+    color: #6c757d;
+}
+
+.category-toggle:hover {
+    color: #0d6efd;
+}
+
+/* Spin animation for refresh icon */
+.spin-animation {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Custom scrollbar for modals */
+.modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+/* Strikethrough for inactive subcategories */
+.text-decoration-line-through {
+    text-decoration-color: rgba(108, 117, 125, 0.5);
+}
+
+/* Focus improvements */
+.form-control:focus,
+.form-select:focus {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}
+
+/* Light background variant */
+.bg-light-subtle {
+    background-color: #f8f9fa !important;
+}
+
+/* Badge adjustments */
+.badge {
+    font-weight: 500;
+    padding: 0.4em 0.7em;
+}
+
+/* Modal animations */
+.modal.show {
+    animation: modalFadeIn 0.2s ease;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+    .btn-group-sm .btn {
+        padding: 0.25rem 0.4rem;
+        font-size: 0.75rem;
+    }
+
+    .table td, .table th {
+        padding: 0.5rem;
+    }
+}
